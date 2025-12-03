@@ -1,36 +1,45 @@
+import { useEffect, useState } from 'react'
+
 function AdminDashboard() {
+  const [recentTickets, setRecentTickets] = useState([])
+
+  useEffect(() => {
+    const localTickets = JSON.parse(localStorage.getItem('tickets') || '[]')
+    const mockTickets = [
+      {
+        id: 'TCK-1024',
+        category: 'WiFi',
+        room: 'A1-203',
+        status: 'In Progress',
+        statusKey: 'in-progress',
+        slaDue: 'Today 17:00',
+      },
+      {
+        id: 'TCK-1019',
+        category: 'Thiết bị',
+        room: 'Lab B3-105',
+        status: 'Overdue',
+        statusKey: 'overdue',
+        slaDue: 'Yesterday 15:30',
+      },
+      {
+        id: 'TCK-1015',
+        category: 'Vệ sinh',
+        room: 'Dorm KTX-C204',
+        status: 'Resolved',
+        statusKey: 'resolved',
+        slaDue: 'Completed',
+      },
+    ]
+    setRecentTickets([...localTickets, ...mockTickets])
+  }, [])
   const kpis = [
     { label: 'Tổng số ticket', value: 132 },
     { label: 'Đúng SLA', value: '87%' },
     { label: 'Ticket trễ hạn', value: 26 },
   ]
 
-  const recentTickets = [
-    {
-      id: 'TCK-1024',
-      category: 'WiFi',
-      room: 'A1-203',
-      status: 'In Progress',
-      statusKey: 'in-progress',
-      slaDue: 'Today 17:00',
-    },
-    {
-      id: 'TCK-1019',
-      category: 'Thiết bị',
-      room: 'Lab B3-105',
-      status: 'Overdue',
-      statusKey: 'overdue',
-      slaDue: 'Yesterday 15:30',
-    },
-    {
-      id: 'TCK-1015',
-      category: 'Vệ sinh',
-      room: 'Dorm KTX-C204',
-      status: 'Resolved',
-      statusKey: 'resolved',
-      slaDue: 'Completed',
-    },
-  ]
+
 
   return (
     <div className="page">
