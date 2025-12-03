@@ -3,6 +3,11 @@ import { useEffect, useState } from 'react'
 function AdminDashboard() {
   const [recentTickets, setRecentTickets] = useState([])
 
+  const [editingTicket, setEditingTicket] = useState(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [newStatus, setNewStatus] = useState('')
+  const [reason, setReason] = useState('')
+
   useEffect(() => {
     const localTickets = JSON.parse(localStorage.getItem('tickets') || '[]')
     const mockTickets = [
@@ -31,8 +36,65 @@ function AdminDashboard() {
         slaDue: 'Completed',
       },
     ]
-    setRecentTickets([...localTickets, ...mockTickets])
+    // Merge mock data only if not present in local storage (simple dedup by ID)
+    const localIds = new Set(localTickets.map(t => t.id))
+    const uniqueMock = mockTickets.filter(t => !localIds.has(t.id))
+
+    setRecentTickets([...localTickets, ...uniqueMock])
   }, [])
+
+  const handleEditClick = (ticket) => {
+    setEditingTicket(ticket)
+    setNewStatus(ticket.statusKey)
+    setReason(ticket.adminResponse || '')
+    setIsModalOpen(true)
+  }
+
+  const handleSaveStatus = () => {
+    if (!editingTicket) return
+
+    const statusMap = {
+      'new': 'Mới',
+      'in-progress': 'Đang xử lý',
+      'resolved': 'Đã xử lý',
+      'rejected': 'Từ chối',
+      'overdue': 'Quá hạn'
+    }
+
+    const updatedTicket = {
+      ...editingTicket,
+      statusKey: newStatus,
+      status: statusMap[newStatus],
+      adminResponse: reason
+    }
+
+    // Update in list
+    const updatedList = recentTickets.map(t =>
+      t.id === editingTicket.id ? updatedTicket : t
+    )
+    setRecentTickets(updatedList)
+
+    // Update in localStorage
+    // Note: This simple logic assumes all displayed tickets are in localStorage. 
+    // For a real app, we'd separate mock and real data better.
+    // Here we filter out mock IDs before saving if we want to persist only user tickets,
+    // but for this demo, we'll try to save everything or just update the ones that exist.
+    const localTickets = JSON.parse(localStorage.getItem('tickets') || '[]')
+    const ticketExists = localTickets.some(t => t.id === editingTicket.id)
+
+    let newLocalTickets
+    if (ticketExists) {
+      newLocalTickets = localTickets.map(t =>
+        t.id === editingTicket.id ? updatedTicket : t
+      )
+    } else {
+      // If it was a mock ticket, we add it to local storage to persist the change
+      newLocalTickets = [updatedTicket, ...localTickets]
+    }
+
+    localStorage.setItem('tickets', JSON.stringify(newLocalTickets))
+    setIsModalOpen(false)
+  }
   const kpis = [
     { label: 'Tổng số ticket', value: 132 },
     { label: 'Đúng SLA', value: '87%' },
@@ -135,6 +197,7 @@ function AdminDashboard() {
                 <th>Phòng</th>
                 <th>Trạng thái</th>
                 <th>Hạn SLA</th>
+                <th>Hành động</th>
               </tr>
             </thead>
             <tbody>
@@ -151,12 +214,61 @@ function AdminDashboard() {
                     </span>
                   </td>
                   <td>{ticket.slaDue}</td>
+                  <td>
+                    <button
+                      className="btn btn-secondary subtle"
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                      onClick={() => handleEditClick(ticket)}
+                    >
+                      Cập nhật
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
+
+      {isModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>Cập nhật trạng thái Ticket</h3>
+              <button className="close-btn" onClick={() => setIsModalOpen(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-field">
+                <label className="form-label">Trạng thái</label>
+                <select
+                  className="input"
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                >
+                  <option value="new">Mới</option>
+                  <option value="in-progress">Đang xử lý</option>
+                  <option value="resolved">Đã xử lý</option>
+                  <option value="rejected">Từ chối</option>
+                </select>
+              </div>
+              <div className="form-field">
+                <label className="form-label">Lý do / Ghi chú</label>
+                <textarea
+                  className="input textarea"
+                  rows={3}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Nhập lý do nếu từ chối hoặc ghi chú thêm..."
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Hủy</button>
+              <button className="btn btn-primary" onClick={handleSaveStatus}>Lưu thay đổi</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,43 +1,31 @@
-function StudentDashboard() {
-  const overviewStats = [
-    { label: 'Ticket đang mở', value: 3 },
-    { label: 'Đang xử lý', value: 5 },
-    { label: 'Đã xử lý', value: 18 },
-  ]
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-  const recentTickets = [
-    {
-      id: 'TCK-1024',
-      category: 'WiFi',
-      room: 'A1-203',
-      status: 'Đang xử lý',
-      statusKey: 'in-progress',
-      slaDue: 'Today 17:00',
-    },
-    {
-      id: 'TCK-1023',
-      category: 'CSVC',
-      room: 'Library 2F',
-      status: 'Mới',
-      statusKey: 'new',
-      slaDue: 'Tomorrow 10:00',
-    },
-    {
-      id: 'TCK-1019',
-      category: 'Thiết bị',
-      room: 'Lab B3-105',
-      status: 'Quá hạn',
-      statusKey: 'overdue',
-      slaDue: 'Yesterday 15:30',
-    },
-    {
-      id: 'TCK-1015',
-      category: 'Vệ sinh',
-      room: 'Dorm KTX-C204',
-      status: 'Đã xử lý',
-      statusKey: 'resolved',
-      slaDue: 'Completed',
-    },
+function StudentDashboard() {
+  const navigate = useNavigate()
+  const [recentTickets, setRecentTickets] = useState([])
+  const [stats, setStats] = useState({
+    open: 0,
+    processing: 0,
+    resolved: 0
+  })
+
+  useEffect(() => {
+    const localTickets = JSON.parse(localStorage.getItem('tickets') || '[]')
+    setRecentTickets(localTickets)
+
+    // Calculate stats
+    const open = localTickets.filter(t => t.statusKey === 'new').length
+    const processing = localTickets.filter(t => t.statusKey === 'in-progress').length
+    const resolved = localTickets.filter(t => t.statusKey === 'resolved').length
+
+    setStats({ open, processing, resolved })
+  }, [])
+
+  const overviewStats = [
+    { label: 'Ticket đang mở', value: stats.open },
+    { label: 'Đang xử lý', value: stats.processing },
+    { label: 'Đã xử lý', value: stats.resolved },
   ]
 
   const filters = ['Tất cả', 'Mới', 'Đang xử lý', 'Đã xử lý', 'Quá hạn']
@@ -51,7 +39,7 @@ function StudentDashboard() {
             Xin chào Minh 👋 – Sinh viên
           </p>
         </div>
-        <button type="button" className="btn btn-primary">
+        <button type="button" className="btn btn-primary" onClick={() => navigate('/student/create-ticket')}>
           Tạo phản ánh mới
         </button>
       </div>

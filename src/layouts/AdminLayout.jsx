@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 function AdminLayout() {
@@ -6,6 +6,25 @@ function AdminLayout() {
   const [showDropdown, setShowDropdown] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState([])
+
+  const dropdownRef = useRef(null)
+  const notifRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false)
+      }
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifications(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   useEffect(() => {
     const checkNotifications = () => {
@@ -99,7 +118,7 @@ function AdminLayout() {
             <span className="page-title-prefix">Quản trị viên</span>
           </div>
           <div className="top-bar-right">
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative' }} ref={notifRef}>
               <button
                 type="button"
                 className="icon-button"
@@ -136,6 +155,7 @@ function AdminLayout() {
             <div
               className="user-info"
               onClick={() => setShowDropdown(!showDropdown)}
+              ref={dropdownRef}
               style={{ cursor: 'pointer', position: 'relative' }}
             >
               <div className="user-avatar">A</div>

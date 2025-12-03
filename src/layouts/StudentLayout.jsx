@@ -1,9 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 function StudentLayout() {
   const navigate = useNavigate()
   const [showDropdown, setShowDropdown] = useState(false)
+  const dropdownRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   const handleLogout = () => {
     // Implement logout logic here (e.g., clear tokens)
@@ -24,6 +38,7 @@ function StudentLayout() {
           <div
             className="user-info"
             onClick={() => setShowDropdown(!showDropdown)}
+            ref={dropdownRef}
             style={{ cursor: 'pointer', position: 'relative' }}
           >
             <div className="user-avatar">M</div>
@@ -33,6 +48,9 @@ function StudentLayout() {
             </div>
             {showDropdown && (
               <div className="user-dropdown">
+                <button onClick={() => navigate('/student/my-tickets')} className="user-dropdown-item">
+                  Ticket của tôi
+                </button>
                 <button onClick={handleLogout} className="user-dropdown-item">
                   Đăng xuất
                 </button>
