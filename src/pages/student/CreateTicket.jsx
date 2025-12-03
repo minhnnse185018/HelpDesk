@@ -4,10 +4,10 @@ function CreateTicket() {
       <div className="page-header">
         <div>
           <h2 className="page-title">
-            Create New Ticket / Tạo phản ánh mới
+            Tạo phản ánh mới
           </h2>
           <p className="page-subtitle">
-            Describe your facility, WiFi or equipment issue.
+            Bạn gặp vấn đề về trang thiết bị, cơ sở vật chất trong khuôn viên trường? Hãy tạo phản ánh ngay!
           </p>
         </div>
       </div>
@@ -17,7 +17,7 @@ function CreateTicket() {
           <div className="form-grid">
             <div className="form-field">
               <label className="form-label">
-                Category / Loại phản ánh
+                Loại phản ánh
               </label>
               <select className="input">
                 <option>CSVC</option>
@@ -29,34 +29,34 @@ function CreateTicket() {
 
             <div className="form-field">
               <label className="form-label">
-                Priority / Mức độ ưu tiên
+                Mức độ ưu tiên
               </label>
               <select className="input">
-                <option>Low / Thấp</option>
-                <option>Medium / Trung bình</option>
-                <option>High / Cao</option>
-                <option>Urgent / Khẩn cấp</option>
+                <option> Thấp</option>
+                <option>Trung bình</option>
+                <option>Cao</option>
+                <option>Khẩn cấp</option>
               </select>
             </div>
 
             <div className="form-field">
-              <label className="form-label">Room / Phòng</label>
+              <label className="form-label">Phòng</label>
               <div className="input-group">
                 <input
                   type="text"
                   className="input"
-                  placeholder="Building / Tòa nhà (vd. A1)"
+                  placeholder="Tòa nhà (anhpha, beta, gamma,...)"
                 />
                 <input
                   type="text"
                   className="input"
-                  placeholder="Room / Phòng (vd. 203)"
+                  placeholder="Phòng (202, 203,...)"
                 />
               </div>
             </div>
 
             <div className="form-field">
-              <label className="form-label">Department / Bộ phận</label>
+              <label className="form-label">Bộ phận</label>
               <select className="input">
                 <option>IT</option>
                 <option>CSVC</option>
@@ -66,29 +66,29 @@ function CreateTicket() {
 
             <div className="form-field full-width">
               <label className="form-label">
-                Title / Tiêu đề vấn đề
+                Tiêu đề vấn đề
               </label>
               <input
                 type="text"
                 className="input"
-                placeholder="Short summary / Tóm tắt ngắn"
+                placeholder="Tóm tắt vấn đề"
               />
             </div>
 
             <div className="form-field full-width">
               <label className="form-label">
-                Description / Mô tả chi tiết
+                Mô tả chi tiết vấn đề
               </label>
               <textarea
                 className="input textarea"
                 rows={4}
-                placeholder="Provide more details about the issue / Mô tả chi tiết vấn đề"
+                placeholder="Điều hòa, tivi không hoạt động, lỗi wifi,..."
               />
             </div>
 
             <div className="form-field full-width">
               <label className="form-label">
-                Attachment / Ảnh đính kèm
+                Ảnh đính kèm
               </label>
               <div className="upload-area">
                 <span className="upload-icon">📎</span>
@@ -106,15 +106,15 @@ function CreateTicket() {
 
           <div className="form-footer">
             <div className="sla-hint">
-              Expected response time based on SLA / Thời gian phản hồi dự kiến
+              Thời gian phản hồi dự kiến
               theo SLA
             </div>
             <div className="form-actions">
               <button type="button" className="btn btn-secondary">
-                Cancel / Hủy
+                Hủy
               </button>
               <button type="button" className="btn btn-primary">
-                Submit Ticket / Gửi phản ánh
+                Gửi phản ánh
               </button>
             </div>
           </div>

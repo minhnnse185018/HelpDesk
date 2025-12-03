@@ -1,7 +1,14 @@
+import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 function StudentLayout() {
   const navigate = useNavigate()
+  const [showDropdown, setShowDropdown] = useState(false)
+
+  const handleLogout = () => {
+    // Implement logout logic here (e.g., clear tokens)
+    navigate('/login')
+  }
 
   return (
     <div className="app-shell">
@@ -14,12 +21,23 @@ function StudentLayout() {
           </div>
         </div>
         <div className="top-bar-right">
-          <div className="user-info">
+          <div
+            className="user-info"
+            onClick={() => setShowDropdown(!showDropdown)}
+            style={{ cursor: 'pointer', position: 'relative' }}
+          >
             <div className="user-avatar">M</div>
             <div className="user-meta">
               <span className="user-name">Minh</span>
-              <span className="user-role">Student / Sinh viên</span>
+              <span className="user-role">Sinh viên</span>
             </div>
+            {showDropdown && (
+              <div className="user-dropdown">
+                <button onClick={handleLogout} className="user-dropdown-item">
+                  Đăng xuất
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -31,7 +49,7 @@ function StudentLayout() {
             `top-nav-link ${isActive ? 'top-nav-link-active' : ''}`
           }
         >
-          Dashboard
+          Bảng điều khiển
         </NavLink>
         <NavLink
           to="/student/my-tickets"
@@ -39,7 +57,7 @@ function StudentLayout() {
             `top-nav-link ${isActive ? 'top-nav-link-active' : ''}`
           }
         >
-          My Tickets / Ticket của tôi
+          Ticket của tôi
         </NavLink>
         <NavLink
           to="/student/create-ticket"
@@ -47,7 +65,7 @@ function StudentLayout() {
             `top-nav-link ${isActive ? 'top-nav-link-active' : ''}`
           }
         >
-          Create Ticket / Tạo phản ánh
+          Tạo phản ánh
         </NavLink>
       </nav>
 

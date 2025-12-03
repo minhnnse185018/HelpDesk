@@ -1,8 +1,8 @@
 function AdminDashboard() {
   const kpis = [
-    { label: 'Total Tickets / Tổng số ticket', value: 132 },
-    { label: 'On-time SLA / Đúng SLA', value: '87%' },
-    { label: 'Overdue Tickets / Ticket trễ hạn', value: 26 },
+    { label: 'Tổng số ticket', value: 132 },
+    { label: 'Đúng SLA', value: '87%' },
+    { label: 'Ticket trễ hạn', value: 26 },
   ]
 
   const recentTickets = [
@@ -36,9 +36,9 @@ function AdminDashboard() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h2 className="page-title">Admin Dashboard</h2>
+          <h2 className="page-title">Bảng điều khiển quản trị</h2>
           <p className="page-subtitle">
-            Overview of tickets, SLA performance and recent activity.
+            Tổng quan về ticket, hiệu suất SLA và hoạt động gần đây.
           </p>
         </div>
       </div>
@@ -57,7 +57,7 @@ function AdminDashboard() {
       <section className="section section-grid-two">
         <div className="card chart-card">
           <h3 className="section-title">
-            Tickets by Category / Ticket theo loại
+            Ticket theo loại
           </h3>
           <div className="chart-placeholder bar-chart">
             <div className="bar-row">
@@ -93,18 +93,18 @@ function AdminDashboard() {
 
         <div className="card chart-card">
           <h3 className="section-title">
-            SLA Status / Trạng thái SLA
+            Trạng thái SLA
           </h3>
           <div className="chart-placeholder donut-chart">
             <div className="donut" />
             <div className="donut-legend">
               <div className="legend-item">
                 <span className="legend-dot legend-dot-green" />
-                <span>On-time / Đúng SLA</span>
+                <span>Đúng SLA</span>
               </div>
               <div className="legend-item">
                 <span className="legend-dot legend-dot-red" />
-                <span>Overdue / Trễ hạn</span>
+                <span>Trễ hạn</span>
               </div>
             </div>
           </div>
@@ -115,17 +115,17 @@ function AdminDashboard() {
         <div className="card table-card">
           <div className="section-header">
             <h3 className="section-title">
-              Recent Tickets / Ticket gần đây
+              Ticket gần đây
             </h3>
           </div>
           <table className="table">
             <thead>
               <tr>
-                <th>Ticket ID</th>
-                <th>Category / Loại</th>
-                <th>Room / Phòng</th>
-                <th>Status / Trạng thái</th>
-                <th>SLA Due / Hạn SLA</th>
+                <th>Mã Ticket</th>
+                <th>Loại</th>
+                <th>Phòng</th>
+                <th>Trạng thái</th>
+                <th>Hạn SLA</th>
               </tr>
             </thead>
             <tbody>

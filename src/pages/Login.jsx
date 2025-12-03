@@ -21,7 +21,7 @@ function Login() {
           <div className="wifi-shape" />
           <div className="tools-shape" />
           <p className="login-illustration-text">
-            Modern Campus Facilities
+            Cơ sở vật chất hiện đại
             <br />
             Hạ tầng CSVC, WiFi, thiết bị
           </p>
@@ -32,7 +32,7 @@ function Login() {
             <div className="app-logo">FH</div>
             <div>
               <h1 className="login-title">
-                Facility Feedback &amp; Helpdesk Request System
+                Hệ thống phản ánh & Helpdesk
               </h1>
               <p className="login-subtitle">
                 Hệ thống phản ánh CSVC, WiFi, thiết bị
@@ -43,7 +43,7 @@ function Login() {
           <form className="login-form" onSubmit={handleStudentLogin}>
             <div className="form-field">
               <label htmlFor="identifier" className="form-label">
-                Email or Student ID / Email hoặc MSSV
+                Email hoặc MSSV
               </label>
               <input
                 id="identifier"
@@ -55,7 +55,7 @@ function Login() {
 
             <div className="form-field">
               <label htmlFor="password" className="form-label">
-                Password / Mật khẩu
+                Mật khẩu
               </label>
               <input
                 id="password"
@@ -66,19 +66,19 @@ function Login() {
             </div>
 
             <button type="submit" className="btn btn-primary full-width">
-              Login / Đăng nhập
+              Đăng nhập
             </button>
 
             <div className="login-footer-links">
               <button type="button" className="link-button">
-                Forgot password? / Quên mật khẩu?
+                Quên mật khẩu?
               </button>
               <button
                 type="button"
                 className="link-button small"
                 onClick={handleAdminLogin}
               >
-                Login as Admin / Đăng nhập quản trị
+                Đăng nhập quản trị
               </button>
             </div>
           </form>

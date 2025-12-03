@@ -1,7 +1,13 @@
+import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 function AdminLayout() {
   const navigate = useNavigate()
+  const [showDropdown, setShowDropdown] = useState(false)
+
+  const handleLogout = () => {
+    navigate('/login')
+  }
 
   return (
     <div className="app-shell app-shell-admin">
@@ -9,7 +15,7 @@ function AdminLayout() {
         <div className="sidebar-header" onClick={() => navigate('/admin/dashboard')}>
           <div className="app-logo">FH</div>
           <div className="app-title-group">
-            <span className="app-title-short">Facility Helpdesk</span>
+            <span className="app-title-short">Helpdesk</span>
           </div>
         </div>
         <nav className="sidebar-nav">
@@ -19,7 +25,7 @@ function AdminLayout() {
               `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
             }
           >
-            Dashboard
+            Bảng điều khiển
           </NavLink>
           <NavLink
             to="/admin/tickets"
@@ -27,7 +33,7 @@ function AdminLayout() {
               `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
             }
           >
-            Tickets
+            Quản lý Ticket
           </NavLink>
           <NavLink
             to="/admin/categories"
@@ -35,7 +41,7 @@ function AdminLayout() {
               `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
             }
           >
-            Categories
+            Danh mục
           </NavLink>
           <NavLink
             to="/admin/rooms-departments"
@@ -43,7 +49,7 @@ function AdminLayout() {
               `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
             }
           >
-            Rooms &amp; Departments
+            Phòng & Ban
           </NavLink>
           <NavLink
             to="/admin/reports"
@@ -51,7 +57,7 @@ function AdminLayout() {
               `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
             }
           >
-            Reports
+            Báo cáo
           </NavLink>
         </nav>
       </aside>
@@ -59,7 +65,7 @@ function AdminLayout() {
       <div className="app-main">
         <header className="top-bar top-bar-admin">
           <div className="top-bar-left">
-            <span className="page-title-prefix">Admin</span>
+            <span className="page-title-prefix">Quản trị viên</span>
           </div>
           <div className="top-bar-right">
             <button
@@ -69,12 +75,23 @@ function AdminLayout() {
             >
               🔔
             </button>
-            <div className="user-info">
+            <div
+              className="user-info"
+              onClick={() => setShowDropdown(!showDropdown)}
+              style={{ cursor: 'pointer', position: 'relative' }}
+            >
               <div className="user-avatar">A</div>
               <div className="user-meta">
                 <span className="user-name">Admin</span>
-                <span className="user-role">Facility Admin / Quản trị</span>
+                <span className="user-role">Quản trị viên</span>
               </div>
+              {showDropdown && (
+                <div className="user-dropdown">
+                  <button onClick={handleLogout} className="user-dropdown-item">
+                    Đăng xuất
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>

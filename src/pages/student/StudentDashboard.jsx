@@ -1,8 +1,8 @@
 function StudentDashboard() {
   const overviewStats = [
-    { label: 'Open Tickets / Ticket đang mở', value: 3 },
-    { label: 'In Progress / Đang xử lý', value: 5 },
-    { label: 'Resolved / Đã xử lý', value: 18 },
+    { label: 'Ticket đang mở', value: 3 },
+    { label: 'Đang xử lý', value: 5 },
+    { label: 'Đã xử lý', value: 18 },
   ]
 
   const recentTickets = [
@@ -40,19 +40,19 @@ function StudentDashboard() {
     },
   ]
 
-  const filters = ['All', 'New', 'In Progress', 'Resolved', 'Overdue']
+  const filters = ['Tất cả', 'Mới', 'Đang xử lý', 'Đã xử lý', 'Quá hạn']
 
   return (
     <div className="page">
       <div className="page-header">
         <div>
-          <h2 className="page-title">Student Dashboard</h2>
+          <h2 className="page-title">Bảng điều khiển sinh viên</h2>
           <p className="page-subtitle">
-            Hi Minh 👋 – Student / Sinh viên
+            Xin chào Minh 👋 – Sinh viên
           </p>
         </div>
         <button type="button" className="btn btn-primary">
-          Create New Ticket / Tạo phản ánh mới
+          Tạo phản ánh mới
         </button>
       </div>
 
@@ -70,7 +70,7 @@ function StudentDashboard() {
       <section className="section">
         <div className="section-header">
           <h3 className="section-title">
-            Recent Tickets / Ticket gần đây
+            Ticket gần đây
           </h3>
           <div className="filter-pills">
             {filters.map((filter) => (
@@ -85,11 +85,11 @@ function StudentDashboard() {
           <table className="table">
             <thead>
               <tr>
-                <th>Ticket ID</th>
-                <th>Category / Loại</th>
-                <th>Room / Phòng</th>
-                <th>Status / Trạng thái</th>
-                <th>SLA Due / Hạn SLA</th>
+                <th>Mã Ticket</th>
+                <th>Loại</th>
+                <th>Phòng</th>
+                <th>Trạng thái</th>
+                <th>Hạn SLA</th>
               </tr>
             </thead>
             <tbody>
