@@ -1,12 +1,43 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 function AdminLayout() {
   const navigate = useNavigate()
   const [showDropdown, setShowDropdown] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [notifications, setNotifications] = useState([])
+
+  useEffect(() => {
+    const checkNotifications = () => {
+      const tickets = JSON.parse(localStorage.getItem('tickets') || '[]')
+      const unread = tickets.filter(t => t.isRead === false)
+      setNotifications(unread)
+    }
+
+    checkNotifications()
+    // Poll every 2 seconds to check for new tickets
+    const interval = setInterval(checkNotifications, 2000)
+    return () => clearInterval(interval)
+  }, [])
 
   const handleLogout = () => {
     navigate('/login')
+  }
+
+  const handleNotificationClick = (ticketId) => {
+    // Mark as read
+    const tickets = JSON.parse(localStorage.getItem('tickets') || '[]')
+    const updatedTickets = tickets.map(t =>
+      t.id === ticketId ? { ...t, isRead: true } : t
+    )
+    localStorage.setItem('tickets', JSON.stringify(updatedTickets))
+
+    // Update local state
+    setNotifications(prev => prev.filter(t => t.id !== ticketId))
+    setShowNotifications(false)
+
+    // Navigate to dashboard (or ticket detail if implemented)
+    navigate('/admin/dashboard')
   }
 
   return (
@@ -68,13 +99,40 @@ function AdminLayout() {
             <span className="page-title-prefix">Quản trị viên</span>
           </div>
           <div className="top-bar-right">
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Notifications"
-            >
-              🔔
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Notifications"
+                onClick={() => setShowNotifications(!showNotifications)}
+              >
+                🔔
+                {notifications.length > 0 && (
+                  <span className="notification-badge">{notifications.length}</span>
+                )}
+              </button>
+              {showNotifications && (
+                <div className="notification-dropdown">
+                  <div className="notification-header">Thông báo</div>
+                  {notifications.length === 0 ? (
+                    <div className="notification-empty">Không có thông báo mới</div>
+                  ) : (
+                    <div className="notification-list">
+                      {notifications.map(ticket => (
+                        <div
+                          key={ticket.id}
+                          className="notification-item"
+                          onClick={() => handleNotificationClick(ticket.id)}
+                        >
+                          <div className="notification-title">Ticket mới: {ticket.title}</div>
+                          <div className="notification-time">{new Date(ticket.timestamp).toLocaleTimeString()}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <div
               className="user-info"
               onClick={() => setShowDropdown(!showDropdown)}

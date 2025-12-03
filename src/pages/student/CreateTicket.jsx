@@ -46,7 +46,7 @@ function CreateTicket() {
       id: `TCK-${Math.floor(1000 + Math.random() * 9000)}`,
       category: formData.category,
       room: `${formData.building}-${formData.room}`,
-      status: 'New',
+      status: 'Mới',
       statusKey: 'new',
       slaDue: 'Tomorrow 10:00', // Mock SLA
       title: formData.title,
@@ -54,6 +54,7 @@ function CreateTicket() {
       department: formData.department === 'Khác' ? formData.customDepartment : formData.department,
       priority: formData.priority,
       fileNames: formData.files.map(f => f.name),
+      isRead: false,
       timestamp: new Date().toISOString()
     }
 
