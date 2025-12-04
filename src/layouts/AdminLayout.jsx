@@ -1,12 +1,37 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useState } from "react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { logout } from "../api/auth";
+import { useAuthProfile } from "../hooks/useAuthProfile";
+import ProfileModal from "../components/ProfileModal";
 
 function AdminLayout() {
-  const navigate = useNavigate()
-
+  const navigate = useNavigate();
+  const { profile, refreshProfile } = useAuthProfile();
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const displayName = profile.name || "Admin";
+  const displayRole = profile.role || "ADMIN";
+  const displayAvatar = displayName.charAt(0).toUpperCase() || "A";
+  const handleLogout = async () => {
+    const refreshToken = localStorage.getItem("refreshToken");
+    try {
+      if (refreshToken) await logout({ refreshToken });
+    } catch (error) {
+      // Ignore logout API errors; still clear client state.
+      console.error("Logout failed:", error?.message || error);
+    }
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("role");
+    localStorage.removeItem("username");
+    navigate("/login", { replace: true });
+  };
   return (
     <div className="app-shell app-shell-admin">
       <aside className="sidebar">
-        <div className="sidebar-header" onClick={() => navigate('/admin/dashboard')}>
+        <div
+          className="sidebar-header"
+          onClick={() => navigate("/admin/dashboard")}
+        >
           <div className="app-logo">FH</div>
           <div className="app-title-group">
             <span className="app-title-short">Facility Helpdesk</span>
@@ -16,7 +41,7 @@ function AdminLayout() {
           <NavLink
             to="/admin/dashboard"
             className={({ isActive }) =>
-              `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+              `sidebar-link ${isActive ? "sidebar-link-active" : ""}`
             }
           >
             Dashboard
@@ -24,7 +49,7 @@ function AdminLayout() {
           <NavLink
             to="/admin/tickets"
             className={({ isActive }) =>
-              `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+              `sidebar-link ${isActive ? "sidebar-link-active" : ""}`
             }
           >
             Tickets
@@ -32,7 +57,7 @@ function AdminLayout() {
           <NavLink
             to="/admin/categories"
             className={({ isActive }) =>
-              `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+              `sidebar-link ${isActive ? "sidebar-link-active" : ""}`
             }
           >
             Categories
@@ -40,7 +65,7 @@ function AdminLayout() {
           <NavLink
             to="/admin/rooms-departments"
             className={({ isActive }) =>
-              `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+              `sidebar-link ${isActive ? "sidebar-link-active" : ""}`
             }
           >
             Rooms &amp; Departments
@@ -48,7 +73,7 @@ function AdminLayout() {
           <NavLink
             to="/admin/reports"
             className={({ isActive }) =>
-              `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+              `sidebar-link ${isActive ? "sidebar-link-active" : ""}`
             }
           >
             Reports
@@ -62,29 +87,39 @@ function AdminLayout() {
             <span className="page-title-prefix">Admin</span>
           </div>
           <div className="top-bar-right">
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Notifications"
+            <div
+              className="user-info"
+              onClick={() => setShowProfileModal(true)}
+              style={{ cursor: "pointer" }}
             >
-              🔔
-            </button>
-            <div className="user-info">
-              <div className="user-avatar">A</div>
+              <div className="user-avatar">{displayAvatar}</div>
               <div className="user-meta">
-                <span className="user-name">Admin</span>
-                <span className="user-role">Facility Admin / Quản trị</span>
+                <span className="user-name">{displayName}</span>
+                <span className="user-role">{displayRole}</span>
               </div>
             </div>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleLogout}
+            >
+              Logout
+            </button>
           </div>
         </header>
 
         <main className="app-content">
-          <Outlet />
+          <Outlet context={{ profile }} />
         </main>
+
+        <ProfileModal
+          open={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          onUpdated={refreshProfile}
+        />
       </div>
     </div>
-  )
+  );
 }
 
-export default AdminLayout
+export default AdminLayout;

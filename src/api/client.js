@@ -6,13 +6,14 @@
 const getBaseUrl = () => {
   const fromEnv = import.meta.env.VITE_API_BASE_URL
   if (fromEnv && typeof fromEnv === 'string') {
-    return fromEnv.replace(/\/$/, '')
+    return fromEnv.trim().replace(/\/$/, '')
   }
   console.warn(
     'VITE_API_BASE_URL is not set; falling back to http://localhost:8080/api'
   )
   return 'http://localhost:8080/api'
 }
+
 
 const buildUrl = (path) => {
   const normalizedPath = String(path || '').replace(/^\//, '')
@@ -26,6 +27,15 @@ const prepareBody = (body) => {
   return JSON.stringify(body)
 }
 
+const getAccessToken = () => {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    return localStorage.getItem('accessToken')
+  } catch (_err) {
+    return null
+  }
+}
+
 const defaultHeaders = (body) =>
   body instanceof FormData
     ? {}
@@ -37,23 +47,54 @@ const defaultHeaders = (body) =>
 async function request(path, options = {}) {
   const { method = 'GET', headers, body, ...rest } = options
   const payload = prepareBody(body)
-  const response = await fetch(buildUrl(path), {
-    method,
-    body: payload,
-    headers: {
-      ...defaultHeaders(body),
-      ...headers,
-    },
-    ...rest,
-  })
+  const url = buildUrl(path)
+  const token = getAccessToken()
+
+  let response
+  try {
+    response = await fetch(url, {
+      method,
+      body: payload,
+      headers: {
+        ...defaultHeaders(body),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+      ...rest,
+    })
+  } catch (err) {
+    // Typically CORS or network issues
+    throw new Error(`Network error calling ${url}: ${err.message}`)
+  }
 
   if (!response.ok) {
-    const message = await response
-      .text()
-      .catch(() => `HTTP ${response.status}`)
-    throw new Error(
-      `API request failed: ${response.status} ${response.statusText} - ${message}`
-    )
+    const contentType = response.headers.get('content-type') || ''
+    let apiMessage = ''
+
+    if (contentType.includes('application/json')) {
+      try {
+        const data = await response.json()
+        apiMessage =
+          data?.message ||
+          data?.error ||
+          (typeof data === 'string' ? data : '') ||
+          ''
+      } catch (_) {
+        apiMessage = ''
+      }
+    }
+
+    if (!apiMessage) {
+      apiMessage = await response.text().catch(() => '')
+    }
+
+    const finalMessage =
+      apiMessage?.toString().trim() ||
+      response.statusText ||
+      `HTTP ${response.status}` ||
+      'Error'
+
+    throw new Error(finalMessage)
   }
 
   if (response.status === 204) return null

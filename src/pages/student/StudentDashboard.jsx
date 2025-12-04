@@ -1,4 +1,15 @@
+import { useOutletContext } from 'react-router-dom'
+
 function StudentDashboard() {
+  const outletContext = useOutletContext() || {}
+  const profile = outletContext.profile || {}
+  const nameFromStorage =
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('username') || localStorage.getItem('email')
+      : ''
+  const displayName = profile.name || nameFromStorage || 'User'
+  const displayRole = profile.role || 'Student'
+
   const overviewStats = [
     { label: 'Open Tickets / Ticket đang mở', value: 3 },
     { label: 'In Progress / Đang xử lý', value: 5 },
@@ -48,7 +59,7 @@ function StudentDashboard() {
         <div>
           <h2 className="page-title">Student Dashboard</h2>
           <p className="page-subtitle">
-            Hi Minh 👋 – Student / Sinh viên
+            Hi {displayName} 👋 – {displayRole}
           </p>
         </div>
         <button type="button" className="btn btn-primary">

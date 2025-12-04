@@ -421,6 +421,16 @@
   margin-bottom: 0.75rem;
 }
 
+.form-error {
+  color: #b91c1c;
+  font-size: 0.78rem;
+}
+
+.form-success {
+  color: #15803d;
+  font-size: 0.8rem;
+}
+
 .form-label {
   font-size: 0.8rem;
   font-weight: 500;

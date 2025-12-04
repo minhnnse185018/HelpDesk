@@ -1,7 +1,33 @@
+import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { logout } from '../api/auth'
+import { useAuthProfile } from '../hooks/useAuthProfile'
+import ProfileModal from '../components/ProfileModal'
 
 function StudentLayout() {
   const navigate = useNavigate()
+  const { profile, refreshProfile } = useAuthProfile()
+  const displayName = profile.name || 'User'
+  const displayRole = profile.role
+    ? profile.role.charAt(0) + profile.role.slice(1).toLowerCase()
+    : 'Student'
+  const displayAvatar = displayName.charAt(0).toUpperCase() || 'U'
+  const [showProfileModal, setShowProfileModal] = useState(false)
+
+  const handleLogout = async () => {
+    const refreshToken = localStorage.getItem('refreshToken')
+    try {
+      if (refreshToken) await logout({ refreshToken })
+    } catch (error) {
+      // Ignore logout API errors; still clear client state.
+      console.error('Logout failed:', error?.message || error)
+    }
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('refreshToken')
+    localStorage.removeItem('role')
+    localStorage.removeItem('username')
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="app-shell">
@@ -14,16 +40,24 @@ function StudentLayout() {
           </div>
         </div>
         <div className="top-bar-right">
-          <div className="user-info">
-            <div className="user-avatar">M</div>
+          <div className="user-info" onClick={() => setShowProfileModal(true)}>
+            <div className="user-avatar">{displayAvatar}</div>
             <div className="user-meta">
-              <span className="user-name">Minh</span>
-              <span className="user-role">Student / Sinh viên</span>
+              <span className="user-name">{displayName}</span>
+              <span className="user-role">{displayRole}</span>
             </div>
           </div>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleLogout}
+          >
+            Logout
+          </button>
         </div>
-      </header>
 
+      </header>
+  
       <nav className="top-nav-links">
         <NavLink
           to="/student/dashboard"
@@ -52,8 +86,14 @@ function StudentLayout() {
       </nav>
 
       <main className="app-content">
-        <Outlet />
+        <Outlet context={{ profile }} />
       </main>
+
+      <ProfileModal
+        open={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        onUpdated={refreshProfile}
+      />
     </div>
   )
 }

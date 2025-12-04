@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import StudentLayout from './layouts/StudentLayout.jsx'
 import AdminLayout from './layouts/AdminLayout.jsx'
 import Login from './pages/Login.jsx'
+import Register from './pages/Register.jsx'
+import VerifyEmail from './pages/VerifyEmail.jsx'
 import StudentDashboard from './pages/student/StudentDashboard.jsx'
 import CreateTicket from './pages/student/CreateTicket.jsx'
 import MyTickets from './pages/student/MyTickets.jsx'
@@ -10,6 +12,8 @@ import TicketManagement from './pages/admin/TicketManagement.jsx'
 import CategoryManagement from './pages/admin/CategoryManagement.jsx'
 import RoomsDepartments from './pages/admin/RoomsDepartments.jsx'
 import Reports from './pages/admin/Reports.jsx'
+import RequireRoles from './components/RequireRoles.jsx'
+import ForgotPassword from './pages/ForgotPassword.jsx'
 import './App.css'
 
 function App() {
@@ -18,15 +22,32 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
-        <Route path="/student" element={<StudentLayout />}>
+        <Route
+          path="/student"
+          element={
+            <RequireRoles allowedRoles={['STUDENT', 'STAFF']}>
+              <StudentLayout />
+            </RequireRoles>
+          }
+        >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<StudentDashboard />} />
           <Route path="create-ticket" element={<CreateTicket />} />
           <Route path="my-tickets" element={<MyTickets />} />
         </Route>
 
-        <Route path="/admin" element={<AdminLayout />}>
+        <Route
+          path="/admin"
+          element={
+            <RequireRoles allowedRoles={['ADMIN']}>
+              <AdminLayout />
+            </RequireRoles>
+          }
+        >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="tickets" element={<TicketManagement />} />
