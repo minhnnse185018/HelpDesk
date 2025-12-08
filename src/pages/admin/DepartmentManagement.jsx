@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiClient } from '../../api/client'
 
-function CategoryManagement() {
-  const [categories, setCategories] = useState([])
+function DepartmentManagement() {
   const [departments, setDepartments] = useState([])
   const [selectedId, setSelectedId] = useState(null)
-  const [selectedCategory, setSelectedCategory] = useState(null)
+  const [selectedDepartment, setSelectedDepartment] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
@@ -20,76 +19,59 @@ function CategoryManagement() {
     name: '',
     code: '',
     description: '',
-    departmentId: '',
     isActive: true,
   })
 
-  // Load departments for dropdown
+  // Load departments list
   const loadDepartments = useCallback(async () => {
+    setLoading(true)
+    setError('')
     try {
       const response = await apiClient.get('/api/v1/departments')
       const departmentsData = response?.data || {}
+      // Convert object to array if needed
       const departmentsList = Array.isArray(departmentsData) 
         ? departmentsData 
         : Object.values(departmentsData).filter(Boolean)
       setDepartments(departmentsList)
-    } catch (err) {
-      console.error('Failed to load departments:', err)
-    }
-  }, [])
-
-  // Load categories list
-  const loadCategories = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const response = await apiClient.get('/api/v1/categories')
-      const categoriesData = response?.data || {}
-      // Convert object to array
-      const categoriesList = Array.isArray(categoriesData) 
-        ? categoriesData 
-        : Object.values(categoriesData).filter(Boolean)
-      setCategories(categoriesList)
-      if (!selectedId && categoriesList.length > 0) {
-        setSelectedId(categoriesList[0].id)
+      if (!selectedId && departmentsList.length > 0) {
+        setSelectedId(departmentsList[0].id)
       }
     } catch (err) {
-      setError(err?.message || 'Failed to load categories')
+      setError(err?.message || 'Failed to load departments')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  // Load selected category details
-  const loadSelectedCategory = useCallback(async () => {
+  // Load selected department details
+  const loadSelectedDepartment = useCallback(async () => {
     if (!selectedId) return
     setActionError('')
     try {
-      const response = await apiClient.get(`/api/v1/categories/${selectedId}`)
-      const category = response?.data || null
-      setSelectedCategory(category)
-      if (category) {
+      const response = await apiClient.get(`/api/v1/departments/${selectedId}`)
+      const dept = response?.data || null
+      setSelectedDepartment(dept)
+      if (dept) {
         setFormData({
-          name: category.name || '',
-          code: category.code || '',
-          description: category.description || '',
-          departmentId: category.departmentId || '',
-          isActive: category.isActive ?? true,
+          name: dept.name || '',
+          code: dept.code || '',
+          description: dept.description || '',
+          isActive: dept.isActive ?? true,
         })
       }
     } catch (err) {
-      setActionError(err?.message || 'Failed to load category details')
+      setActionError(err?.message || 'Failed to load department details')
     }
   }, [selectedId])
 
   useEffect(() => {
     loadDepartments()
-    loadCategories()
-  }, [loadDepartments, loadCategories])
+  }, [loadDepartments])
 
   useEffect(() => {
-    loadSelectedCategory()
-  }, [loadSelectedCategory])
+    loadSelectedDepartment()
+  }, [loadSelectedDepartment])
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -100,40 +82,40 @@ function CategoryManagement() {
     }))
   }
 
-  // Create new category
+  // Create new department
   const handleCreate = async (e) => {
     e.preventDefault()
     setCreating(true)
     setActionError('')
     try {
-      await apiClient.post('/api/v1/categories', formData)
+      await apiClient.post('/api/v1/departments', formData)
       setShowCreateModal(false)
-      setFormData({ name: '', code: '', description: '', departmentId: '', isActive: true })
-      await loadCategories()
+      setFormData({ name: '', code: '', description: '', isActive: true })
+      await loadDepartments()
     } catch (err) {
-      setActionError(err?.message || 'Failed to create category')
+      setActionError(err?.message || 'Failed to create department')
     } finally {
       setCreating(false)
     }
   }
 
-  // Update category
+  // Update department
   const handleUpdate = async (e) => {
     e.preventDefault()
     if (!selectedId) return
     setUpdating(true)
     setActionError('')
     try {
-      await apiClient.put(`/api/v1/categories/${selectedId}`, formData)
-      await Promise.all([loadCategories(), loadSelectedCategory()])
+      await apiClient.put(`/api/v1/departments/${selectedId}`, formData)
+      await Promise.all([loadDepartments(), loadSelectedDepartment()])
     } catch (err) {
-      setActionError(err?.message || 'Failed to update category')
+      setActionError(err?.message || 'Failed to update department')
     } finally {
       setUpdating(false)
     }
   }
 
-  // Delete category
+  // Delete department
   const handleDelete = () => {
     if (!selectedId) return
     setShowDeleteModal(true)
@@ -144,39 +126,34 @@ function CategoryManagement() {
     setDeleting(true)
     setActionError('')
     try {
-      await apiClient.delete(`/api/v1/categories/${selectedId}`)
-      setSelectedCategory(null)
+      await apiClient.delete(`/api/v1/departments/${selectedId}`)
+      setSelectedDepartment(null)
       setSelectedId(null)
-      await loadCategories()
+      await loadDepartments()
     } catch (err) {
-      setActionError(err?.message || 'Failed to delete category')
+      setActionError(err?.message || 'Failed to delete department')
     } finally {
       setDeleting(false)
     }
   }
 
   const openCreateModal = () => {
-    setFormData({ name: '', code: '', description: '', departmentId: '', isActive: true })
+    setFormData({ name: '', code: '', description: '', isActive: true })
     setActionError('')
     setShowCreateModal(true)
-  }
-
-  const getDepartmentName = (departmentId) => {
-    const dept = departments.find(d => d.id === departmentId)
-    return dept?.name || '—'
   }
 
   return (
     <div className="page page-with-panel">
       <div className="page-header">
         <div>
-          <h2 className="page-title">Category Management</h2>
+          <h2 className="page-title">Department Management</h2>
           <p className="page-subtitle">
-            Create, view, update, and delete categories.
+            Create, view, update, and delete departments.
           </p>
         </div>
         <button className="btn btn-primary" onClick={openCreateModal}>
-          Create Category
+          Create Department
         </button>
       </div>
 
@@ -185,7 +162,7 @@ function CategoryManagement() {
           <div className="filter-bar">
             <div className="filter-bar-main">
               <span className="filter-hint">
-                Total Categories: {categories.length}
+                Total Departments: {departments.length}
               </span>
             </div>
             {error && <div className="form-error">{error}</div>}
@@ -197,31 +174,31 @@ function CategoryManagement() {
                 <tr>
                   <th>Code</th>
                   <th>Name</th>
-                  <th>Department</th>
+                  <th>Description</th>
                   <th>Active</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={4}>Loading categories...</td>
+                    <td colSpan={4}>Loading departments...</td>
                   </tr>
-                ) : categories.length === 0 ? (
+                ) : departments.length === 0 ? (
                   <tr>
-                    <td colSpan={4}>No categories found.</td>
+                    <td colSpan={4}>No departments found.</td>
                   </tr>
                 ) : (
-                  categories.map((category) => (
+                  departments.map((dept) => (
                     <tr
-                      key={category.id}
-                      className={selectedId === category.id ? 'row-selected' : ''}
-                      onClick={() => setSelectedId(category.id)}
+                      key={dept.id}
+                      className={selectedId === dept.id ? 'row-selected' : ''}
+                      onClick={() => setSelectedId(dept.id)}
                       style={{ cursor: 'pointer' }}
                     >
-                      <td>{category.code}</td>
-                      <td>{category.name}</td>
-                      <td>{getDepartmentName(category.departmentId)}</td>
-                      <td>{category.isActive ? 'Yes' : 'No'}</td>
+                      <td>{dept.code}</td>
+                      <td>{dept.name}</td>
+                      <td>{dept.description || '—'}</td>
+                      <td>{dept.isActive ? 'Yes' : 'No'}</td>
                     </tr>
                   ))
                 )}
@@ -232,10 +209,10 @@ function CategoryManagement() {
 
         <aside className="detail-panel">
           <div className="card detail-card">
-            <h3 className="detail-title">Category Details</h3>
-            {selectedCategory ? (
+            <h3 className="detail-title">Department Details</h3>
+            {selectedDepartment ? (
               <>
-                <p className="detail-subtitle">{selectedCategory.code}</p>
+                <p className="detail-subtitle">{selectedDepartment.code}</p>
 
                 <form onSubmit={handleUpdate}>
                   <div className="form-field">
@@ -277,25 +254,6 @@ function CategoryManagement() {
                   </div>
 
                   <div className="form-field">
-                    <label className="form-label">Department</label>
-                    <select
-                      name="departmentId"
-                      className="input"
-                      value={formData.departmentId}
-                      onChange={handleInputChange}
-                      required
-                      disabled={updating || deleting}
-                    >
-                      <option value="">Select department</option>
-                      {departments.map((dept) => (
-                        <option key={dept.id} value={dept.id}>
-                          {dept.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-field">
                     <label className="form-label checkbox-label">
                       <input
                         type="checkbox"
@@ -313,7 +271,7 @@ function CategoryManagement() {
                     className="btn btn-primary"
                     disabled={updating || deleting}
                   >
-                    {updating ? 'Updating...' : 'Update Category'}
+                    {updating ? 'Updating...' : 'Update Department'}
                   </button>
                 </form>
 
@@ -325,25 +283,25 @@ function CategoryManagement() {
                     onClick={handleDelete}
                     disabled={deleting || updating}
                   >
-                    {deleting ? 'Deleting...' : 'Delete Category'}
+                    {deleting ? 'Deleting...' : 'Delete Department'}
                   </button>
                 </div>
 
                 {actionError && <div className="form-error">{actionError}</div>}
               </>
             ) : (
-              <p>Select a category to view details.</p>
+              <p>Select a department to view details.</p>
             )}
           </div>
         </aside>
       </section>
 
-      {/* Create Category Modal */}
+      {/* Create Department Modal */}
       {showCreateModal && (
         <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Create New Category</h3>
+              <h3>Create New Department</h3>
             </div>
             <form onSubmit={handleCreate}>
               <div className="modal-body">
@@ -357,7 +315,7 @@ function CategoryManagement() {
                     onChange={handleInputChange}
                     required
                     disabled={creating}
-                    placeholder="e.g., WIFI"
+                    placeholder="e.g., Information Technology Department"
                   />
                 </div>
 
@@ -371,7 +329,7 @@ function CategoryManagement() {
                     onChange={handleInputChange}
                     required
                     disabled={creating}
-                    placeholder="e.g., WF101"
+                    placeholder="e.g., IT"
                   />
                 </div>
 
@@ -384,27 +342,8 @@ function CategoryManagement() {
                     value={formData.description}
                     onChange={handleInputChange}
                     disabled={creating}
-                    placeholder="Enter category description"
+                    placeholder="Enter department description"
                   />
-                </div>
-
-                <div className="form-field">
-                  <label className="form-label">Department</label>
-                  <select
-                    name="departmentId"
-                    className="input"
-                    value={formData.departmentId}
-                    onChange={handleInputChange}
-                    required
-                    disabled={creating}
-                  >
-                    <option value="">Select department</option>
-                    {departments.map((dept) => (
-                      <option key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 <div className="form-field">
@@ -436,7 +375,7 @@ function CategoryManagement() {
                   className="btn btn-primary"
                   disabled={creating}
                 >
-                  {creating ? 'Creating...' : 'Create Category'}
+                  {creating ? 'Creating...' : 'Create Department'}
                 </button>
               </div>
             </form>
@@ -449,19 +388,18 @@ function CategoryManagement() {
         <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Delete Category</h3>
+              <h3>Delete Department</h3>
             </div>
             <div className="modal-body">
-              <p>Are you sure you want to delete this category?</p>
+              <p>Are you sure you want to delete this department?</p>
               <p className="modal-warning">
                 <strong>Warning:</strong> This action cannot be undone.
               </p>
-              {selectedCategory && (
+              {selectedDepartment && (
                 <div className="modal-user-info">
-                  <p><strong>Code:</strong> {selectedCategory.code}</p>
-                  <p><strong>Name:</strong> {selectedCategory.name}</p>
-                  <p><strong>Description:</strong> {selectedCategory.description || '—'}</p>
-                  <p><strong>Department:</strong> {getDepartmentName(selectedCategory.departmentId)}</p>
+                  <p><strong>Code:</strong> {selectedDepartment.code}</p>
+                  <p><strong>Name:</strong> {selectedDepartment.name}</p>
+                  <p><strong>Description:</strong> {selectedDepartment.description || '—'}</p>
                 </div>
               )}
             </div>
@@ -478,7 +416,7 @@ function CategoryManagement() {
                 onClick={confirmDelete}
                 disabled={deleting}
               >
-                {deleting ? 'Deleting...' : 'Delete Category'}
+                {deleting ? 'Deleting...' : 'Delete Department'}
               </button>
             </div>
           </div>
@@ -488,4 +426,4 @@ function CategoryManagement() {
   )
 }
 
-export default CategoryManagement
+export default DepartmentManagement

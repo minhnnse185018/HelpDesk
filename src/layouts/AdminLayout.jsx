@@ -63,12 +63,28 @@ function AdminLayout() {
             Categories
           </NavLink>
           <NavLink
-            to="/admin/rooms-departments"
+            to="/admin/departments"
             className={({ isActive }) =>
               `sidebar-link ${isActive ? "sidebar-link-active" : ""}`
             }
           >
-            Rooms &amp; Departments
+            Departments
+          </NavLink>
+          <NavLink
+            to="/admin/rooms"
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? "sidebar-link-active" : ""}`
+            }
+          >
+            Rooms
+          </NavLink>
+          <NavLink
+            to="/admin/users"
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? "sidebar-link-active" : ""}`
+            }
+          >
+            Users
           </NavLink>
           <NavLink
             to="/admin/reports"
