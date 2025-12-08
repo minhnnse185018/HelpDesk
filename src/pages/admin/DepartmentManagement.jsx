@@ -1,21 +1,18 @@
 import { useEffect, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import {
-  createCategory,
-  deleteCategory,
-  fetchCategories,
+  createDepartment,
+  deleteDepartment,
   fetchDepartments,
-  updateCategory,
+  updateDepartment,
 } from '../../api/admin'
 
-function CategoryManagement() {
-  const [categories, setCategories] = useState([])
+function DepartmentManagement() {
   const [departments, setDepartments] = useState([])
   const [formData, setFormData] = useState({
     name: '',
     code: '',
     description: '',
-    departmentId: '',
     isActive: true,
   })
   const [editingId, setEditingId] = useState(null)
@@ -28,14 +25,11 @@ function CategoryManagement() {
   useEffect(() => {
     let isMounted = true
     setLoading(true)
-    Promise.all([fetchCategories(), fetchDepartments()])
-      .then(([categoryData, departmentData]) => {
-        if (isMounted) {
-          setCategories(categoryData)
-          setDepartments(departmentData)
-        }
+    fetchDepartments()
+      .then((data) => {
+        if (isMounted) setDepartments(data)
       })
-      .catch((err) => setError(err.message || 'Cannot load data'))
+      .catch((err) => setError(err.message || 'Không tải được phòng ban'))
       .finally(() => setLoading(false))
     return () => {
       isMounted = false
@@ -47,7 +41,6 @@ function CategoryManagement() {
       name: '',
       code: '',
       description: '',
-      departmentId: '',
       isActive: true,
     })
     setEditingId(null)
@@ -60,53 +53,48 @@ function CategoryManagement() {
     setError('')
     try {
       if (editingId) {
-        await updateCategory(editingId, formData)
-        setMessage('Đã cập nhật category')
+        await updateDepartment(editingId, formData)
+        setMessage('Đã cập nhật phòng ban')
       } else {
-        await createCategory(formData)
-        setMessage('Đã tạo category mới')
+        await createDepartment(formData)
+        setMessage('Đã tạo phòng ban mới')
       }
       // Reload data from server
-      const [categoryData, departmentData] = await Promise.all([
-        fetchCategories(),
-        fetchDepartments()
-      ])
-      setCategories(categoryData)
-      setDepartments(departmentData)
+      const data = await fetchDepartments()
+      setDepartments(data)
       resetForm()
       setIsModalOpen(false)
     } catch (err) {
-      setError(err.message || 'Lưu category thất bại')
+      setError(err.message || 'Lưu phòng ban thất bại')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleEdit = (category) => {
+  const handleEdit = (department) => {
     setFormData({
-      name: category.name,
-      code: category.code,
-      description: category.description,
-      departmentId: category.departmentId || '',
-      isActive: category.isActive ?? true,
+      name: department.name,
+      code: department.code,
+      description: department.description,
+      isActive: department.isActive ?? true,
     })
-    setEditingId(category.id)
+    setEditingId(department.id)
     setMessage('')
     setError('')
     setIsModalOpen(true)
   }
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Xóa category này?')) return
+    if (!window.confirm('Xóa phòng ban này?')) return
     setSaving(true)
     setError('')
     try {
-      await deleteCategory(id)
-      setCategories((prev) => prev.filter((c) => c.id !== id))
+      await deleteDepartment(id)
+      setDepartments((prev) => prev.filter((d) => d.id !== id))
       if (editingId === id) resetForm()
-      setMessage('Đã xóa category')
+      setMessage('Đã xóa phòng ban')
     } catch (err) {
-      setError(err.message || 'Xóa category thất bại')
+      setError(err.message || 'Xóa phòng ban thất bại')
     } finally {
       setSaving(false)
     }
@@ -117,10 +105,10 @@ function CategoryManagement() {
       <div className="page-header">
         <div>
           <h2 className="page-title">
-            Feedback Categories / Loại phản ánh
+            Departments / Phòng Ban
           </h2>
           <p className="page-subtitle">
-            Manage categories and SLA settings for tickets.
+            Manage departments and their information.
           </p>
         </div>
         <button
@@ -133,14 +121,17 @@ function CategoryManagement() {
             setError('')
           }}
         >
-          New Category / Thêm loại mới
+          New Department / Thêm phòng ban
         </button>
       </div>
 
       <section className="section">
+        {error && <p className="text-danger">{error}</p>}
+        {message && <p className="text-success">{message}</p>}
+
         <div className="card table-card">
           <div className="section-header">
-            <h3 className="section-title">Categories</h3>
+            <h3 className="section-title">Departments / Phòng Ban</h3>
             {loading && <span className="badge subtle">Loading...</span>}
           </div>
           <table className="table">
@@ -149,37 +140,33 @@ function CategoryManagement() {
                 <th>Name / Tên</th>
                 <th>Code / Mã</th>
                 <th>Description / Mô tả</th>
-                <th>Department ID</th>
                 <th>Active / Hoạt động</th>
                 <th>Actions / Thao tác</th>
               </tr>
             </thead>
             <tbody>
-              {categories.map((category) => (
-                <tr key={category.id}>
-                  <td>{category.name}</td>
-                  <td>{category.code}</td>
-                  <td>{category.description}</td>
-                  <td style={{ fontSize: '0.75rem', color: '#666' }}>
-                    {category.departmentId || '-'}
-                  </td>
+              {departments.map((department) => (
+                <tr key={department.id}>
+                  <td>{department.name}</td>
+                  <td>{department.code}</td>
+                  <td>{department.description}</td>
                   <td>
-                    <span className={`badge ${category.isActive ? 'badge-success' : 'badge-gray'}`}>
-                      {category.isActive ? 'Yes' : 'No'}
+                    <span className={`badge ${department.isActive ? 'badge-success' : 'badge-gray'}`}>
+                      {department.isActive ? 'Yes' : 'No'}
                     </span>
                   </td>
                   <td>
                     <button
                       type="button"
                       className="link-button small"
-                      onClick={() => handleEdit(category)}
+                      onClick={() => handleEdit(department)}
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       className="link-button small danger"
-                      onClick={() => handleDelete(category.id)}
+                      onClick={() => handleDelete(department.id)}
                       disabled={saving}
                     >
                       Delete
@@ -187,9 +174,9 @@ function CategoryManagement() {
                   </td>
                 </tr>
               ))}
-              {!categories.length && (
+              {!departments.length && (
                 <tr>
-                  <td colSpan="6">No categories yet</td>
+                  <td colSpan="5">No departments yet</td>
                 </tr>
               )}
             </tbody>
@@ -203,7 +190,7 @@ function CategoryManagement() {
           <Dialog.Content className="modal">
             <div className="modal-header">
               <Dialog.Title>
-                {editingId ? 'Edit Category / Sửa' : 'New Category / Thêm loại mới'}
+                {editingId ? 'Edit Department / Sửa' : 'New Department / Thêm phòng ban'}
               </Dialog.Title>
               <Dialog.Close asChild>
                 <button
@@ -224,7 +211,7 @@ function CategoryManagement() {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. WiFi, CSVC, Thiết bị"
+                  placeholder="e.g. Phòng Công Nghệ Thông Tin"
                 />
               </div>
               <div className="form-field">
@@ -234,7 +221,7 @@ function CategoryManagement() {
                   required
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  placeholder="e.g. WF101, CS001"
+                  placeholder="e.g. IT, HR, CSVC"
                 />
               </div>
               <div className="form-field">
@@ -246,25 +233,8 @@ function CategoryManagement() {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  placeholder="Chi tiết về category này"
+                  placeholder="Chi tiết về phòng ban này"
                 />
-              </div>
-              <div className="form-field">
-                <label className="form-label">Department / Phòng Ban</label>
-                <select
-                  className="input"
-                  value={formData.departmentId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, departmentId: e.target.value })
-                  }
-                >
-                  <option value="">Select a department / Chọn phòng ban</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name} ({dept.code})
-                    </option>
-                  ))}
-                </select>
               </div>
               <div className="form-field">
                 <label className="form-label">
@@ -310,4 +280,4 @@ function CategoryManagement() {
   )
 }
 
-export default CategoryManagement
+export default DepartmentManagement

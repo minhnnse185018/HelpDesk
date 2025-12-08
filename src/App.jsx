@@ -10,6 +10,9 @@ import MyTickets from './pages/student/MyTickets.jsx'
 import AdminDashboard from './pages/admin/AdminDashboard.jsx'
 import TicketManagement from './pages/admin/TicketManagement.jsx'
 import CategoryManagement from './pages/admin/CategoryManagement.jsx'
+import DepartmentManagement from './pages/admin/DepartmentManagement.jsx'
+import RoomManagement from './pages/admin/RoomManagement.jsx'
+import SlaPolicyManagement from './pages/admin/SlaPolicyManagement.jsx'
 import RoomsDepartments from './pages/admin/RoomsDepartments.jsx'
 import Reports from './pages/admin/Reports.jsx'
 import RequireRoles from './components/RequireRoles.jsx'
@@ -43,7 +46,7 @@ function App() {
         <Route
           path="/admin"
           element={
-            <RequireRoles allowedRoles={['ADMIN']}>
+            <RequireRoles allowedRoles={['admin']}>
               <AdminLayout />
             </RequireRoles>
           }
@@ -52,6 +55,9 @@ function App() {
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="tickets" element={<TicketManagement />} />
           <Route path="categories" element={<CategoryManagement />} />
+          <Route path="departments" element={<DepartmentManagement />} />
+          <Route path="rooms" element={<RoomManagement />} />
+          <Route path="sla-policies" element={<SlaPolicyManagement />} />
           <Route path="rooms-departments" element={<RoomsDepartments />} />
           <Route path="reports" element={<Reports />} />
         </Route>

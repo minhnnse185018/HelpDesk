@@ -16,9 +16,9 @@ function TicketManagement() {
     fetchTickets()
       .then((data) => {
         if (!isMounted) return
-        setTickets(data)
-        setSelectedTicket(data[0] || null)
-        setResponseText(data[0]?.adminResponse || '')
+        setTickets(data || [])
+        setSelectedTicket(data?.[0] || null)
+        setResponseText(data?.[0]?.adminResponse || '')
       })
       .catch((err) => setError(err.message || 'Không tải được tickets'))
       .finally(() => setLoading(false))
@@ -137,45 +137,55 @@ function TicketManagement() {
                 </tr>
               </thead>
               <tbody>
-                {tickets.map((ticket) => (
-                  <tr
-                    key={ticket.id}
-                    className={
-                      selectedTicket?.id === ticket.id ? 'row-selected' : ''
-                    }
-                    onClick={() => {
-                      setSelectedTicket(ticket)
-                      setResponseText(ticket.adminResponse || '')
-                    }}
-                  >
-                    <td>{ticket.id}</td>
-                    <td>{ticket.category}</td>
-                    <td>{ticket.room}</td>
-                    <td>{ticket.requestedBy}</td>
-                    <td>{ticket.assignedTo}</td>
-                    <td>
-                      <span
-                        className={`status-badge status-${ticket.statusKey || 'new'}`}
-                      >
-                        {ticket.status}
-                      </span>
-                    </td>
-                    <td>{ticket.slaDue}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="link-button small danger"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDelete(ticket.id)
-                        }}
-                        disabled={saving}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {tickets.map((ticket) => {
+                  const categories = ticket.ticketCategories
+                    ?.map((tc) => tc.category?.name)
+                    .filter(Boolean)
+                    .join(', ') || '-'
+                  const roomName = ticket.room?.name || '-'
+                  const creator = ticket.creator?.username || ticket.creator?.email || '-'
+                  const assignee = ticket.assignee?.username || ticket.assignee?.email || ticket.assignedTo || '-'
+                  
+                  return (
+                    <tr
+                      key={ticket.id}
+                      className={
+                        selectedTicket?.id === ticket.id ? 'row-selected' : ''
+                      }
+                      onClick={() => {
+                        setSelectedTicket(ticket)
+                        setResponseText(ticket.adminResponse || '')
+                      }}
+                    >
+                      <td style={{ fontSize: '0.75rem' }}>{ticket.id.substring(0, 8)}...</td>
+                      <td>{categories}</td>
+                      <td>{roomName}</td>
+                      <td>{creator}</td>
+                      <td>{assignee}</td>
+                      <td>
+                        <span
+                          className={`status-badge status-${ticket.status || 'open'}`}
+                        >
+                          {ticket.status}
+                        </span>
+                      </td>
+                      <td>{ticket.dueDate ? new Date(ticket.dueDate).toLocaleString('vi-VN') : '-'}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="link-button small danger"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(ticket.id)
+                          }}
+                          disabled={saving}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
                 {!tickets.length && (
                   <tr>
                     <td colSpan="8">No tickets yet</td>
@@ -192,39 +202,74 @@ function TicketManagement() {
               <h3 className="detail-title">
                 Ticket Detail / Chi tiết Ticket
               </h3>
-              <p className="detail-subtitle">{selectedTicket.id}</p>
+              <p className="detail-subtitle" style={{ fontSize: '0.75rem', wordBreak: 'break-all' }}>
+                {selectedTicket.id}
+              </p>
 
               <div className="detail-grid">
                 <div>
-                  <p className="detail-label">Category / Loại</p>
-                  <p className="detail-value">{selectedTicket.category}</p>
+                  <p className="detail-label">Title / Tiêu đề</p>
+                  <p className="detail-value">{selectedTicket.title}</p>
+                </div>
+                <div>
+                  <p className="detail-label">Categories / Loại</p>
+                  <p className="detail-value">
+                    {selectedTicket.ticketCategories
+                      ?.map((tc) => tc.category?.name)
+                      .filter(Boolean)
+                      .join(', ') || '-'}
+                  </p>
                 </div>
                 <div>
                   <p className="detail-label">Room / Phòng</p>
-                  <p className="detail-value">{selectedTicket.room}</p>
+                  <p className="detail-value">
+                    {selectedTicket.room?.name} ({selectedTicket.room?.code})
+                  </p>
                 </div>
                 <div>
                   <p className="detail-label">Requested by / Người gửi</p>
-                  <p className="detail-value">{selectedTicket.requestedBy}</p>
+                  <p className="detail-value">
+                    {selectedTicket.creator?.username || selectedTicket.creator?.email}
+                  </p>
                 </div>
                 <div>
                   <p className="detail-label">Assigned to / Người xử lý</p>
-                  <p className="detail-value">{selectedTicket.assignedTo}</p>
+                  <p className="detail-value">
+                    {selectedTicket.assignee?.username || selectedTicket.assignee?.email || '-'}
+                  </p>
                 </div>
                 <div>
                   <p className="detail-label">Priority / Mức độ ưu tiên</p>
-                  <p className="detail-value">{selectedTicket.priority}</p>
+                  <p className="detail-value">{selectedTicket.priority || '-'}</p>
                 </div>
                 <div>
-                  <p className="detail-label">SLA Due / Hạn SLA</p>
-                  <p className="detail-value">{selectedTicket.slaDue}</p>
+                  <p className="detail-label">Status / Trạng thái</p>
+                  <p className="detail-value">
+                    <span className={`status-badge status-${selectedTicket.status}`}>
+                      {selectedTicket.status}
+                    </span>
+                  </p>
                 </div>
                 <div>
+                  <p className="detail-label">Due Date / Hạn xử lý</p>
+                  <p className="detail-value">
+                    {selectedTicket.dueDate
+                      ? new Date(selectedTicket.dueDate).toLocaleString('vi-VN')
+                      : '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="detail-label">Created At / Ngày tạo</p>
+                  <p className="detail-value">
+                    {new Date(selectedTicket.createdAt).toLocaleString('vi-VN')}
+                  </p>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
                   <p className="detail-label">Description / Mô tả</p>
                   <p className="detail-value">{selectedTicket.description}</p>
                 </div>
                 {selectedTicket.adminResponse && (
-                  <div>
+                  <div style={{ gridColumn: '1 / -1' }}>
                     <p className="detail-label">Admin response / Phản hồi</p>
                     <p className="detail-value">{selectedTicket.adminResponse}</p>
                   </div>
@@ -250,7 +295,7 @@ function TicketManagement() {
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    onClick={() => handleUpdateStatus('In Progress')}
+                    onClick={() => handleUpdateStatus('in_progress')}
                     disabled={saving}
                   >
                     Mark In Progress / Đang xử lý
@@ -258,7 +303,7 @@ function TicketManagement() {
                   <button
                     type="button"
                     className="btn btn-primary"
-                    onClick={() => handleUpdateStatus('Resolved')}
+                    onClick={() => handleUpdateStatus('resolved')}
                     disabled={saving}
                   >
                     Resolve / Đã xử lý
@@ -266,7 +311,7 @@ function TicketManagement() {
                   <button
                     type="button"
                     className="btn btn-secondary subtle"
-                    onClick={() => handleUpdateStatus('Reopened')}
+                    onClick={() => handleUpdateStatus('reopened')}
                     disabled={saving}
                   >
                     Reopen / Mở lại
@@ -274,7 +319,7 @@ function TicketManagement() {
                   <button
                     type="button"
                     className="btn btn-secondary subtle"
-                    onClick={() => handleUpdateStatus('Escalated')}
+                    onClick={() => handleUpdateStatus('escalated')}
                     disabled={saving}
                   >
                     Escalate / Chuyển cấp trên

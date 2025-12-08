@@ -63,13 +63,37 @@ function AdminLayout() {
             Categories
           </NavLink>
           <NavLink
+            to="/admin/departments"
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? "sidebar-link-active" : ""}`
+            }
+          >
+            Departments
+          </NavLink>
+          <NavLink
+            to="/admin/rooms"
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? "sidebar-link-active" : ""}`
+            }
+          >
+            Rooms
+          </NavLink>
+          <NavLink
+            to="/admin/sla-policies"
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? "sidebar-link-active" : ""}`
+            }
+          >
+            SLA Policies
+          </NavLink>
+          {/* <NavLink
             to="/admin/rooms-departments"
             className={({ isActive }) =>
               `sidebar-link ${isActive ? "sidebar-link-active" : ""}`
             }
           >
             Rooms &amp; Departments
-          </NavLink>
+          </NavLink> */}
           <NavLink
             to="/admin/reports"
             className={({ isActive }) =>

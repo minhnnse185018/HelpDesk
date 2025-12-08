@@ -1,21 +1,20 @@
 import { useEffect, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import {
-  createCategory,
-  deleteCategory,
-  fetchCategories,
-  fetchDepartments,
-  updateCategory,
+  createRoom,
+  deleteRoom,
+  fetchRooms,
+  updateRoom,
 } from '../../api/admin'
 
-function CategoryManagement() {
-  const [categories, setCategories] = useState([])
-  const [departments, setDepartments] = useState([])
+function RoomManagement() {
+  const [rooms, setRooms] = useState([])
   const [formData, setFormData] = useState({
     name: '',
     code: '',
+    floor: '',
+    capacity: '',
     description: '',
-    departmentId: '',
     isActive: true,
   })
   const [editingId, setEditingId] = useState(null)
@@ -28,14 +27,11 @@ function CategoryManagement() {
   useEffect(() => {
     let isMounted = true
     setLoading(true)
-    Promise.all([fetchCategories(), fetchDepartments()])
-      .then(([categoryData, departmentData]) => {
-        if (isMounted) {
-          setCategories(categoryData)
-          setDepartments(departmentData)
-        }
+    fetchRooms()
+      .then((data) => {
+        if (isMounted) setRooms(data)
       })
-      .catch((err) => setError(err.message || 'Cannot load data'))
+      .catch((err) => setError(err.message || 'Không tải được phòng'))
       .finally(() => setLoading(false))
     return () => {
       isMounted = false
@@ -46,8 +42,9 @@ function CategoryManagement() {
     setFormData({
       name: '',
       code: '',
+      floor: '',
+      capacity: '',
       description: '',
-      departmentId: '',
       isActive: true,
     })
     setEditingId(null)
@@ -59,54 +56,57 @@ function CategoryManagement() {
     setMessage('')
     setError('')
     try {
+      const payload = {
+        ...formData,
+        floor: formData.floor ? parseInt(formData.floor) : null,
+        capacity: formData.capacity ? parseInt(formData.capacity) : null,
+      }
+      
       if (editingId) {
-        await updateCategory(editingId, formData)
-        setMessage('Đã cập nhật category')
+        await updateRoom(editingId, payload)
+        setMessage('Đã cập nhật phòng')
       } else {
-        await createCategory(formData)
-        setMessage('Đã tạo category mới')
+        await createRoom(payload)
+        setMessage('Đã tạo phòng mới')
       }
       // Reload data from server
-      const [categoryData, departmentData] = await Promise.all([
-        fetchCategories(),
-        fetchDepartments()
-      ])
-      setCategories(categoryData)
-      setDepartments(departmentData)
+      const data = await fetchRooms()
+      setRooms(data)
       resetForm()
       setIsModalOpen(false)
     } catch (err) {
-      setError(err.message || 'Lưu category thất bại')
+      setError(err.message || 'Lưu phòng thất bại')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleEdit = (category) => {
+  const handleEdit = (room) => {
     setFormData({
-      name: category.name,
-      code: category.code,
-      description: category.description,
-      departmentId: category.departmentId || '',
-      isActive: category.isActive ?? true,
+      name: room.name,
+      code: room.code,
+      floor: room.floor ? room.floor.toString() : '',
+      capacity: room.capacity ? room.capacity.toString() : '',
+      description: room.description,
+      isActive: room.isActive ?? true,
     })
-    setEditingId(category.id)
+    setEditingId(room.id)
     setMessage('')
     setError('')
     setIsModalOpen(true)
   }
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Xóa category này?')) return
+    if (!window.confirm('Xóa phòng này?')) return
     setSaving(true)
     setError('')
     try {
-      await deleteCategory(id)
-      setCategories((prev) => prev.filter((c) => c.id !== id))
+      await deleteRoom(id)
+      setRooms((prev) => prev.filter((r) => r.id !== id))
       if (editingId === id) resetForm()
-      setMessage('Đã xóa category')
+      setMessage('Đã xóa phòng')
     } catch (err) {
-      setError(err.message || 'Xóa category thất bại')
+      setError(err.message || 'Xóa phòng thất bại')
     } finally {
       setSaving(false)
     }
@@ -117,10 +117,10 @@ function CategoryManagement() {
       <div className="page-header">
         <div>
           <h2 className="page-title">
-            Feedback Categories / Loại phản ánh
+            Rooms / Phòng
           </h2>
           <p className="page-subtitle">
-            Manage categories and SLA settings for tickets.
+            Manage rooms and their information.
           </p>
         </div>
         <button
@@ -133,14 +133,17 @@ function CategoryManagement() {
             setError('')
           }}
         >
-          New Category / Thêm loại mới
+          New Room / Thêm phòng
         </button>
       </div>
 
       <section className="section">
+        {error && <p className="text-danger">{error}</p>}
+        {message && <p className="text-success">{message}</p>}
+
         <div className="card table-card">
           <div className="section-header">
-            <h3 className="section-title">Categories</h3>
+            <h3 className="section-title">Rooms / Phòng</h3>
             {loading && <span className="badge subtle">Loading...</span>}
           </div>
           <table className="table">
@@ -148,38 +151,38 @@ function CategoryManagement() {
               <tr>
                 <th>Name / Tên</th>
                 <th>Code / Mã</th>
+                <th>Floor / Tầng</th>
+                <th>Capacity / Sức chứa</th>
                 <th>Description / Mô tả</th>
-                <th>Department ID</th>
                 <th>Active / Hoạt động</th>
                 <th>Actions / Thao tác</th>
               </tr>
             </thead>
             <tbody>
-              {categories.map((category) => (
-                <tr key={category.id}>
-                  <td>{category.name}</td>
-                  <td>{category.code}</td>
-                  <td>{category.description}</td>
-                  <td style={{ fontSize: '0.75rem', color: '#666' }}>
-                    {category.departmentId || '-'}
-                  </td>
+              {rooms.map((room) => (
+                <tr key={room.id}>
+                  <td>{room.name}</td>
+                  <td>{room.code}</td>
+                  <td>{room.floor}</td>
+                  <td>{room.capacity}</td>
+                  <td>{room.description}</td>
                   <td>
-                    <span className={`badge ${category.isActive ? 'badge-success' : 'badge-gray'}`}>
-                      {category.isActive ? 'Yes' : 'No'}
+                    <span className={`badge ${room.isActive ? 'badge-success' : 'badge-gray'}`}>
+                      {room.isActive ? 'Yes' : 'No'}
                     </span>
                   </td>
                   <td>
                     <button
                       type="button"
                       className="link-button small"
-                      onClick={() => handleEdit(category)}
+                      onClick={() => handleEdit(room)}
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       className="link-button small danger"
-                      onClick={() => handleDelete(category.id)}
+                      onClick={() => handleDelete(room.id)}
                       disabled={saving}
                     >
                       Delete
@@ -187,9 +190,9 @@ function CategoryManagement() {
                   </td>
                 </tr>
               ))}
-              {!categories.length && (
+              {!rooms.length && (
                 <tr>
-                  <td colSpan="6">No categories yet</td>
+                  <td colSpan="7">No rooms yet</td>
                 </tr>
               )}
             </tbody>
@@ -203,7 +206,7 @@ function CategoryManagement() {
           <Dialog.Content className="modal">
             <div className="modal-header">
               <Dialog.Title>
-                {editingId ? 'Edit Category / Sửa' : 'New Category / Thêm loại mới'}
+                {editingId ? 'Edit Room / Sửa' : 'New Room / Thêm phòng'}
               </Dialog.Title>
               <Dialog.Close asChild>
                 <button
@@ -218,23 +221,43 @@ function CategoryManagement() {
             </div>
             <form className="form-grid" onSubmit={handleSubmit}>
               <div className="form-field">
-                <label className="form-label">Name / Tên</label>
+                <label className="form-label">Name / Tên phòng</label>
                 <input
                   className="input"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. WiFi, CSVC, Thiết bị"
+                  placeholder="e.g. Phòng họp A1"
                 />
               </div>
               <div className="form-field">
-                <label className="form-label">Code / Mã</label>
+                <label className="form-label">Code / Mã phòng</label>
                 <input
                   className="input"
                   required
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  placeholder="e.g. WF101, CS001"
+                  placeholder="e.g. A101, 202"
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Floor / Tầng</label>
+                <input
+                  className="input"
+                  type="number"
+                  value={formData.floor}
+                  onChange={(e) => setFormData({ ...formData, floor: e.target.value })}
+                  placeholder="e.g. 1, 2, 3"
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Capacity / Sức chứa</label>
+                <input
+                  className="input"
+                  type="number"
+                  value={formData.capacity}
+                  onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                  placeholder="e.g. 20, 30, 50"
                 />
               </div>
               <div className="form-field">
@@ -246,25 +269,8 @@ function CategoryManagement() {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  placeholder="Chi tiết về category này"
+                  placeholder="Chi tiết về phòng này"
                 />
-              </div>
-              <div className="form-field">
-                <label className="form-label">Department / Phòng Ban</label>
-                <select
-                  className="input"
-                  value={formData.departmentId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, departmentId: e.target.value })
-                  }
-                >
-                  <option value="">Select a department / Chọn phòng ban</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name} ({dept.code})
-                    </option>
-                  ))}
-                </select>
               </div>
               <div className="form-field">
                 <label className="form-label">
@@ -310,4 +316,4 @@ function CategoryManagement() {
   )
 }
 
-export default CategoryManagement
+export default RoomManagement

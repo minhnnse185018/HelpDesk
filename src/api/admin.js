@@ -145,154 +145,191 @@ const toStatusKey = (status) => {
   return 'other'
 }
 
+// Helper to convert object with numeric keys to array
+const objectToArray = (obj) => {
+  if (Array.isArray(obj)) return obj
+  if (!obj || typeof obj !== 'object') return []
+  return Object.values(obj)
+}
+
+// Helper to handle API responses with nested data
+const extractData = (response) => {
+  if (response?.data) {
+    return objectToArray(response.data)
+  }
+  return objectToArray(response)
+}
+
 // Categories
 export const fetchCategories = async () => {
-  if (useRealApi) return apiClient.get('/api/v1/categories')
-  return withMockData((data) => [...data.categories])
+  const response = await apiClient.get('/api/v1/categories')
+  return extractData(response)
+}
+
+export const fetchActiveCategories = async () => {
+  const response = await apiClient.get('/api/v1/categories/active')
+  return extractData(response)
+}
+
+export const getCategoryById = async (id) => {
+  const response = await apiClient.get(`/api/v1/categories/${id}`)
+  return response?.data || response
 }
 
 export const createCategory = async (payload) => {
-  if (useRealApi) return apiClient.post('/api/v1/categories', payload)
-  return withMockData((data) => {
-    const id = `cat-${Date.now()}`
-    const newItem = { id, ...payload }
-    data.categories.push(newItem)
-    return newItem
-  })
+  return apiClient.post('/api/v1/categories', payload)
 }
 
 export const updateCategory = async (id, payload) => {
-  if (useRealApi) return apiClient.put(`/api/v1/categories/${id}`, payload)
-  return withMockData((data) => {
-    const idx = data.categories.findIndex((item) => item.id === id)
-    if (idx === -1) throw new Error('Category not found')
-    data.categories[idx] = { ...data.categories[idx], ...payload }
-    return data.categories[idx]
-  })
+  return apiClient.patch(`/api/v1/categories/${id}`, payload)
 }
 
 export const deleteCategory = async (id) => {
-  if (useRealApi) return apiClient.delete(`/api/v1/categories/${id}`)
-  return withMockData((data) => {
-    data.categories = data.categories.filter((item) => item.id !== id)
-    return true
-  })
-}
-
-// Rooms
-export const fetchRooms = async () => {
-  if (useRealApi) return apiClient.get('/api/v1/rooms')
-  return withMockData((data) => [...data.rooms])
-}
-
-export const createRoom = async (payload) => {
-  if (useRealApi) return apiClient.post('/api/v1/rooms', payload)
-  return withMockData((data) => {
-    const id = `room-${Date.now()}`
-    const newItem = { id, ...payload }
-    data.rooms.push(newItem)
-    return newItem
-  })
-}
-
-export const updateRoom = async (id, payload) => {
-  if (useRealApi) return apiClient.put(`/api/v1/rooms/${id}`, payload)
-  return withMockData((data) => {
-    const idx = data.rooms.findIndex((item) => item.id === id)
-    if (idx === -1) throw new Error('Room not found')
-    data.rooms[idx] = { ...data.rooms[idx], ...payload }
-    return data.rooms[idx]
-  })
-}
-
-export const deleteRoom = async (id) => {
-  if (useRealApi) return apiClient.delete(`/api/v1/rooms/${id}`)
-  return withMockData((data) => {
-    data.rooms = data.rooms.filter((item) => item.id !== id)
-    return true
-  })
+  return apiClient.delete(`/api/v1/categories/${id}`)
 }
 
 // Departments
 export const fetchDepartments = async () => {
-  if (useRealApi) return apiClient.get('/api/v1/departments')
-  return withMockData((data) => [...data.departments])
+  const response = await apiClient.get('/api/v1/departments')
+  return extractData(response)
+}
+
+export const getDepartmentById = async (id) => {
+  const response = await apiClient.get(`/api/v1/departments/${id}`)
+  return response?.data || response
 }
 
 export const createDepartment = async (payload) => {
-  if (useRealApi) return apiClient.post('/api/v1/departments', payload)
-  return withMockData((data) => {
-    const id = `dept-${Date.now()}`
-    const newItem = { id, ...payload }
-    data.departments.push(newItem)
-    return newItem
-  })
+  return apiClient.post('/api/v1/departments', payload)
 }
 
 export const updateDepartment = async (id, payload) => {
-  if (useRealApi) return apiClient.put(`/api/v1/departments/${id}`, payload)
-  return withMockData((data) => {
-    const idx = data.departments.findIndex((item) => item.id === id)
-    if (idx === -1) throw new Error('Department not found')
-    data.departments[idx] = { ...data.departments[idx], ...payload }
-    return data.departments[idx]
-  })
+  return apiClient.put(`/api/v1/departments/${id}`, payload)
 }
 
 export const deleteDepartment = async (id) => {
-  if (useRealApi) return apiClient.delete(`/api/v1/departments/${id}`)
-  return withMockData((data) => {
-    data.departments = data.departments.filter((item) => item.id !== id)
-    return true
-  })
+  return apiClient.delete(`/api/v1/departments/${id}`)
+}
+
+// Rooms
+export const fetchRooms = async () => {
+  const response = await apiClient.get('/api/v1/rooms')
+  return extractData(response)
+}
+
+export const getRoomById = async (id) => {
+  const response = await apiClient.get(`/api/v1/rooms/${id}`)
+  return response?.data || response
+}
+
+export const createRoom = async (payload) => {
+  return apiClient.post('/api/v1/rooms', payload)
+}
+
+export const updateRoom = async (id, payload) => {
+  return apiClient.put(`/api/v1/rooms/${id}`, payload)
+}
+
+export const deleteRoom = async (id) => {
+  return apiClient.delete(`/api/v1/rooms/${id}`)
+}
+
+// SLA Policies
+export const fetchSlaPolicies = async () => {
+  const response = await apiClient.get('/api/v1/sla-policies')
+  return extractData(response)
+}
+
+export const fetchActiveSlaPolicies = async () => {
+  const response = await apiClient.get('/api/v1/sla-policies/active')
+  return extractData(response)
+}
+
+export const getSlaPolicyById = async (id) => {
+  const response = await apiClient.get(`/api/v1/sla-policies/${id}`)
+  return response?.data || response
+}
+
+export const createSlaPolicy = async (payload) => {
+  return apiClient.post('/api/v1/sla-policies', payload)
+}
+
+export const updateSlaPolicy = async (id, payload) => {
+  return apiClient.patch(`/api/v1/sla-policies/${id}`, payload)
+}
+
+export const deleteSlaPolicy = async (id) => {
+  return apiClient.delete(`/api/v1/sla-policies/${id}`)
 }
 
 // Tickets
 export const fetchTickets = async () => {
-  if (useRealApi) return apiClient.get('/api/v1/tickets')
-  return withMockData((data) => [...data.tickets])
+  const response = await apiClient.get('/api/v1/tickets')
+  return extractData(response)
+}
+
+export const fetchParentTickets = async () => {
+  const response = await apiClient.get('/api/v1/tickets/parent-tickets')
+  return extractData(response)
+}
+
+export const fetchMyTickets = async () => {
+  const response = await apiClient.get('/api/v1/tickets/my-tickets')
+  return extractData(response)
+}
+
+export const fetchAssignedToMe = async () => {
+  const response = await apiClient.get('/api/v1/tickets/assigned-to-me')
+  return extractData(response)
+}
+
+export const fetchSubTickets = async (parentId) => {
+  const response = await apiClient.get(`/api/v1/tickets/sub-tickets/${parentId}`)
+  return extractData(response)
+}
+
+export const getTicketById = async (id) => {
+  const response = await apiClient.get(`/api/v1/tickets/${id}`)
+  return response?.data || response
 }
 
 export const createTicket = async (payload) => {
-  if (useRealApi) return apiClient.post('/api/v1/tickets', payload)
-  return withMockData((data) => {
-    const id = `TCK-${Math.floor(1000 + Math.random() * 9000)}`
-    const newItem = {
-      id,
-      status: 'New',
-      statusKey: 'new',
-      priority: 'Medium',
-      slaDue: 'Tomorrow 17:00',
-      ...payload,
-      statusKey: payload?.statusKey || toStatusKey(payload?.status || 'new'),
-    }
-    data.tickets.unshift(newItem)
-    return newItem
-  })
+  return apiClient.post('/api/v1/tickets', payload)
 }
 
 export const updateTicket = async (id, payload) => {
-  if (useRealApi) return apiClient.patch(`/api/v1/tickets/${id}`, payload)
-  return withMockData((data) => {
-    const idx = data.tickets.findIndex((item) => item.id === id)
-    if (idx === -1) throw new Error('Ticket not found')
-    data.tickets[idx] = {
-      ...data.tickets[idx],
-      ...payload,
-      statusKey: payload?.statusKey
-        ? payload.statusKey
-        : toStatusKey(payload?.status || data.tickets[idx].status),
-    }
-    return data.tickets[idx]
-  })
+  return apiClient.patch(`/api/v1/tickets/${id}`, payload)
 }
 
 export const deleteTicket = async (id) => {
-  if (useRealApi) return apiClient.delete(`/api/v1/tickets/${id}`)
-  return withMockData((data) => {
-    data.tickets = data.tickets.filter((item) => item.id !== id)
-    return true
-  })
+  return apiClient.delete(`/api/v1/tickets/${id}`)
+}
+
+export const fetchPendingSplitTickets = async () => {
+  const response = await apiClient.get('/api/v1/tickets/admin/pending-split')
+  return extractData(response)
+}
+
+export const fetchWaitingAcceptanceTickets = async () => {
+  const response = await apiClient.get('/api/v1/tickets/admin/waiting-acceptance')
+  return extractData(response)
+}
+
+export const fetchStaffWorkload = async (staffId) => {
+  const response = await apiClient.get(`/api/v1/tickets/staff/${staffId}/workload`)
+  return response?.data || response
+}
+
+export const acceptTicket = async (id) => {
+  return apiClient.post(`/api/v1/tickets/${id}/accept`)
+}
+
+export const denyTicket = async (id, payload) => {
+  return apiClient.post(`/api/v1/tickets/${id}/deny`, payload)
+}
+
+export const splitTicketCategories = async (id, payload) => {
+  return apiClient.post(`/api/v1/tickets/${id}/split-categories`, payload)
 }
 
 // Dashboard
