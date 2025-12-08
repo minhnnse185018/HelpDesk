@@ -5,29 +5,29 @@ import { useAuthProfile } from '../hooks/useAuthProfile'
 import ProfileModal from '../components/ProfileModal'
 
 function StudentLayout() {
-  const navigate = useNavigate()
-  const { profile, refreshProfile } = useAuthProfile()
-  const displayName = profile.name || 'User'
-  const displayRole = profile.role
-    ? profile.role.charAt(0) + profile.role.slice(1).toLowerCase()
-    : 'Student'
-  const displayAvatar = displayName.charAt(0).toUpperCase() || 'U'
-  const [showProfileModal, setShowProfileModal] = useState(false)
+  // const navigate = useNavigate()
+  // const { profile, refreshProfile } = useAuthProfile()
+  // const displayName = profile.name || 'User'
+  // const displayRole = profile.role
+  //   ? profile.role.charAt(0) + profile.role.slice(1).toLowerCase()
+  //   : 'Student'
+  // const displayAvatar = displayName.charAt(0).toUpperCase() || 'U'
+  // const [showProfileModal, setShowProfileModal] = useState(false)
 
-  const handleLogout = async () => {
-    const refreshToken = localStorage.getItem('refreshToken')
-    try {
-      if (refreshToken) await logout({ refreshToken })
-    } catch (error) {
-      // Ignore logout API errors; still clear client state.
-      console.error('Logout failed:', error?.message || error)
-    }
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
-    localStorage.removeItem('role')
-    localStorage.removeItem('username')
-    navigate('/login', { replace: true })
-  }
+  // const handleLogout = async () => {
+    // const refreshToken = localStorage.getItem('refreshToken')
+    // try {
+    //   if (refreshToken) await logout({ refreshToken })
+    // } catch (error) {
+    //   // Ignore logout API errors; still clear client state.
+    //   console.error('Logout failed:', error?.message || error)
+    // }
+    // localStorage.removeItem('accessToken')
+    // localStorage.removeItem('refreshToken')
+    // localStorage.removeItem('role')
+    // localStorage.removeItem('username')
+    // navigate('/login', { replace: true })
+  // }
 
   return (
     <div className="app-shell">
@@ -89,11 +89,11 @@ function StudentLayout() {
         <Outlet context={{ profile }} />
       </main>
 
-      <ProfileModal
+      {/* <ProfileModal
         open={showProfileModal}
         onClose={() => setShowProfileModal(false)}
         onUpdated={refreshProfile}
-      />
+      /> */}
     </div>
   )
 }

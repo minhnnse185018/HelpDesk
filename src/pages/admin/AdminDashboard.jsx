@@ -1,11 +1,14 @@
+import { useEffect, useState } from 'react'
+import { fetchDashboardStats } from '../../api/admin'
+
 function AdminDashboard() {
-  const kpis = [
+  const [kpis, setKpis] = useState([
     { label: 'Total Tickets / Tổng số ticket', value: 132 },
     { label: 'On-time SLA / Đúng SLA', value: '87%' },
     { label: 'Overdue Tickets / Ticket trễ hạn', value: 26 },
-  ]
+  ])
 
-  const recentTickets = [
+  const [recentTickets, setRecentTickets] = useState([
     {
       id: 'TCK-1024',
       category: 'WiFi',
@@ -30,7 +33,26 @@ function AdminDashboard() {
       statusKey: 'resolved',
       slaDue: 'Completed',
     },
-  ]
+  ])
+
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let isMounted = true
+    setLoading(true)
+    fetchDashboardStats()
+      .then((data) => {
+        if (!isMounted) return
+        setKpis(data.kpis || [])
+        setRecentTickets(data.recentTickets || [])
+      })
+      .catch((err) => setError(err.message || 'Không tải được dashboard'))
+      .finally(() => setLoading(false))
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   return (
     <div className="page">

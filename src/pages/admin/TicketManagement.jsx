@@ -1,43 +1,102 @@
-import { useState } from 'react'
-
-const mockTicketsAdmin = [
-  {
-    id: 'TCK-1024',
-    category: 'WiFi',
-    room: 'A1-203',
-    requestedBy: 'Minh',
-    assignedTo: 'IT Staff 1',
-    status: 'In Progress',
-    statusKey: 'in-progress',
-    slaDue: 'Today 17:00',
-    priority: 'High',
-  },
-  {
-    id: 'TCK-1023',
-    category: 'CSVC',
-    room: 'Library 2F',
-    requestedBy: 'Lan',
-    assignedTo: 'CSVC Staff 2',
-    status: 'New',
-    statusKey: 'new',
-    slaDue: 'Tomorrow 10:00',
-    priority: 'Medium',
-  },
-  {
-    id: 'TCK-1019',
-    category: 'Thiết bị',
-    room: 'Lab B3-105',
-    requestedBy: 'Huy',
-    assignedTo: 'IT Staff 3',
-    status: 'Overdue',
-    statusKey: 'overdue',
-    slaDue: 'Yesterday 15:30',
-    priority: 'Urgent',
-  },
-]
+import { useEffect, useState } from 'react'
+import { deleteTicket, fetchTickets, updateTicket } from '../../api/admin'
 
 function TicketManagement() {
-  const [selectedTicket, setSelectedTicket] = useState(mockTicketsAdmin[0])
+  const [tickets, setTickets] = useState([])
+  const [selectedTicket, setSelectedTicket] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [responseText, setResponseText] = useState('')
+
+  useEffect(() => {
+    let isMounted = true
+    setLoading(true)
+    fetchTickets()
+      .then((data) => {
+        if (!isMounted) return
+        setTickets(data)
+        setSelectedTicket(data[0] || null)
+        setResponseText(data[0]?.adminResponse || '')
+      })
+      .catch((err) => setError(err.message || 'Không tải được tickets'))
+      .finally(() => setLoading(false))
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const handleUpdateStatus = async (status) => {
+    if (!selectedTicket) return
+    setSaving(true)
+    setError('')
+    setMessage('')
+    try {
+      const updated = await updateTicket(selectedTicket.id, { status })
+      setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+      setSelectedTicket(updated)
+      setMessage('Đã cập nhật trạng thái')
+    } catch (err) {
+      setError(err.message || 'Cập nhật trạng thái thất bại')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleAssign = async (assignedTo) => {
+    if (!selectedTicket) return
+    setSaving(true)
+    setError('')
+    setMessage('')
+    try {
+      const updated = await updateTicket(selectedTicket.id, { assignedTo })
+      setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+      setSelectedTicket(updated)
+      setMessage('Đã gán người xử lý')
+    } catch (err) {
+      setError(err.message || 'Gán thất bại')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRespond = async () => {
+    if (!selectedTicket) return
+    setSaving(true)
+    setError('')
+    setMessage('')
+    try {
+      const updated = await updateTicket(selectedTicket.id, {
+        adminResponse: responseText,
+      })
+      setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+      setSelectedTicket(updated)
+      setResponseText(updated.adminResponse || '')
+      setMessage('Đã phản hồi cho ticket')
+    } catch (err) {
+      setError(err.message || 'Phản hồi thất bại')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Xóa ticket này?')) return
+    setSaving(true)
+    setError('')
+    setMessage('')
+    try {
+      await deleteTicket(id)
+      setTickets((prev) => prev.filter((t) => t.id !== id))
+      if (selectedTicket?.id === id) setSelectedTicket(null)
+      setMessage('Đã xóa ticket')
+    } catch (err) {
+      setError(err.message || 'Xóa ticket thất bại')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="page page-with-panel">
@@ -52,38 +111,17 @@ function TicketManagement() {
         </div>
       </div>
 
+      <section className="section">
+        {error && <p className="text-danger">{error}</p>}
+        {message && <p className="text-success">{message}</p>}
+      </section>
+
       <section className="section section-with-panel">
         <div className="table-panel">
-          <div className="filter-bar">
-            <div className="filter-bar-main">
-              <select className="input filter-input">
-                <option>Status / Trạng thái</option>
-                <option>New</option>
-                <option>In Progress</option>
-                <option>Resolved</option>
-                <option>Overdue</option>
-              </select>
-              <select className="input filter-input">
-                <option>Category / Loại</option>
-                <option>CSVC</option>
-                <option>WiFi</option>
-                <option>Thiết bị</option>
-                <option>Vệ sinh</option>
-              </select>
-              <select className="input filter-input">
-                <option>Department / Bộ phận</option>
-                <option>IT</option>
-                <option>CSVC</option>
-                <option>KTX</option>
-              </select>
-              <select className="input filter-input">
-                <option>SLA / SLA</option>
-                <option>On-time / Đúng SLA</option>
-                <option>Overdue / Trễ hạn</option>
-              </select>
-            </div>
+          <div className="section-header">
+            <h3 className="section-title">Tickets</h3>
+            {loading && <span className="badge subtle">Loading...</span>}
           </div>
-
           <div className="card table-card">
             <table className="table">
               <thead>
@@ -99,13 +137,16 @@ function TicketManagement() {
                 </tr>
               </thead>
               <tbody>
-                {mockTicketsAdmin.map((ticket) => (
+                {tickets.map((ticket) => (
                   <tr
                     key={ticket.id}
                     className={
                       selectedTicket?.id === ticket.id ? 'row-selected' : ''
                     }
-                    onClick={() => setSelectedTicket(ticket)}
+                    onClick={() => {
+                      setSelectedTicket(ticket)
+                      setResponseText(ticket.adminResponse || '')
+                    }}
                   >
                     <td>{ticket.id}</td>
                     <td>{ticket.category}</td>
@@ -114,7 +155,7 @@ function TicketManagement() {
                     <td>{ticket.assignedTo}</td>
                     <td>
                       <span
-                        className={`status-badge status-${ticket.statusKey}`}
+                        className={`status-badge status-${ticket.statusKey || 'new'}`}
                       >
                         {ticket.status}
                       </span>
@@ -123,14 +164,23 @@ function TicketManagement() {
                     <td>
                       <button
                         type="button"
-                        className="icon-button"
-                        aria-label="More actions"
+                        className="link-button small danger"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDelete(ticket.id)
+                        }}
+                        disabled={saving}
                       >
-                        ⋯
+                        Delete
                       </button>
                     </td>
                   </tr>
                 ))}
+                {!tickets.length && (
+                  <tr>
+                    <td colSpan="8">No tickets yet</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -170,13 +220,15 @@ function TicketManagement() {
                   <p className="detail-value">{selectedTicket.slaDue}</p>
                 </div>
                 <div>
-                  <p className="detail-label">SLA Status / Trạng thái SLA</p>
-                  <p className="detail-value">
-                    <span className="sla-badge sla-badge-warning">
-                      2h remaining / Còn 2 giờ
-                    </span>
-                  </p>
+                  <p className="detail-label">Description / Mô tả</p>
+                  <p className="detail-value">{selectedTicket.description}</p>
                 </div>
+                {selectedTicket.adminResponse && (
+                  <div>
+                    <p className="detail-label">Admin response / Phản hồi</p>
+                    <p className="detail-value">{selectedTicket.adminResponse}</p>
+                  </div>
+                )}
               </div>
 
               <div className="detail-section">
@@ -187,21 +239,69 @@ function TicketManagement() {
                   <label className="form-label">
                     Assign to / Gán cho
                   </label>
-                  <select className="input">
-                    <option>IT Staff 1</option>
-                    <option>IT Staff 2</option>
-                    <option>CSVC Staff 1</option>
-                  </select>
+                  <input
+                    className="input"
+                    value={selectedTicket.assignedTo || ''}
+                    onChange={(e) => handleAssign(e.target.value)}
+                    placeholder="Nhập tên nhân sự"
+                  />
                 </div>
                 <div className="form-actions">
-                  <button type="button" className="btn btn-secondary">
-                    Mark In Progress / Đánh dấu đang xử lý
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => handleUpdateStatus('In Progress')}
+                    disabled={saving}
+                  >
+                    Mark In Progress / Đang xử lý
                   </button>
-                  <button type="button" className="btn btn-primary">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => handleUpdateStatus('Resolved')}
+                    disabled={saving}
+                  >
                     Resolve / Đã xử lý
                   </button>
-                  <button type="button" className="btn btn-secondary subtle">
+                  <button
+                    type="button"
+                    className="btn btn-secondary subtle"
+                    onClick={() => handleUpdateStatus('Reopened')}
+                    disabled={saving}
+                  >
+                    Reopen / Mở lại
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary subtle"
+                    onClick={() => handleUpdateStatus('Escalated')}
+                    disabled={saving}
+                  >
                     Escalate / Chuyển cấp trên
+                  </button>
+                </div>
+              </div>
+
+              <div className="detail-section">
+                <h4 className="detail-section-title">Respond / Phản hồi</h4>
+                <div className="form-field">
+                  <label className="form-label">Message / Nội dung</label>
+                  <textarea
+                    className="input"
+                    rows="3"
+                    value={responseText}
+                    onChange={(e) => setResponseText(e.target.value)}
+                    placeholder="Nội dung phản hồi cho người gửi"
+                  />
+                </div>
+                <div className="form-actions">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleRespond}
+                    disabled={saving || !responseText.trim()}
+                  >
+                    Send Response / Gửi phản hồi
                   </button>
                 </div>
               </div>
@@ -214,34 +314,22 @@ function TicketManagement() {
                   <li className="timeline-item">
                     <div className="timeline-dot" />
                     <div>
-                      <p className="timeline-title">
-                        Ticket created / Tạo ticket
-                      </p>
-                      <p className="timeline-meta">
-                        2025-12-01 09:15 · Minh
-                      </p>
+                      <p className="timeline-title">Ticket created / Tạo ticket</p>
+                      <p className="timeline-meta">Ghi log mô phỏng</p>
                     </div>
                   </li>
                   <li className="timeline-item">
                     <div className="timeline-dot" />
                     <div>
-                      <p className="timeline-title">
-                        Assigned to IT Staff 1
-                      </p>
-                      <p className="timeline-meta">
-                        2025-12-01 09:30 · Admin
-                      </p>
+                      <p className="timeline-title">Assigned / Phân công</p>
+                      <p className="timeline-meta">Mock timeline</p>
                     </div>
                   </li>
                   <li className="timeline-item">
                     <div className="timeline-dot" />
                     <div>
-                      <p className="timeline-title">
-                        In Progress / Đang xử lý
-                      </p>
-                      <p className="timeline-meta">
-                        2025-12-01 10:00 · IT Staff 1
-                      </p>
+                      <p className="timeline-title">Status update</p>
+                      <p className="timeline-meta">Mock timeline</p>
                     </div>
                   </li>
                 </ul>
