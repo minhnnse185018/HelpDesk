@@ -9,9 +9,9 @@ const getBaseUrl = () => {
     return fromEnv.trim().replace(/\/$/, '')
   }
   console.warn(
-    'VITE_API_BASE_URL is not set; falling back to http://localhost:8080/api'
+    'VITE_API_BASE_URL is not set; falling back to http://localhost:3001'
   )
-  return 'http://localhost:8080/api'
+  return 'http://localhost:3001'
 }
 
 

@@ -10,12 +10,13 @@ import MyTickets from "./pages/student/MyTickets.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
 import TicketManagement from "./pages/admin/TicketManagement.jsx";
 import CategoryManagement from "./pages/admin/CategoryManagement.jsx";
-import Reports from "./pages/admin/Reports.jsx";
+import Reports from "./pages/admin/SlaManagement.jsx";
 import UserManagement from "./pages/admin/UserManagement.jsx";
 import DepartmentManagement from "./pages/admin/DepartmentManagement.jsx";
 import RoomManagement from "./pages/admin/RoomManagement.jsx";
 import RequireRoles from "./components/RequireRoles.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
+import SlaManagement from "./pages/admin/SlaManagement.jsx";
 import "./App.css";
 
 function App() {
@@ -56,6 +57,7 @@ function App() {
           <Route path="categories" element={<CategoryManagement />} />
           <Route path="departments" element={<DepartmentManagement />} />
           <Route path="rooms" element={<RoomManagement />} />
+          <Route path="Sla" element={<SlaManagement />} />
           <Route path="reports" element={<Reports />} />
           <Route path="users" element={<UserManagement />} />
         </Route>

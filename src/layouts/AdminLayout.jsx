@@ -92,7 +92,7 @@ function AdminLayout() {
               `sidebar-link ${isActive ? "sidebar-link-active" : ""}`
             }
           >
-            Reports
+            Sla Polices
           </NavLink>
         </nav>
       </aside>
