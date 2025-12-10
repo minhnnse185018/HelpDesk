@@ -113,7 +113,8 @@ function Login() {
     try {
       const idToken = credentialResponse.credential;
 
-      const res = await axios.post("http://localhost:3001/api/v1/auth/google", {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
+      const res = await axios.post(`${baseUrl}/api/v1/auth/google`, {
         idToken,
       });
 
