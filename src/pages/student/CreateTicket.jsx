@@ -1,125 +1,676 @@
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { apiClient } from '../../api/client'
+
 function CreateTicket() {
+  const navigate = useNavigate()
+  const [rooms, setRooms] = useState([])
+  const [categories, setCategories] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [files, setFiles] = useState([])
+
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    roomId: '',
+    categoryIds: [],
+  })
+
+  const loadRooms = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/api/v1/rooms')
+      const roomsData = response?.data || {}
+      const roomsList = Array.isArray(roomsData)
+        ? roomsData
+        : Object.values(roomsData).filter(Boolean)
+      setRooms(roomsList.filter(room => room.isActive))
+    } catch (err) {
+      console.error('Failed to load rooms:', err)
+    }
+  }, [])
+
+  const loadCategories = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/api/v1/categories')
+      const categoriesData = response?.data || {}
+      const categoriesList = Array.isArray(categoriesData)
+        ? categoriesData
+        : Object.values(categoriesData).filter(Boolean)
+      setCategories(categoriesList.filter(cat => cat.isActive))
+    } catch (err) {
+      console.error('Failed to load categories:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadRooms()
+    loadCategories()
+  }, [loadRooms, loadCategories])
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleCategoryChange = (e) => {
+    const id = e.target.value
+    if (id && !formData.categoryIds.includes(id)) {
+      setFormData(prev => ({
+        ...prev,
+        categoryIds: [...prev.categoryIds, id],
+      }))
+    }
+  }
+
+  const removeCategory = (id) => {
+    setFormData(prev => ({
+      ...prev,
+      categoryIds: prev.categoryIds.filter(c => c !== id),
+    }))
+  }
+
+  const validateFile = (file) => {
+    const maxVideo = 50 * 1024 * 1024
+    const maxDoc = 10 * 1024 * 1024
+    const videoTypes = ['video/mp4', 'video/mpeg', 'video/quicktime', 'video/x-msvideo']
+
+    if (videoTypes.includes(file.type)) {
+      if (file.size > maxVideo) return 'Video must be less than 50MB'
+    } else {
+      if (file.size > maxDoc) return 'Images/Documents must be less than 10MB'
+    }
+    return null
+  }
+
+  const handleFileChange = (e) => {
+    const selected = Array.from(e.target.files || [])
+    if (files.length + selected.length > 10) {
+      setError('Maximum 10 files allowed')
+      return
+    }
+
+    const valid = []
+    for (const file of selected) {
+      const err = validateFile(file)
+      if (err) {
+        setError(err)
+        return
+      }
+      valid.push(file)
+    }
+
+    setFiles(prev => [...prev, ...valid])
+    setError('')
+  }
+
+  const removeFile = (index) => {
+    setFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!formData.title.trim()) return setError('Title is required')
+    if (!formData.description.trim()) return setError('Description is required')
+    if (!formData.roomId) return setError('Please select a room')
+    if (formData.categoryIds.length === 0) return setError('Please select at least one category')
+
+    setSubmitting(true)
+    setError('')
+
+    try {
+      const fd = new FormData()
+      fd.append('title', formData.title)
+      fd.append('description', formData.description)
+      fd.append('roomId', formData.roomId)
+
+      formData.categoryIds.forEach(id => fd.append('categoryIds', id))
+      files.forEach(file => fd.append('files', file))
+
+      await apiClient.post('/api/v1/tickets', fd)
+
+      navigate('/student/my-tickets')
+    } catch (err) {
+      setError(err?.message || 'Failed to create ticket')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const getCategoryName = (id) => {
+    return categories.find(c => c.id === id)?.name || id
+  }
+
+  const getFilePreview = (file) => {
+    if (file.type.startsWith('image/')) {
+      return URL.createObjectURL(file)
+    }
+    return null
+  }
+
+  const getFileIcon = (file) => {
+    if (file.type.startsWith('image/')) return '🖼️'
+    if (file.type.startsWith('video/')) return '🎥'
+    if (file.type.includes('pdf')) return '📄'
+    return '📎'
+  }
+
   return (
-    <div className="page">
-      <div className="page-header">
-        <div>
-          <h2 className="page-title">
-            Create New Ticket / Tạo phản ánh mới
-          </h2>
-          <p className="page-subtitle">
-            Describe your facility, WiFi or equipment issue.
-          </p>
-        </div>
-      </div>
+    <div style={{ minHeight: '100vh', background: '#f8f9fa', padding: '2rem 1rem' }}>
+      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
 
-      <section className="section">
-        <div className="card form-card two-column-form">
-          <div className="form-grid">
-            <div className="form-field">
-              <label className="form-label">
-                Category / Loại phản ánh
-              </label>
-              <select className="input">
-                <option>CSVC</option>
-                <option>WiFi</option>
-                <option>Thiết bị</option>
-                <option>Vệ sinh</option>
-              </select>
-            </div>
+        {/* Header */}
+        <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.25rem' }}>
+          Create New Ticket
+        </h1>
+        <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
+          Submit a new ticket regarding facility, WiFi, or equipment issues.
+        </p>
 
-            <div className="form-field">
-              <label className="form-label">
-                Priority / Mức độ ưu tiên
-              </label>
-              <select className="input">
-                <option>Low / Thấp</option>
-                <option>Medium / Trung bình</option>
-                <option>High / Cao</option>
-                <option>Urgent / Khẩn cấp</option>
-              </select>
-            </div>
+        <form onSubmit={handleSubmit}>
+          <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
 
-            <div className="form-field">
-              <label className="form-label">Room / Phòng</label>
-              <div className="input-group">
+            {/* Error */}
+            {error && (
+              <div style={{
+                background: '#fee2e2',
+                border: '1px solid #fca5a5',
+                padding: '1rem',
+                borderRadius: '8px',
+                marginBottom: '1.5rem',
+                color: '#991b1b',
+                fontSize: '0.875rem'
+              }}>
+                ⚠️ {error}
+              </div>
+            )}
+
+            {/* Form Body */}
+            <div style={{ display: 'grid', gap: '1.5rem' }}>
+
+              {/* Title */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Title <span style={{ color: '#dc2626' }}>*</span>
+                </label>
                 <input
                   type="text"
-                  className="input"
-                  placeholder="Building / Tòa nhà (vd. A1)"
-                />
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Room / Phòng (vd. 203)"
+                  name="title"
+                  value={formData.title}
+                  onChange={handleInputChange}
+                  placeholder="Example: TV in room A101 is broken"
+                  disabled={submitting}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    fontSize: '1rem',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    outline: 'none',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                  onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
                 />
               </div>
-            </div>
 
-            <div className="form-field">
-              <label className="form-label">Department / Bộ phận</label>
-              <select className="input">
-                <option>IT</option>
-                <option>CSVC</option>
-                <option>KTX</option>
-              </select>
-            </div>
+              {/* Description */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Description <span style={{ color: '#dc2626' }}>*</span>
+                </label>
+                <textarea
+                  name="description"
+                  rows={5}
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  placeholder="Example: TV won't turn on, no power light"
+                  disabled={submitting}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    fontSize: '1rem',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                  onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                />
+              </div>
 
-            <div className="form-field full-width">
-              <label className="form-label">
-                Title / Tiêu đề vấn đề
-              </label>
-              <input
-                type="text"
-                className="input"
-                placeholder="Short summary / Tóm tắt ngắn"
-              />
-            </div>
+              {/* Room + Category */}
+              <div style={{
+                display: 'grid',
+                gap: '1.5rem',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))'
+              }}>
 
-            <div className="form-field full-width">
-              <label className="form-label">
-                Description / Mô tả chi tiết
-              </label>
-              <textarea
-                className="input textarea"
-                rows={4}
-                placeholder="Provide more details about the issue / Mô tả chi tiết vấn đề"
-              />
-            </div>
-
-            <div className="form-field full-width">
-              <label className="form-label">
-                Attachment / Ảnh đính kèm
-              </label>
-              <div className="upload-area">
-                <span className="upload-icon">📎</span>
+                {/* Room */}
                 <div>
-                  <p className="upload-title">
-                    Click to upload or drag and drop
-                  </p>
-                  <p className="upload-hint">
-                    Attachment / Ảnh đính kèm (PNG, JPG, PDF)
-                  </p>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Room <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
+                  <select
+                    name="roomId"
+                    value={formData.roomId}
+                    onChange={handleInputChange}
+                    disabled={submitting || loading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      fontSize: '1rem',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">Select a room</option>
+                    {rooms.map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} - {r.code} (Floor {r.floor})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Category */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Category <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
+                  <select
+                    onChange={handleCategoryChange}
+                    value=""
+                    disabled={submitting || loading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      fontSize: '1rem',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">Add category</option>
+                    {categories
+                      .filter(c => !formData.categoryIds.includes(c.id))
+                      .map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                  </select>
+
+                  {/* Selected Categories */}
+                  {formData.categoryIds.length > 0 && (
+                    <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {formData.categoryIds.map(id => (
+                        <span key={id} style={{
+                          background: '#eff6ff',
+                          border: '1px solid #bfdbfe',
+                          color: '#1e40af',
+                          padding: '0.375rem 0.75rem',
+                          borderRadius: '6px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontSize: '0.875rem',
+                          fontWeight: '500'
+                        }}>
+                          {getCategoryName(id)}
+                          <button
+                            type="button"
+                            onClick={() => removeCategory(id)}
+                            disabled={submitting}
+                            style={{
+                              border: 'none',
+                              background: 'none',
+                              cursor: submitting ? 'not-allowed' : 'pointer',
+                              color: '#6b7280',
+                              fontSize: '1.125rem',
+                              lineHeight: '1',
+                              padding: '0'
+                            }}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="form-footer">
-            <div className="sla-hint">
-              Expected response time based on SLA / Thời gian phản hồi dự kiến
-              theo SLA
+              {/* Upload Section - IMPROVED */}
+              <div style={{
+                paddingTop: '1.5rem',
+                borderTop: '1px solid #e5e7eb'
+              }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#374151',
+                  marginBottom: '0.75rem'
+                }}>
+                  Attachments (Optional)
+                </label>
+
+                <input
+                  id="file-upload"
+                  type="file"
+                  multiple
+                  accept="image/*,video/*,.pdf,.doc,.docx"
+                  onChange={handleFileChange}
+                  disabled={submitting}
+                  style={{ display: 'none' }}
+                />
+
+                {/* Upload Area */}
+                <label
+                  htmlFor="file-upload"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '2rem',
+                    border: '2px dashed #d1d5db',
+                    borderRadius: '8px',
+                    background: '#fafbfc',
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    textAlign: 'center'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!submitting) {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.backgroundColor = '#eff6ff'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#d1d5db'
+                    e.currentTarget.style.backgroundColor = '#fafbfc'
+                  }}
+                >
+                  <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📎</div>
+                  <div style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '0.25rem'
+                  }}>
+                    Click to upload or drag and drop
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                    Max 10 files · Images/Docs ≤ 10MB · Videos ≤ 50MB
+                  </div>
+                  {files.length > 0 && (
+                    <div style={{
+                      marginTop: '0.75rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#3b82f6'
+                    }}>
+                      {files.length} file{files.length > 1 ? 's' : ''} selected
+                    </div>
+                  )}
+                </label>
+
+                {/* File Preview Grid */}
+                {files.length > 0 && (
+                  <div style={{
+                    marginTop: '1.5rem',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                    gap: '1rem'
+                  }}>
+                    {files.map((file, index) => {
+                      const preview = getFilePreview(file)
+                      const isImage = file.type.startsWith('image/')
+                      
+                      return (
+                        <div
+                          key={index}
+                          style={{
+                            position: 'relative',
+                            aspectRatio: '1',
+                            backgroundColor: '#f9fafb',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            border: '1px solid #e5e7eb',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.boxShadow = 'none'
+                          }}
+                        >
+                          {/* Preview/Icon */}
+                          {isImage && preview ? (
+                            <img
+                              src={preview}
+                              alt={file.name}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
+                              }}
+                            />
+                          ) : (
+                            <div style={{
+                              width: '100%',
+                              height: '100%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '1rem'
+                            }}>
+                              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>
+                                {getFileIcon(file)}
+                              </div>
+                              <div style={{
+                                fontSize: '0.625rem',
+                                color: '#6b7280',
+                                textAlign: 'center',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                wordBreak: 'break-word'
+                              }}>
+                                {file.name}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* File Info Overlay */}
+                          <div style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
+                            padding: '0.5rem',
+                            paddingTop: '1.5rem'
+                          }}>
+                            <div style={{
+                              fontSize: '0.625rem',
+                              color: 'white',
+                              fontWeight: '600',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {file.name}
+                            </div>
+                            <div style={{
+                              fontSize: '0.625rem',
+                              color: 'rgba(255,255,255,0.8)'
+                            }}>
+                              {(file.size / 1024 / 1024).toFixed(2)} MB
+                            </div>
+                          </div>
+
+                          {/* Remove Button */}
+                          <button
+                            type="button"
+                            onClick={() => removeFile(index)}
+                            disabled={submitting}
+                            style={{
+                              position: 'absolute',
+                              top: '0.5rem',
+                              right: '0.5rem',
+                              width: '1.75rem',
+                              height: '1.75rem',
+                              borderRadius: '50%',
+                              backgroundColor: 'rgba(220, 38, 38, 0.9)',
+                              color: 'white',
+                              border: 'none',
+                              cursor: submitting ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '1rem',
+                              fontWeight: '700',
+                              lineHeight: '1',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!submitting) {
+                                e.currentTarget.style.backgroundColor = 'rgba(220, 38, 38, 1)'
+                                e.currentTarget.style.transform = 'scale(1.1)'
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'rgba(220, 38, 38, 0.9)'
+                              e.currentTarget.style.transform = 'scale(1)'
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="form-actions">
-              <button type="button" className="btn btn-secondary">
-                Cancel / Hủy
-              </button>
-              <button type="button" className="btn btn-primary">
-                Submit Ticket / Gửi phản ánh
-              </button>
+
+            {/* Footer */}
+            <div style={{
+              marginTop: '2rem',
+              paddingTop: '1.5rem',
+              borderTop: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}>
+              <p style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                fontStyle: 'italic'
+              }}>
+                💡 Response time will be based on SLA
+              </p>
+              
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => navigate('/student/dashboard')}
+                  disabled={submitting}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    background: 'white',
+                    color: '#374151',
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!submitting) e.currentTarget.style.backgroundColor = '#f9fafb'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white'
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={submitting || loading}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    borderRadius: '8px',
+                    background: (submitting || loading) ? '#9ca3af' : '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    cursor: (submitting || loading) ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!submitting && !loading) {
+                      e.currentTarget.style.backgroundColor = '#2563eb'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!submitting && !loading) {
+                      e.currentTarget.style.backgroundColor = '#3b82f6'
+                    }
+                  }}
+                >
+                  {submitting ? '⏳ Submitting...' : '✓ Submit Ticket'}
+                </button>
+              </div>
             </div>
+
           </div>
-        </div>
-      </section>
+        </form>
+      </div>
     </div>
   )
 }

@@ -1,214 +1,1189 @@
-import { useState } from 'react'
-
-const mockTickets = [
-  {
-    id: 'TCK-1024',
-    category: 'WiFi',
-    room: 'A1-203',
-    createdAt: '2025-12-01 09:15',
-    slaDue: '2025-12-02 12:00',
-    status: 'In Progress',
-    statusKey: 'in-progress',
-  },
-  {
-    id: 'TCK-1023',
-    category: 'CSVC',
-    room: 'Library 2F',
-    createdAt: '2025-11-30 15:40',
-    slaDue: '2025-12-01 10:00',
-    status: 'New',
-    statusKey: 'new',
-  },
-  {
-    id: 'TCK-1019',
-    category: 'Thiết bị',
-    room: 'Lab B3-105',
-    createdAt: '2025-11-28 08:20',
-    slaDue: '2025-11-28 15:30',
-    status: 'Overdue',
-    statusKey: 'overdue',
-  },
-  {
-    id: 'TCK-1015',
-    category: 'Vệ sinh',
-    room: 'Dorm KTX-C204',
-    createdAt: '2025-11-25 20:05',
-    slaDue: '2025-11-26 12:00',
-    status: 'Resolved',
-    statusKey: 'resolved',
-  },
-]
+import { useState, useEffect, useCallback } from 'react'
+import { apiClient } from '../../api/client'
 
 function MyTickets() {
+  const [tickets, setTickets] = useState([])
   const [selectedTicket, setSelectedTicket] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [imagePopup, setImagePopup] = useState(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
+
+  const loadTickets = useCallback(async () => {
+    try {
+      setLoading(true)
+      const response = await apiClient.get('/api/v1/tickets/my-tickets')
+      const ticketsData = response?.data || {}
+      const ticketsList = Array.isArray(ticketsData)
+        ? ticketsData
+        : Object.values(ticketsData).filter(Boolean)
+      setTickets(ticketsList)
+      setError('')
+    } catch (err) {
+      setError(err?.message || 'Failed to load tickets')
+      console.error('Failed to load tickets:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadTickets()
+  }, [loadTickets])
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A'
+    const date = new Date(dateString)
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  const getStatusLabel = (status) => {
+    const statusMap = {
+      open: 'New',
+      assigned: 'Assigned',
+      accepted: 'In Progress',
+      denied: 'Denied',
+      resolved: 'Resolved',
+      closed: 'Closed',
+    }
+    return statusMap[status] || status
+  }
+
+  const getStatusColor = (status) => {
+    const statusColorMap = {
+      open: { bg: '#dbeafe', text: '#1e40af', border: '#93c5fd' },
+      assigned: { bg: '#fef3c7', text: '#92400e', border: '#fcd34d' },
+      accepted: { bg: '#e0e7ff', text: '#3730a3', border: '#a5b4fc' },
+      denied: { bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' },
+      resolved: { bg: '#d1fae5', text: '#065f46', border: '#6ee7b7' },
+      closed: { bg: '#e5e7eb', text: '#374151', border: '#d1d5db' },
+    }
+    return statusColorMap[status] || statusColorMap.open
+  }
+
+  const getCategoryNames = (ticketCategories) => {
+    if (!ticketCategories || ticketCategories.length === 0) return 'N/A'
+    return ticketCategories.map((tc) => tc.category?.name || 'Unknown').join(', ')
+  }
+
+  const filteredTickets = tickets.filter((ticket) => {
+    const matchesSearch =
+      !searchTerm ||
+      ticket.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.room?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.room?.code?.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesCategory =
+      !categoryFilter ||
+      ticket.ticketCategories?.some(
+        (tc) => tc.category?.name === categoryFilter
+      )
+
+    const matchesStatus =
+      !statusFilter || getStatusLabel(ticket.status) === statusFilter
+
+    return matchesSearch && matchesCategory && matchesStatus
+  })
+
+  const allCategories = [
+    ...new Set(
+      tickets.flatMap((t) =>
+        t.ticketCategories?.map((tc) => tc.category?.name).filter(Boolean)
+      )
+    ),
+  ]
+
+  const handleSelectTicket = (ticket) => {
+    setSelectedTicket(ticket)
+  }
+
+  const openImagePopup = (attachment) => {
+    setImagePopup(attachment)
+  }
+
+  const closeImagePopup = () => {
+    setImagePopup(null)
+  }
+
+  const handleDeleteTicket = async (ticketId) => {
+    try {
+      await apiClient.delete(`/api/v1/tickets/${ticketId}`)
+      setTickets(tickets.filter(t => t.id !== ticketId))
+      if (selectedTicket?.id === ticketId) {
+        setSelectedTicket(null)
+      }
+      setDeleteConfirm(null)
+      setError('')
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to delete ticket')
+      console.error('Failed to delete ticket:', err)
+    }
+  }
 
   return (
-    <div className="page page-with-panel">
-      <div className="page-header">
-        <div>
-          <h2 className="page-title">My Tickets / Ticket của tôi</h2>
-          <p className="page-subtitle">
-            View and track your submitted tickets.
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#f8f9fa',
+      padding: '2rem 1rem'
+    }}>
+      <div style={{
+        maxWidth: '1600px',
+        margin: '0 auto'
+      }}>
+        {/* Header */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h1 style={{
+            fontSize: '2rem',
+            fontWeight: '700',
+            color: '#1a1a1a',
+            marginBottom: '0.5rem'
+          }}>
+            My Tickets
+          </h1>
+          <p style={{
+            fontSize: '1rem',
+            color: '#6b7280'
+          }}>
+            View and track your submitted tickets
           </p>
         </div>
-      </div>
 
-      <section className="section section-with-panel">
-        <div className="table-panel">
-          <div className="filter-bar">
-            <div className="filter-bar-main">
-              <div className="search-field">
+        {/* Error Message */}
+        {error && (
+          <div style={{
+            backgroundColor: '#fee2e2',
+            border: '1px solid #fca5a5',
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+            color: '#991b1b'
+          }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        {/* Main Content */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: selectedTicket ? '1fr 450px' : '1fr',
+          gap: '1.5rem',
+          alignItems: 'start'
+        }}>
+          {/* Left Panel - Table */}
+          <div>
+            {/* Filter Bar */}
+            <div style={{
+              backgroundColor: 'white',
+              padding: '1.25rem',
+              borderRadius: '12px',
+              marginBottom: '1rem',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '1rem'
+              }}>
                 <input
                   type="text"
-                  className="input"
-                  placeholder="Search by title, room… / Tìm theo tiêu đề, phòng…"
+                  placeholder="Search by title or room..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    padding: '0.75rem',
+                    fontSize: '0.875rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                  onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
                 />
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  style={{
+                    padding: '0.75rem',
+                    fontSize: '0.875rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">All Categories</option>
+                  {allCategories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  style={{
+                    padding: '0.75rem',
+                    fontSize: '0.875rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">All Status</option>
+                  <option value="New">New</option>
+                  <option value="Assigned">Assigned</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Denied">Denied</option>
+                  <option value="Resolved">Resolved</option>
+                  <option value="Closed">Closed</option>
+                </select>
               </div>
-              <select className="input filter-input">
-                <option>All categories / Tất cả loại</option>
-                <option>CSVC</option>
-                <option>WiFi</option>
-                <option>Thiết bị</option>
-                <option>Vệ sinh</option>
-              </select>
-              <select className="input filter-input">
-                <option>Status / Trạng thái</option>
-                <option>New</option>
-                <option>In Progress</option>
-                <option>Resolved</option>
-                <option>Overdue</option>
-              </select>
+            </div>
+
+            {/* Table */}
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              overflow: 'hidden'
+            }}>
+              {loading ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: '#6b7280' }}>
+                  ⏳ Loading tickets...
+                </div>
+              ) : filteredTickets.length === 0 ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: '#6b7280' }}>
+                  📭 No tickets found
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{
+                    width: '100%',
+                    borderCollapse: 'collapse'
+                  }}>
+                    <thead>
+                      <tr style={{
+                        backgroundColor: '#f9fafb',
+                        borderBottom: '2px solid #e5e7eb'
+                      }}>
+                        <th style={{
+                          padding: '1rem',
+                          textAlign: 'left',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>Title</th>
+                        <th style={{
+                          padding: '1rem',
+                          textAlign: 'left',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>Category</th>
+                        <th style={{
+                          padding: '1rem',
+                          textAlign: 'left',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>Room</th>
+                        <th style={{
+                          padding: '1rem',
+                          textAlign: 'left',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>Created</th>
+                        <th style={{
+                          padding: '1rem',
+                          textAlign: 'left',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>Due Date</th>
+                        <th style={{
+                          padding: '1rem',
+                          textAlign: 'left',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          color: '#6b7280',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredTickets.map((ticket) => {
+                        const isSelected = selectedTicket?.id === ticket.id
+                        const statusColor = getStatusColor(ticket.status)
+                        return (
+                          <tr
+                            key={ticket.id}
+                            onClick={() => handleSelectTicket(ticket)}
+                            style={{
+                              cursor: 'pointer',
+                              backgroundColor: isSelected ? '#eff6ff' : 'white',
+                              borderBottom: '1px solid #e5e7eb',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected) e.currentTarget.style.backgroundColor = '#f9fafb'
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) e.currentTarget.style.backgroundColor = 'white'
+                            }}
+                          >
+                            <td style={{
+                              padding: '1rem',
+                              fontSize: '0.875rem',
+                              color: '#111827',
+                              fontWeight: '500'
+                            }}>{ticket.title}</td>
+                            <td style={{
+                              padding: '1rem',
+                              fontSize: '0.875rem',
+                              color: '#6b7280'
+                            }}>{getCategoryNames(ticket.ticketCategories)}</td>
+                            <td style={{
+                              padding: '1rem',
+                              fontSize: '0.875rem',
+                              color: '#6b7280'
+                            }}>
+                              {ticket.room?.name} ({ticket.room?.code})
+                            </td>
+                            <td style={{
+                              padding: '1rem',
+                              fontSize: '0.875rem',
+                              color: '#6b7280'
+                            }}>{formatDate(ticket.createdAt)}</td>
+                            <td style={{
+                              padding: '1rem',
+                              fontSize: '0.875rem',
+                              color: '#6b7280'
+                            }}>{formatDate(ticket.dueDate)}</td>
+                            <td style={{ padding: '1rem' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '0.375rem 0.75rem',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                borderRadius: '6px',
+                                backgroundColor: statusColor.bg,
+                                color: statusColor.text,
+                                border: `1px solid ${statusColor.border}`
+                              }}>
+                                {getStatusLabel(ticket.status)}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="card table-card">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Ticket ID</th>
-                  <th>Category / Loại</th>
-                  <th>Room / Phòng</th>
-                  <th>Created At / Ngày tạo</th>
-                  <th>SLA Due / Hạn SLA</th>
-                  <th>Status / Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mockTickets.map((ticket) => (
-                  <tr
-                    key={ticket.id}
-                    className={
-                      selectedTicket?.id === ticket.id ? 'row-selected' : ''
-                    }
-                    onClick={() => setSelectedTicket(ticket)}
-                  >
-                    <td>{ticket.id}</td>
-                    <td>{ticket.category}</td>
-                    <td>{ticket.room}</td>
-                    <td>{ticket.createdAt}</td>
-                    <td>{ticket.slaDue}</td>
-                    <td>
-                      <span
-                        className={`status-badge status-${ticket.statusKey}`}
-                      >
-                        {ticket.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <aside className="detail-panel">
-          {selectedTicket ? (
-            <div className="card detail-card">
-              <h3 className="detail-title">
-                Ticket Detail / Chi tiết Ticket
-              </h3>
-              <p className="detail-subtitle">{selectedTicket.id}</p>
-
-              <div className="detail-grid">
+          {/* Right Panel - Detail */}
+          {selectedTicket && (
+            <div style={{
+              position: 'sticky',
+              top: '2rem',
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              padding: '1.5rem',
+              maxHeight: 'calc(100vh - 4rem)',
+              overflowY: 'auto'
+            }}>
+              {/* Close Button */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'start',
+                marginBottom: '1.5rem'
+              }}>
                 <div>
-                  <p className="detail-label">Category / Loại</p>
-                  <p className="detail-value">{selectedTicket.category}</p>
-                </div>
-                <div>
-                  <p className="detail-label">Room / Phòng</p>
-                  <p className="detail-value">{selectedTicket.room}</p>
-                </div>
-                <div>
-                  <p className="detail-label">Created At / Ngày tạo</p>
-                  <p className="detail-value">{selectedTicket.createdAt}</p>
-                </div>
-                <div>
-                  <p className="detail-label">SLA Due / Hạn SLA</p>
-                  <p className="detail-value">{selectedTicket.slaDue}</p>
-                </div>
-                <div>
-                  <p className="detail-label">Status / Trạng thái</p>
-                  <p className="detail-value">
-                    <span
-                      className={`status-badge status-${selectedTicket.statusKey}`}
-                    >
-                      {selectedTicket.status}
-                    </span>
+                  <h3 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: '700',
+                    color: '#111827',
+                    marginBottom: '0.25rem'
+                  }}>
+                    Ticket Details
+                  </h3>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280'
+                  }}>
+                    {selectedTicket.title}
                   </p>
                 </div>
+                <button
+                  onClick={() => setSelectedTicket(null)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer',
+                    color: '#6b7280',
+                    padding: '0',
+                    lineHeight: '1'
+                  }}
+                >
+                  ×
+                </button>
               </div>
 
-              <div className="detail-section">
-                <h4 className="detail-section-title">
-                  Timeline / Lịch sử xử lý
-                </h4>
-                <ul className="timeline">
-                  <li className="timeline-item">
-                    <div className="timeline-dot" />
-                    <div>
-                      <p className="timeline-title">
-                        Ticket created / Tạo ticket
-                      </p>
-                      <p className="timeline-meta">
-                        2025-11-28 08:20 · Minh
-                      </p>
-                    </div>
-                  </li>
-                  <li className="timeline-item">
-                    <div className="timeline-dot" />
-                    <div>
-                      <p className="timeline-title">
-                        Assigned to facility staff / Phân công nhân sự CSVC
-                      </p>
-                      <p className="timeline-meta">
-                        2025-11-28 09:00 · Admin
-                      </p>
-                    </div>
-                  </li>
-                  <li className="timeline-item">
-                    <div className="timeline-dot" />
-                    <div>
-                      <p className="timeline-title">
-                        In Progress / Đang xử lý
-                      </p>
-                      <p className="timeline-meta">
-                        2025-11-28 10:15 · Staff
-                      </p>
-                    </div>
-                  </li>
-                </ul>
+              {/* Info Grid */}
+              <div style={{
+                display: 'grid',
+                gap: '1rem',
+                marginBottom: '1.5rem'
+              }}>
+                <div>
+                  <p style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginBottom: '0.25rem'
+                  }}>Category</p>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#111827'
+                  }}>{getCategoryNames(selectedTicket.ticketCategories)}</p>
+                </div>
+                <div>
+                  <p style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginBottom: '0.25rem'
+                  }}>Room</p>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#111827'
+                  }}>
+                    {selectedTicket.room?.name} ({selectedTicket.room?.code}) - Floor{' '}
+                    {selectedTicket.room?.floor}
+                  </p>
+                </div>
+                {selectedTicket.department && (
+                  <div>
+                    <p style={{
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      marginBottom: '0.25rem'
+                    }}>Department</p>
+                    <p style={{
+                      fontSize: '0.875rem',
+                      color: '#111827'
+                    }}>{selectedTicket.department.name}</p>
+                  </div>
+                )}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '1rem'
+                }}>
+                  <div>
+                    <p style={{
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      marginBottom: '0.25rem'
+                    }}>Created</p>
+                    <p style={{
+                      fontSize: '0.875rem',
+                      color: '#111827'
+                    }}>{formatDate(selectedTicket.createdAt)}</p>
+                  </div>
+                  <div>
+                    <p style={{
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      marginBottom: '0.25rem'
+                    }}>Due Date</p>
+                    <p style={{
+                      fontSize: '0.875rem',
+                      color: '#111827'
+                    }}>{formatDate(selectedTicket.dueDate)}</p>
+                  </div>
+                </div>
+                <div>
+                  <p style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginBottom: '0.25rem'
+                  }}>Status</p>
+                  {(() => {
+                    const statusColor = getStatusColor(selectedTicket.status)
+                    return (
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '0.375rem 0.75rem',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        borderRadius: '6px',
+                        backgroundColor: statusColor.bg,
+                        color: statusColor.text,
+                        border: `1px solid ${statusColor.border}`
+                      }}>
+                        {getStatusLabel(selectedTicket.status)}
+                      </span>
+                    )
+                  })()}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="card detail-card empty-detail">
-              <p className="empty-detail-text">
-                Select a ticket to view details / Chọn một ticket để xem chi
-                tiết
-              </p>
+
+              {/* Description */}
+              <div style={{
+                marginBottom: '1.5rem',
+                paddingTop: '1.5rem',
+                borderTop: '1px solid #e5e7eb'
+              }}>
+                <h4 style={{
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  marginBottom: '0.75rem'
+                }}>Description</h4>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#374151',
+                  whiteSpace: 'pre-wrap',
+                  lineHeight: '1.6'
+                }}>
+                  {selectedTicket.description || 'No description provided'}
+                </p>
+              </div>
+
+              {/* Attachments - Grid Layout */}
+              {selectedTicket.attachments && selectedTicket.attachments.length > 0 && (
+                <div style={{
+                  marginBottom: '1.5rem',
+                  paddingTop: '1.5rem',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  <h4 style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#111827',
+                    marginBottom: '0.75rem'
+                  }}>Attachments ({selectedTicket.attachments.length})</h4>
+                  
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                    gap: '0.75rem'
+                  }}>
+                    {selectedTicket.attachments.map((attachment) => {
+                      const isImage = attachment.mimeType?.startsWith('image/')
+                      return (
+                        <div
+                          key={attachment.id}
+                          onClick={() => isImage && openImagePopup(attachment)}
+                          style={{
+                            position: 'relative',
+                            aspectRatio: '1',
+                            backgroundColor: '#f9fafb',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            cursor: isImage ? 'pointer' : 'default',
+                            border: '1px solid #e5e7eb',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (isImage) {
+                              e.currentTarget.style.transform = 'scale(1.05)'
+                              e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)'
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (isImage) {
+                              e.currentTarget.style.transform = 'scale(1)'
+                              e.currentTarget.style.boxShadow = 'none'
+                            }
+                          }}
+                        >
+                          {isImage ? (
+                            <>
+                              <img
+                                src={attachment.filePath}
+                                alt={attachment.fileName}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover'
+                                }}
+                              />
+                              <div style={{
+                                position: 'absolute',
+                                top: '0.5rem',
+                                right: '0.5rem',
+                                backgroundColor: 'rgba(0,0,0,0.6)',
+                                color: 'white',
+                                borderRadius: '4px',
+                                padding: '0.25rem 0.5rem',
+                                fontSize: '0.625rem',
+                                fontWeight: '600'
+                              }}>
+                                🔍
+                              </div>
+                            </>
+                          ) : (
+                            <a
+                              href={attachment.filePath}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '100%',
+                                height: '100%',
+                                textDecoration: 'none',
+                                color: '#6b7280',
+                                padding: '0.5rem'
+                              }}
+                            >
+                              <span style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>📎</span>
+                              <span style={{
+                                fontSize: '0.625rem',
+                                textAlign: 'center',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical'
+                              }}>
+                                {attachment.fileName}
+                              </span>
+                            </a>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Timeline */}
+              <div style={{
+                paddingTop: '1.5rem',
+                borderTop: '1px solid #e5e7eb'
+              }}>
+                <h4 style={{
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  marginBottom: '1rem'
+                }}>Timeline</h4>
+                <div style={{ position: 'relative' }}>
+                  {/* Timeline Items */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem'
+                  }}>
+                    {/* Created */}
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                      <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: '#3b82f6',
+                        marginTop: '0.375rem',
+                        flexShrink: 0
+                      }} />
+                      <div>
+                        <p style={{
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#111827'
+                        }}>Ticket Created</p>
+                        <p style={{
+                          fontSize: '0.75rem',
+                          color: '#6b7280',
+                          marginTop: '0.125rem'
+                        }}>
+                          {formatDate(selectedTicket.createdAt)} · {selectedTicket.creator?.username || selectedTicket.creator?.email}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Assigned */}
+                    {selectedTicket.assignedAt && (
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: '#f59e0b',
+                          marginTop: '0.375rem',
+                          flexShrink: 0
+                        }} />
+                        <div>
+                          <p style={{
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            color: '#111827'
+                          }}>Assigned</p>
+                          <p style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginTop: '0.125rem'
+                          }}>
+                            {formatDate(selectedTicket.assignedAt)} · {selectedTicket.assignee?.username || selectedTicket.assignee?.email || 'System'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Accepted */}
+                    {selectedTicket.acceptedAt && (
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: '#6366f1',
+                          marginTop: '0.375rem',
+                          flexShrink: 0
+                        }} />
+                        <div>
+                          <p style={{
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            color: '#111827'
+                          }}>Accepted</p>
+                          <p style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginTop: '0.125rem'
+                          }}>
+                            {formatDate(selectedTicket.acceptedAt)} · {selectedTicket.assignee?.username || selectedTicket.assignee?.email}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Started */}
+                    {selectedTicket.startedAt && (
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: '#8b5cf6',
+                          marginTop: '0.375rem',
+                          flexShrink: 0
+                        }} />
+                        <div>
+                          <p style={{
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            color: '#111827'
+                          }}>Started</p>
+                          <p style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginTop: '0.125rem'
+                          }}>
+                            {formatDate(selectedTicket.startedAt)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Resolved */}
+                    {selectedTicket.resolvedAt && (
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: '#10b981',
+                          marginTop: '0.375rem',
+                          flexShrink: 0
+                        }} />
+                        <div>
+                          <p style={{
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            color: '#111827'
+                          }}>Resolved</p>
+                          <p style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginTop: '0.125rem'
+                          }}>
+                            {formatDate(selectedTicket.resolvedAt)}
+                          </p>
+                          {selectedTicket.resolutionNote && (
+                            <p style={{
+                              fontSize: '0.75rem',
+                              color: '#374151',
+                              marginTop: '0.25rem',
+                              fontStyle: 'italic'
+                            }}>
+                              {selectedTicket.resolutionNote}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Closed */}
+                    {selectedTicket.closedAt && (
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: '#6b7280',
+                          marginTop: '0.375rem',
+                          flexShrink: 0
+                        }} />
+                        <div>
+                          <p style={{
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            color: '#111827'
+                          }}>Closed</p>
+                          <p style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginTop: '0.125rem'
+                          }}>
+                            {formatDate(selectedTicket.closedAt)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Denied */}
+                    {selectedTicket.status === 'denied' && selectedTicket.deniedReason && (
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: '#ef4444',
+                          marginTop: '0.375rem',
+                          flexShrink: 0
+                        }} />
+                        <div>
+                          <p style={{
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            color: '#111827'
+                          }}>Denied</p>
+                          <p style={{
+                            fontSize: '0.75rem',
+                            color: '#6b7280',
+                            marginTop: '0.125rem'
+                          }}>
+                            Reason: {selectedTicket.deniedReason}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Delete Button */}
+              <button
+                onClick={() => setDeleteConfirm(selectedTicket)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1rem',
+                  backgroundColor: 'white',
+                  color: 'black',
+                  border: '1px solid black',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  marginTop: '1.5rem',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f3f4f6'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                }}
+              >
+                Delete Ticket
+              </button>
             </div>
           )}
-        </aside>
-      </section>
+        </div>
+
+        {/* Delete Confirmation Modal */}
+        {deleteConfirm && (
+          <div
+            onClick={() => setDeleteConfirm(null)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              padding: '1rem'
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: 'white',
+                borderRadius: '12px',
+                padding: '2rem',
+                maxWidth: '450px',
+                width: '100%',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)'
+              }}
+            >
+              <h3 style={{
+                fontSize: '1.25rem',
+                fontWeight: '700',
+                color: '#111827',
+                marginBottom: '0.75rem'
+              }}>
+                Delete Ticket?
+              </h3>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                marginBottom: '1.5rem',
+                lineHeight: '1.6'
+              }}>
+                Are you sure you want to delete the ticket <strong>"{deleteConfirm.title}"</strong>? This action cannot be undone.
+              </p>
+              <div style={{
+                display: 'flex',
+                gap: '0.75rem',
+                justifyContent: 'flex-end'
+              }}>
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  style={{
+                    padding: '0.625rem 1.25rem',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#e5e7eb'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f3f4f6'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteTicket(deleteConfirm.id)}
+                  style={{
+                    padding: '0.625rem 1.25rem',
+                    backgroundColor: '#111827',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#374151'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#111827'
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Image Popup Modal */}
+        {imagePopup && (
+          <div
+            onClick={closeImagePopup}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.9)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              padding: '2rem'
+            }}
+          >
+            {/* Close Button */}
+            <button
+              onClick={closeImagePopup}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: 'rgba(255, 255, 255, 0.2)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '3rem',
+                height: '3rem',
+                color: 'white',
+                fontSize: '2rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s',
+                lineHeight: '1'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+              }}
+            >
+              ×
+            </button>
+
+            {/* Image Container */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                maxWidth: '90%',
+                maxHeight: '90%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center'
+              }}
+            >
+              <img
+                src={imagePopup.filePath}
+                alt={imagePopup.fileName}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '80vh',
+                  objectFit: 'contain',
+                  borderRadius: '8px',
+                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)'
+                }}
+              />
+              
+              {/* Image Info */}
+              <div style={{
+                marginTop: '1.5rem',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(10px)',
+                padding: '1rem 1.5rem',
+                borderRadius: '8px',
+                textAlign: 'center'
+              }}>
+                <p style={{
+                  color: 'white',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  marginBottom: '0.25rem'
+                }}>
+                  {imagePopup.fileName}
+                </p>
+                <p style={{
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '0.75rem'
+                }}>
+                  {(imagePopup.fileSize / 1024 / 1024).toFixed(2)} MB
+                </p>
+                
+                {/* Download Button */}
+                <a
+                  href={imagePopup.filePath}
+                  download={imagePopup.fileName}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-block',
+                    marginTop: '0.75rem',
+                    padding: '0.5rem 1rem',
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    textDecoration: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#2563eb'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#3b82f6'
+                  }}
+                >
+                  ⬇️ Download
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
