@@ -17,6 +17,8 @@ import RoomManagement from "./pages/admin/RoomManagement.jsx";
 import RequireRoles from "./components/RequireRoles.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import SlaManagement from "./pages/admin/SlaManagement.jsx";
+import AdminReassignRequests from "./pages/admin/AdminReassignRequests.jsx";
+import AdminReassignRequestDetail from "./pages/admin/AdminReassignRequestDetail.jsx";
 import "./App.css";
 
 function App() {
@@ -60,6 +62,8 @@ function App() {
           <Route path="Sla" element={<SlaManagement />} />
           <Route path="reports" element={<Reports />} />
           <Route path="users" element={<UserManagement />} />
+          <Route path="reassign-requests" element={<AdminReassignRequests />} />
+          <Route path="reassign-requests/:id" element={<AdminReassignRequestDetail />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/login" replace />} />

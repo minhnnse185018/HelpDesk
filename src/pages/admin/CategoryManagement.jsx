@@ -124,7 +124,7 @@ function CategoryManagement() {
     setUpdating(true)
     setActionError('')
     try {
-      await apiClient.put(`/api/v1/categories/${selectedId}`, formData)
+      await apiClient.patch(`/api/v1/categories/${selectedId}`, formData)
       await Promise.all([loadCategories(), loadSelectedCategory()])
     } catch (err) {
       setActionError(err?.message || 'Failed to update category')

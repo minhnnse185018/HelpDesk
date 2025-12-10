@@ -30,7 +30,7 @@ function StudentLayout() {
 
   const displayName = profile.name || "User";
   const displayRole = profile.role
-    ? profile.role.charAt(0) + profile.role.slice(1).toLowerCase()
+    ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1).toLowerCase()
     : "Student";
   const displayAvatar = displayName.charAt(0).toUpperCase() || "U";
   const [showProfileModal, setShowProfileModal] = useState(false);

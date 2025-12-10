@@ -8,8 +8,10 @@ function AdminLayout() {
   const navigate = useNavigate();
   const { profile, refreshProfile } = useAuthProfile();
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const displayName = profile.name || "Admin";
-  const displayRole = profile.role || "ADMIN";
+  const displayName = profile.name || profile.username || "Admin";
+  const displayRole = profile.role
+    ? profile.role.charAt(0) + profile.role.slice(1).toLowerCase()
+    : "Admin";
   const displayAvatar = displayName.charAt(0).toUpperCase() || "A";
   const handleLogout = async () => {
     const refreshToken = localStorage.getItem("refreshToken");
