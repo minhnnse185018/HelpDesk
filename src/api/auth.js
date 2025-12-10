@@ -6,7 +6,7 @@ export const isValidEmail = (value) =>
   value.trim().length > 3 &&
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
 
-export const isValidPassword = (value, minLength = 8) =>
+export const isValidPassword = (value, minLength = 6) =>
   typeof value === 'string' && value.trim().length >= minLength
 
 export const isNonEmpty = (value) =>
