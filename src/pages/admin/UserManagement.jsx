@@ -320,9 +320,8 @@ function UserManagement() {
                 </div>
 
                 <div className="detail-section">
-                  <h4 className="detail-section-title">Update Role</h4>
                   <div className="form-field">
-                    <label className="form-label">Role</label>
+                    <label className="form-label">Update Role</label>
                     <select
                       className="input"
                       value={selectedRole}
@@ -343,9 +342,8 @@ function UserManagement() {
 
                 {selectedRole === 'staff' && (
                   <div className="detail-section">
-                    <h4 className="detail-section-title">Assign Department</h4>
                     <div className="form-field">
-                      <label className="form-label">Department</label>
+                      <label className="form-label">Assign Department</label>
                       <select
                         className="input"
                         value={selectedUser?.departmentId || ''}
