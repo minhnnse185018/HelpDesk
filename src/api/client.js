@@ -129,6 +129,13 @@ async function request(path, options = {}) {
   // NORMAL RESPONSE PROCESSING
   // ===============================
   if (!response.ok) {
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const errorData = await response.json().catch(() => null);
+      const error = new Error(errorData?.message || response.statusText);
+      error.response = { data: errorData };
+      throw error;
+    }
     const text = await response.text().catch(() => "");
     throw new Error(text || response.statusText);
   }

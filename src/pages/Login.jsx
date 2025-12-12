@@ -95,8 +95,12 @@ function Login() {
       if (usernameFromPayload)
         localStorage.setItem("username", usernameFromPayload);
 
-      const destination =
-        normalizedRole === "ADMIN" ? "/admin/dashboard" : "/student/dashboard";
+      let destination = "/student/dashboard";
+      if (normalizedRole === "ADMIN") {
+        destination = "/admin/dashboard";
+      } else if (normalizedRole === "STAFF") {
+        destination = "/staff/dashboard";
+      }
       navigate(destination, { replace: true });
     } catch (error) {
       setServerError(extractErrorMessage(error));
@@ -154,12 +158,13 @@ function Login() {
 
       // DELAY 100ms để Google iframe giải phóng
       setTimeout(() => {
-        navigate(
-          normalizedRole === "ADMIN"
-            ? "/admin/dashboard"
-            : "/student/dashboard",
-          { replace: true }
-        );
+        let destination = "/student/dashboard";
+        if (normalizedRole === "ADMIN") {
+          destination = "/admin/dashboard";
+        } else if (normalizedRole === "STAFF") {
+          destination = "/staff/dashboard";
+        }
+        navigate(destination, { replace: true });
       }, 100);
     } catch (err) {
       console.error(err);

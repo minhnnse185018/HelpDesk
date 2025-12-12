@@ -148,9 +148,6 @@ function DepartmentManagement() {
       <div className="page-header">
         <div>
           <h2 className="page-title">Department Management</h2>
-          <p className="page-subtitle">
-            Create, view, update, and delete departments.
-          </p>
         </div>
         <button className="btn btn-primary" onClick={openCreateModal}>
           Create Department

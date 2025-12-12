@@ -4,7 +4,7 @@ import { logout } from "../api/auth";
 import { useAuthProfile } from "../hooks/useAuthProfile";
 import ProfileModal from "../components/ProfileModal";
 
-function StudentLayout() {
+function StaffLayout() {
   const navigate = useNavigate();
   const { profile, refreshProfile } = useAuthProfile();
   const [showNav, setShowNav] = useState(true);
@@ -28,11 +28,11 @@ function StudentLayout() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const displayName = profile.name || "User";
+  const displayName = profile.name || "Staff";
   const displayRole = profile.role
     ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1).toLowerCase()
-    : "Student";
-  const displayAvatar = displayName.charAt(0).toUpperCase() || "U";
+    : "Staff";
+  const displayAvatar = displayName.charAt(0).toUpperCase() || "S";
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   const handleLogout = async () => {
@@ -49,11 +49,11 @@ function StudentLayout() {
     <div className="app-shell">
       {/* HEADER */}
       <header className="top-bar">
-        <div className="top-bar-left" onClick={() => navigate("/student/dashboard")}>
+        <div className="top-bar-left" onClick={() => navigate("/staff/dashboard")}>
           <div className="app-logo">FH</div>
           <div className="app-title-group">
             <span className="app-title">Facility Feedback & Helpdesk</span>
-            <span className="app-subtitle">Hệ thống phản ánh CSVC, WiFi, thiết bị</span>
+            <span className="app-subtitle">Staff Portal - Quản lý và xử lý tickets</span>
           </div>
         </div>
 
@@ -71,14 +71,14 @@ function StudentLayout() {
 
       {/* FLOATING NAV */}
       <nav className={`top-nav-links ${showNav ? "top-nav-show" : "top-nav-hide"}`}>
-        <NavLink to="/student/dashboard" className={({ isActive }) =>
+        <NavLink to="/staff/dashboard" className={({ isActive }) =>
           `top-nav-link ${isActive ? "top-nav-link-active" : ""}`}>Dashboard</NavLink>
 
-        <NavLink to="/student/my-tickets" className={({ isActive }) =>
-          `top-nav-link ${isActive ? "top-nav-link-active" : ""}`}>My Tickets</NavLink>
+        <NavLink to="/staff/tickets" className={({ isActive }) =>
+          `top-nav-link ${isActive ? "top-nav-link-active" : ""}`}>Assigned Tickets</NavLink>
 
-        <NavLink to="/student/create-ticket" className={({ isActive }) =>
-          `top-nav-link ${isActive ? "top-nav-link-active" : ""}`}>Create Ticket</NavLink>
+        <NavLink to="/staff/sub-tickets" className={({ isActive }) =>
+          `top-nav-link ${isActive ? "top-nav-link-active" : ""}`}>Sub-Tickets</NavLink>
       </nav>
 
       <main className="app-content">
@@ -90,4 +90,4 @@ function StudentLayout() {
   );
 }
 
-export default StudentLayout;
+export default StaffLayout;

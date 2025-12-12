@@ -16,6 +16,21 @@ function UserManagement() {
   const [updating, setUpdating] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [departments, setDepartments] = useState([])
+  const [assigningDepartment, setAssigningDepartment] = useState(false)
+  const [activeTab, setActiveTab] = useState('staff')
+
+  // Load danh sách departments
+  const loadDepartments = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/api/v1/departments')
+      const deptData = response?.data || []
+      const deptList = Array.isArray(deptData) ? deptData : Object.values(deptData).filter(Boolean)
+      setDepartments(deptList)
+    } catch (err) {
+      console.error('Failed to load departments:', err)
+    }
+  }, [])
 
   // Load danh sách users
   const loadUsers = useCallback(async () => {
@@ -51,7 +66,8 @@ function UserManagement() {
 
   useEffect(() => {
     loadUsers()
-  }, [loadUsers])
+    loadDepartments()
+  }, [loadUsers, loadDepartments])
 
   useEffect(() => {
     loadSelectedUser()
@@ -70,6 +86,29 @@ function UserManagement() {
       setActionError(err?.message || 'Failed to update role')
     } finally {
       setUpdating(false)
+    }
+  }
+
+  // Gán staff vào department
+  const handleAssignDepartment = async (event) => {
+    const departmentId = event.target.value
+    if (!selectedId || !departmentId) return
+    
+    // Validate: chỉ staff mới được assign vào department
+    if (selectedRole !== 'staff') {
+      setActionError('Only staff users can be assigned to departments')
+      return
+    }
+    
+    setAssigningDepartment(true)
+    setActionError('')
+    try {
+      await apiClient.post(`/api/v1/users/${selectedId}/assign-department`, { departmentId })
+      await Promise.all([loadUsers(), loadSelectedUser()])
+    } catch (err) {
+      setActionError(err?.message || 'Failed to assign department')
+    } finally {
+      setAssigningDepartment(false)
     }
   }
 
@@ -95,12 +134,23 @@ function UserManagement() {
     }
   }
 
-  // Lọc users, không hiển thị users có role là admin
+  // Lọc users theo tab đang chọn
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const normalizedRole = String(user.role || '').toLowerCase()
-      return normalizedRole !== 'admin'
+      return normalizedRole === activeTab
     })
+  }, [users, activeTab])
+
+  // Đếm số lượng users theo role
+  const userCounts = useMemo(() => {
+    const counts = { staff: 0, student: 0 }
+    users.forEach((user) => {
+      const role = String(user.role || '').toLowerCase()
+      if (role === 'staff') counts.staff++
+      if (role === 'student') counts.student++
+    })
+    return counts
   }, [users])
 
   const selectedRole = useMemo(() => {
@@ -121,10 +171,52 @@ function UserManagement() {
 
       <section className="section section-with-panel">
         <div className="table-panel">
+          {/* Tabs */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '0.5rem',
+            marginBottom: '1.5rem',
+            borderBottom: '2px solid #e5e7eb'
+          }}>
+            <button
+              type="button"
+              onClick={() => setActiveTab('staff')}
+              style={{
+                padding: '0.875rem 1.5rem',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'staff' ? '2px solid #3b82f6' : '2px solid transparent',
+                color: activeTab === 'staff' ? '#3b82f6' : '#6b7280',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              Staff ({userCounts.staff})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('student')}
+              style={{
+                padding: '0.875rem 1.5rem',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'student' ? '2px solid #3b82f6' : '2px solid transparent',
+                color: activeTab === 'student' ? '#3b82f6' : '#6b7280',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              Student ({userCounts.student})
+            </button>
+          </div>
+
           <div className="filter-bar">
             <div className="filter-bar-main">
               <span className="filter-hint">
-                Total Users: {filteredUsers.length}
               </span>
             </div>
             {error && <div className="form-error">{error}</div>}
@@ -228,9 +320,8 @@ function UserManagement() {
                 </div>
 
                 <div className="detail-section">
-                  <h4 className="detail-section-title">Update Role</h4>
                   <div className="form-field">
-                    <label className="form-label">Role</label>
+                    <label className="form-label">Update Role</label>
                     <select
                       className="input"
                       value={selectedRole}
@@ -248,6 +339,34 @@ function UserManagement() {
                     </select>
                   </div>
                 </div>
+
+                {selectedRole === 'staff' && (
+                  <div className="detail-section">
+                    <div className="form-field">
+                      <label className="form-label">Assign Department</label>
+                      <select
+                        className="input"
+                        value={selectedUser?.departmentId || ''}
+                        onChange={handleAssignDepartment}
+                        disabled={assigningDepartment || updating || deleting}
+                      >
+                        <option value="">
+                          {selectedUser?.departmentId ? '-- Change Department --' : '-- Select Department --'}
+                        </option>
+                        {departments.map((dept) => (
+                          <option key={dept.id} value={dept.id}>
+                            {dept.name}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedUser?.departmentId && (
+                        <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                          Current: {departments.find(d => d.id === selectedUser.departmentId)?.name || selectedUser.departmentId}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="detail-section">
                   <h4 className="detail-section-title">Danger Zone</h4>

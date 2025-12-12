@@ -24,7 +24,10 @@ export function useAuthProfile() {
     try {
       const response = await getUserProfile()
       const payload = response?.data || response || {}
-      const roleFromApi = payload?.role?.[0] || payload?.roles?.[0]
+      // Handle both string and array role formats
+      const roleFromApi = Array.isArray(payload?.role) 
+        ? payload.role[0]
+        : payload?.role || payload?.roles?.[0]
       const normalizedRole = roleFromApi
         ? String(roleFromApi).toUpperCase()
         : ''
