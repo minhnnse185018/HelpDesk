@@ -1,36 +1,155 @@
-function AdminDashboard() {
-  const kpis = [
-    { label: 'Total Tickets / Tổng số ticket', value: 132 },
-    { label: 'On-time SLA / Đúng SLA', value: '87%' },
-    { label: 'Overdue Tickets / Ticket trễ hạn', value: 26 },
-  ]
+import { useState, useEffect } from 'react'
+import { apiClient } from '../../api/client'
 
-  const recentTickets = [
-    {
-      id: 'TCK-1024',
-      category: 'WiFi',
-      room: 'A1-203',
-      status: 'In Progress',
-      statusKey: 'in-progress',
-      slaDue: 'Today 17:00',
-    },
-    {
-      id: 'TCK-1019',
-      category: 'Thiết bị',
-      room: 'Lab B3-105',
-      status: 'Overdue',
-      statusKey: 'overdue',
-      slaDue: 'Yesterday 15:30',
-    },
-    {
-      id: 'TCK-1015',
-      category: 'Vệ sinh',
-      room: 'Dorm KTX-C204',
-      status: 'Resolved',
-      statusKey: 'resolved',
-      slaDue: 'Completed',
-    },
-  ]
+function AdminDashboard() {
+  const [loading, setLoading] = useState(true)
+  const [tickets, setTickets] = useState([])
+  const [kpis, setKpis] = useState([
+    { label: 'Total Tickets / Tổng số ticket', value: 0 },
+    { label: 'On-time SLA / Đúng SLA', value: '0%' },
+    { label: 'Overdue Tickets / Ticket trễ hạn', value: 0 },
+  ])
+  const [categoryStats, setCategoryStats] = useState([])
+  const [slaStats, setSlaStats] = useState({ onTime: 0, overdue: 0 })
+  const [recentTickets, setRecentTickets] = useState([])
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true)
+      const response = await apiClient.get('/api/v1/tickets')
+      
+      let data = response?.data || response
+      
+      // Normalize data to array
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const keys = Object.keys(data)
+        if (keys.length > 0 && keys.every((key) => !isNaN(Number(key)))) {
+          data = Object.values(data)
+        } else {
+          data = data.tickets || data.data || data.items || []
+        }
+      }
+      
+      const ticketsArray = Array.isArray(data) ? data : []
+      setTickets(ticketsArray)
+      
+      // Calculate KPIs
+      const totalTickets = ticketsArray.length
+      const overdueTickets = ticketsArray.filter(t => t.status === 'overdue').length
+      const onTimePercentage = totalTickets > 0 
+        ? Math.round(((totalTickets - overdueTickets) / totalTickets) * 100)
+        : 0
+      
+      setKpis([
+        { label: 'Total Tickets / Tổng số ticket', value: totalTickets },
+        { label: 'On-time SLA / Đúng SLA', value: `${onTimePercentage}%` },
+        { label: 'Overdue Tickets / Ticket trễ hạn', value: overdueTickets },
+      ])
+      
+      // Calculate category statistics
+      const categoryMap = {}
+      ticketsArray.forEach(ticket => {
+        if (ticket.ticketCategories && Array.isArray(ticket.ticketCategories)) {
+          ticket.ticketCategories.forEach(tc => {
+            const catName = tc.category?.name
+            if (catName) {
+              categoryMap[catName] = (categoryMap[catName] || 0) + 1
+            }
+          })
+        }
+      })
+      
+      const categoryStatsArray = Object.entries(categoryMap)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 6) // Top 6 categories
+      
+      setCategoryStats(categoryStatsArray)
+      
+      // Calculate SLA stats
+      setSlaStats({
+        onTime: totalTickets - overdueTickets,
+        overdue: overdueTickets,
+      })
+      
+      // Get recent tickets (last 5)
+      const recent = ticketsArray
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 5)
+        .map(ticket => ({
+          id: ticket.id,
+          title: ticket.title,
+          category: ticket.ticketCategories?.[0]?.category?.name || 'N/A',
+          room: ticket.room?.name || 'N/A',
+          status: getStatusLabel(ticket.status),
+          statusKey: ticket.status,
+          slaDue: ticket.dueDate ? formatDate(ticket.dueDate) : 'N/A',
+        }))
+      
+      setRecentTickets(recent)
+      
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const getStatusLabel = (status) => {
+    const labels = {
+      open: 'Open',
+      assigned: 'Assigned',
+      in_progress: 'In Progress',
+      resolved: 'Resolved',
+      closed: 'Closed',
+      overdue: 'Overdue',
+    }
+    return labels[status] || status
+  }
+  
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A'
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return 'N/A'
+    return date.toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+  
+  const getMaxCount = () => {
+    return Math.max(...categoryStats.map(c => c.count), 1)
+  }
+
+  if (loading) {
+    return (
+      <div className="page">
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '400px',
+          color: '#6b7280'
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+              Loading Dashboard...
+            </div>
+            <div style={{ fontSize: '0.875rem' }}>
+              Fetching ticket statistics
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="page">
@@ -60,34 +179,29 @@ function AdminDashboard() {
             Tickets by Category / Ticket theo loại
           </h3>
           <div className="chart-placeholder bar-chart">
-            <div className="bar-row">
-              <span className="bar-label">CSVC</span>
-              <div className="bar-track">
-                <div className="bar bar-primary" style={{ width: '70%' }} />
+            {categoryStats.length === 0 ? (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '2rem', 
+                color: '#9ca3af',
+                fontSize: '0.875rem'
+              }}>
+                No category data available
               </div>
-              <span className="bar-value">45</span>
-            </div>
-            <div className="bar-row">
-              <span className="bar-label">WiFi</span>
-              <div className="bar-track">
-                <div className="bar bar-primary" style={{ width: '55%' }} />
-              </div>
-              <span className="bar-value">32</span>
-            </div>
-            <div className="bar-row">
-              <span className="bar-label">Thiết bị</span>
-              <div className="bar-track">
-                <div className="bar bar-primary" style={{ width: '40%' }} />
-              </div>
-              <span className="bar-value">26</span>
-            </div>
-            <div className="bar-row">
-              <span className="bar-label">Vệ sinh</span>
-              <div className="bar-track">
-                <div className="bar bar-primary" style={{ width: '30%' }} />
-              </div>
-              <span className="bar-value">18</span>
-            </div>
+            ) : (
+              categoryStats.map((cat) => (
+                <div key={cat.name} className="bar-row">
+                  <span className="bar-label">{cat.name}</span>
+                  <div className="bar-track">
+                    <div 
+                      className="bar bar-primary" 
+                      style={{ width: `${(cat.count / getMaxCount()) * 100}%` }} 
+                    />
+                  </div>
+                  <span className="bar-value">{cat.count}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -100,11 +214,11 @@ function AdminDashboard() {
             <div className="donut-legend">
               <div className="legend-item">
                 <span className="legend-dot legend-dot-green" />
-                <span>On-time / Đúng SLA</span>
+                <span>On-time / Đúng SLA: {slaStats.onTime}</span>
               </div>
               <div className="legend-item">
                 <span className="legend-dot legend-dot-red" />
-                <span>Overdue / Trễ hạn</span>
+                <span>Overdue / Trễ hạn: {slaStats.overdue}</span>
               </div>
             </div>
           </div>
@@ -129,21 +243,45 @@ function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {recentTickets.map((ticket) => (
-                <tr key={ticket.id}>
-                  <td>{ticket.id}</td>
-                  <td>{ticket.category}</td>
-                  <td>{ticket.room}</td>
-                  <td>
-                    <span
-                      className={`status-badge status-${ticket.statusKey}`}
-                    >
-                      {ticket.status}
-                    </span>
+              {recentTickets.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ 
+                    textAlign: 'center', 
+                    padding: '2rem', 
+                    color: '#9ca3af',
+                    fontSize: '0.875rem'
+                  }}>
+                    No recent tickets
                   </td>
-                  <td>{ticket.slaDue}</td>
                 </tr>
-              ))}
+              ) : (
+                recentTickets.map((ticket) => (
+                  <tr key={ticket.id}>
+                    <td>
+                      <div style={{ 
+                        fontWeight: 500, 
+                        color: '#111827',
+                        maxWidth: '200px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {ticket.title || ticket.id}
+                      </div>
+                    </td>
+                    <td>{ticket.category}</td>
+                    <td>{ticket.room}</td>
+                    <td>
+                      <span
+                        className={`status-badge status-${ticket.statusKey}`}
+                      >
+                        {ticket.status}
+                      </span>
+                    </td>
+                    <td>{ticket.slaDue}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
