@@ -74,7 +74,9 @@ function StaffAssignedTickets() {
   const [error, setError] = useState('')
   const [denyModal, setDenyModal] = useState(null)
   const [resolveModal, setResolveModal] = useState(null)
-  const [activeTab, setActiveTab] = useState('all') // all, assigned, in_progress, resolved, cancelled, closed
+  const [activeTab, setActiveTab] = useState('all')
+  const [alertModal, setAlertModal] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('') // all, assigned, in_progress, resolved, cancelled, closed
 
   const loadTickets = async () => {
     try {
@@ -102,13 +104,26 @@ function StaffAssignedTickets() {
     }
   }
 
-  // Filter tickets by status
+  // Filter tickets by status and search term
   // Tickets with deniedReason are automatically considered cancelled
-  const filteredTickets = activeTab === 'all' 
+  let filteredTickets = activeTab === 'all' 
     ? tickets 
     : activeTab === 'cancelled'
       ? tickets.filter(ticket => ticket.status === 'cancelled' || ticket.deniedReason)
       : tickets.filter(ticket => ticket.status === activeTab && !ticket.deniedReason)
+  
+  // Apply search filter
+  if (searchTerm) {
+    const searchLower = searchTerm.toLowerCase()
+    filteredTickets = filteredTickets.filter((ticket) =>
+      ticket.title?.toLowerCase().includes(searchLower) ||
+      ticket.room?.name?.toLowerCase().includes(searchLower) ||
+      ticket.room?.code?.toLowerCase().includes(searchLower) ||
+      ticket.department?.name?.toLowerCase().includes(searchLower) ||
+      ticket.status?.toLowerCase().includes(searchLower) ||
+      ticket.priority?.toLowerCase().includes(searchLower)
+    )
+  }
 
   // Count tickets by status
   // Tickets with deniedReason count as cancelled
@@ -131,7 +146,7 @@ function StaffAssignedTickets() {
       await loadTickets()
     } catch (err) {
       console.error('Failed to accept ticket:', err)
-      alert('Failed to accept ticket: ' + (err?.message || 'Unknown error'))
+      setAlertModal({ message: 'Failed to accept ticket: ' + (err?.message || 'Unknown error') })
     }
   }
 
@@ -143,7 +158,7 @@ function StaffAssignedTickets() {
       await loadTickets()
     } catch (err) {
       console.error('Failed to deny ticket:', err)
-      alert('Failed to deny ticket: ' + (err?.message || 'Unknown error'))
+      setAlertModal({ message: 'Failed to deny ticket: ' + (err?.message || 'Unknown error') })
     }
   }
 
@@ -155,7 +170,7 @@ function StaffAssignedTickets() {
       await loadTickets()
     } catch (err) {
       console.error('Failed to resolve ticket:', err)
-      alert('Failed to resolve ticket: ' + (err?.message || 'Unknown error'))
+      setAlertModal({ message: 'Failed to resolve ticket: ' + (err?.message || 'Unknown error') })
     }
   }
 
@@ -199,6 +214,44 @@ function StaffAssignedTickets() {
       {!loading && !error && tickets.length === 0 && (
         <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
           <p style={{ color: '#6b7280' }}>No tickets assigned to you yet.</p>
+        </div>
+      )}
+
+      {/* Search Box */}
+      {!loading && !error && tickets.length > 0 && (
+        <div style={{ marginBottom: '1rem' }}>
+          <input
+            type="text"
+            placeholder="Search tickets by title, room, department, status, priority..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "0.75rem 1rem",
+              fontSize: "0.875rem",
+              fontWeight: 500,
+              backgroundColor: "rgba(255, 255, 255, 0.72)",
+              color: "#374151",
+              border: "1px solid rgba(255,255,255,0.18)",
+              borderRadius: "14px",
+              backdropFilter: "blur(40px) saturate(180%)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4)",
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.boxShadow = "0 12px 40px rgba(99, 102, 241, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4)"
+              e.currentTarget.style.borderColor = "rgba(99, 102, 241, 0.3)"
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.boxShadow = "0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4)"
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)"
+            }}
+          />
+          {searchTerm && (
+            <p style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "0.5rem" }}>
+              Found {filteredTickets.length} ticket{filteredTickets.length !== 1 ? 's' : ''}
+            </p>
+          )}
         </div>
       )}
 
@@ -445,6 +498,14 @@ function StaffAssignedTickets() {
         </div>
       )}
 
+      {/* Alert Modal */}
+      {alertModal && (
+        <AlertModal
+          message={alertModal.message}
+          onClose={() => setAlertModal(null)}
+        />
+      )}
+
       {/* Deny Modal */}
       {denyModal && (
         <DenyTicketModal
@@ -682,6 +743,58 @@ function TabButton({ label, active, onClick, color = '#2563eb', bgColor = '#dbea
     >
       {label}
     </button>
+  )
+}
+
+// Alert Modal Component
+function AlertModal({ message, onClose }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="card"
+        style={{
+          width: '100%',
+          maxWidth: '400px',
+          padding: '1.5rem',
+          margin: '1rem',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(40px) saturate(180%)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+          borderRadius: '20px',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: 600, textAlign: 'center' }}>
+          Notice
+        </div>
+        <div style={{ marginBottom: '1.5rem', color: '#374151', textAlign: 'center' }}>
+          {message}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onClose}
+            style={{ minWidth: '100px' }}
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

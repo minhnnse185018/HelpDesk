@@ -24,7 +24,6 @@ function EditTicket() {
 
   useEffect(() => {
     loadTicketData()
-    loadStaffList()
     loadDepartments()
   }, [id])
 
@@ -42,6 +41,9 @@ function EditTicket() {
         assignedTo: ticket.assignedTo || ticket.assignee?.id || '',
         departmentId: ticket.departmentId || ticket.department?.id || ''
       })
+      
+      // Load staff filtered by ticket's department
+      await loadStaffList(ticket)
     } catch (err) {
       console.error('Failed to load ticket:', err)
       setNotification({ type: 'error', message: err?.response?.data?.message || 'Failed to load ticket' })
@@ -50,8 +52,33 @@ function EditTicket() {
     }
   }
 
-  const loadStaffList = async () => {
+  const loadStaffList = async (ticket) => {
     try {
+      // Get department IDs from ticket categories
+      const ticketDepartmentIds = new Set()
+      
+      if (Array.isArray(ticket.ticketCategories) && ticket.ticketCategories.length > 0) {
+        for (const tc of ticket.ticketCategories) {
+          const categoryId = tc.categoryId || tc.category?.id
+          if (categoryId) {
+            try {
+              const categoryRes = await apiClient.get(`/api/v1/categories/${categoryId}`)
+              const categoryData = categoryRes?.data || categoryRes
+              const departmentId = categoryData?.departmentId || categoryData?.department?.id
+              
+              if (departmentId) {
+                ticketDepartmentIds.add(departmentId)
+              }
+            } catch (err) {
+              console.error(`Failed to fetch category ${categoryId}:`, err)
+            }
+          }
+        }
+      }
+
+      console.log('Ticket Department IDs:', Array.from(ticketDepartmentIds))
+
+      // Fetch all users and filter by department
       const response = await apiClient.get('/api/v1/users')
       let data = response?.data || response
       
@@ -59,10 +86,24 @@ function EditTicket() {
         data = Object.values(data).filter(Boolean)
       }
       
-      const filteredStaff = (Array.isArray(data) ? data : []).filter(
-        (user) => String(user.role || '').toLowerCase() === 'staff'
-      )
+      let filteredStaff = []
       
+      if (ticketDepartmentIds.size > 0) {
+        // Filter staff by department
+        filteredStaff = (Array.isArray(data) ? data : []).filter((user) => {
+          const isStaff = String(user.role || '').toLowerCase() === 'staff'
+          const userDeptId = user.departmentId || user.department?.id
+          
+          return isStaff && userDeptId && ticketDepartmentIds.has(userDeptId)
+        })
+      } else {
+        // No department found, show all staff
+        filteredStaff = (Array.isArray(data) ? data : []).filter(
+          (user) => String(user.role || '').toLowerCase() === 'staff'
+        )
+      }
+      
+      console.log('Filtered staff list:', filteredStaff)
       setStaffList(filteredStaff)
     } catch (err) {
       console.error('Failed to load staff:', err)

@@ -4,21 +4,24 @@ import StatusTickets from "./StatusTickets";
 import PendingSplitTickets from "./PendingSplitTickets";
 import WaitingAcceptanceTickets from "./WaitingAcceptanceTickets";
 import OverdueTickets from "./OverdueTickets";
+import SubTickets from "./SubTickets";
+import AdminReassignRequests from "./AdminReassignRequests";
 
 function TicketManagement() {
   const [activeTab, setActiveTab] = useState("all");
 
   const tabs = [
     { key: "all", label: "All Tickets" },
+    { key: "sub-tickets", label: "Sub-Tickets" },
     { key: "open", label: "Open" },
     { key: "assigned", label: "Assigned" },
     { key: "in_progress", label: "In Progress" },
     { key: "resolved", label: "Resolved" },
-    { key: "closed", label: "Closed" },
+    // { key: "closed", label: "Closed" },
     { key: "pending-split", label: "Pending Split" },
-    { key: "waiting-acceptance", label: "Waiting Acceptance" },
+    // { key: "waiting-acceptance", label: "Waiting Acceptance" },
     { key: "overdue", label: "Overdue" },
-    { key: "Sub_Ticket", }
+    { key: "reassign-requests", label: "Reassign Requests" }
   ];
 
   return (
@@ -96,8 +99,10 @@ function TicketManagement() {
         {activeTab === "resolved" && <StatusTickets status="resolved" />}
         {activeTab === "closed" && <StatusTickets status="closed" />}
         {activeTab === "pending-split" && <PendingSplitTickets />}
-        {activeTab === "waiting-acceptance" && <WaitingAcceptanceTickets />}
+        {/* {activeTab === "waiting-acceptance" && <WaitingAcceptanceTickets />} */}
         {activeTab === "overdue" && <OverdueTickets />}
+        {activeTab === "sub-tickets" && <SubTickets />}
+        {activeTab === "reassign-requests" && <AdminReassignRequests />}
       </div>
     </div>
   );

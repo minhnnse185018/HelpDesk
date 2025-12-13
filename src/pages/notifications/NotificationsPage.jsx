@@ -31,7 +31,20 @@ function NotificationsPage() {
         setError('')
         const response = await apiClient.get('/api/v1/notifications')
         const data = response?.data || response
-        setNotifications(Array.isArray(data) ? data : [])
+        
+        console.log('📬 Notifications API response:', data)
+        
+        // Convert to array if it's an object
+        let notificationsArray = []
+        if (Array.isArray(data)) {
+          notificationsArray = data
+        } else if (data && typeof data === 'object') {
+          notificationsArray = Object.values(data)
+        }
+        
+        console.log('📋 Notifications array:', notificationsArray)
+        
+        setNotifications(notificationsArray)
       } catch (err) {
         console.error('Failed to load notifications:', err)
         setError(err?.message || 'Failed to load notifications')
@@ -81,9 +94,23 @@ function NotificationsPage() {
   // Handle notification click
   const handleNotificationClick = (notification) => {
     if (notification.ticketId) {
-      // TODO: Navigate based on user role
-      // For now, defaulting to student route
-      navigate(`/student/tickets/${notification.ticketId}`)
+      // Get user role from localStorage
+      const role = localStorage.getItem('role')?.toUpperCase()
+      
+      // Navigate based on role
+      if (role === 'ADMIN') {
+        navigate(`/admin/tickets/${notification.ticketId}`)
+      } else if (role === 'STAFF') {
+        navigate(`/staff/tickets/${notification.ticketId}`)
+      } else {
+        // Student - navigate to my tickets detail (assuming this route exists)
+        navigate(`/student/my-tickets/${notification.ticketId}`)
+      }
+      
+      // Mark as read when clicked
+      if (!notification.isRead) {
+        handleMarkAsRead(notification.id)
+      }
     }
   }
 

@@ -13,6 +13,8 @@ function AllTickets() {
   const [assignModal, setAssignModal] = useState(null);
   const [notification, setNotification] = useState(null);
   const [sortOrder, setSortOrder] = useState("asc");
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const handleSortByPriority = () => {
     const priorityMap = { low: 1, medium: 2, high: 3, critical: 4 };
@@ -52,32 +54,61 @@ function AllTickets() {
 
   useEffect(() => {
     loadTickets();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      loadTickets();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
-  const handleDelete = async (ticketId) => {
-    if (!window.confirm("Are you sure you want to delete this ticket?"))
-      return;
+  const handleDeleteClick = (ticketId) => {
+    setDeleteConfirmModal(ticketId);
+  };
+
+  const handleDeleteConfirm = async () => {
+    const ticketId = deleteConfirmModal;
+    setDeleteConfirmModal(null);
+
     try {
       await apiClient.delete(`/api/v1/tickets/${ticketId}`);
-      setNotification({ type: "success", message: "Ticket deleted successfully!" });
+      setNotification({ type: "success", message: "Xóa ticket thành công!" });
       loadTickets();
     } catch (err) {
       console.error("Failed to delete:", err);
-      setNotification({ type: "error", message: "Failed to delete ticket" });
+      setNotification({ type: "error", message: "Xóa ticket thất bại" });
     }
   };
 
   const handleAssign = async (ticketId, staffId, priority) => {
     try {
-      await apiClient.put(`/api/v1/tickets/${ticketId}/assign`, { staffId, priority });
+      await apiClient.post(`/api/v1/tickets/${ticketId}/assign-category`, { staffId, priority });
       setNotification({ type: "success", message: "Ticket assigned successfully!" });
       setAssignModal(null);
       loadTickets();
     } catch (err) {
       console.error("Failed to assign:", err);
-      setNotification({ type: "error", message: "Failed to assign ticket" });
+      console.error("Error details:", err.response?.data);
+      setNotification({ type: "error", message: err.response?.data?.message || "Failed to assign ticket" });
     }
   };
+
+  // Filter tickets based on search term
+  const filteredTickets = tickets.filter((ticket) => {
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      ticket.title?.toLowerCase().includes(searchLower) ||
+      ticket.room?.name?.toLowerCase().includes(searchLower) ||
+      ticket.room?.code?.toLowerCase().includes(searchLower) ||
+      ticket.department?.name?.toLowerCase().includes(searchLower) ||
+      ticket.assignee?.username?.toLowerCase().includes(searchLower) ||
+      ticket.assignee?.fullName?.toLowerCase().includes(searchLower) ||
+      ticket.status?.toLowerCase().includes(searchLower) ||
+      ticket.priority?.toLowerCase().includes(searchLower)
+    );
+  });
 
   if (loading) {
     return (
@@ -132,6 +163,42 @@ function AllTickets() {
 
   return (
     <>
+      {/* Search Box */}
+      <div style={{ marginBottom: "1rem" }}>
+        <input
+          type="text"
+          placeholder="Search tickets by title, room, department, assignee, status, priority..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "0.75rem 1rem",
+            fontSize: "0.875rem",
+            fontWeight: 500,
+            backgroundColor: "rgba(255, 255, 255, 0.72)",
+            color: "#374151",
+            border: "1px solid rgba(255,255,255,0.18)",
+            borderRadius: "14px",
+            backdropFilter: "blur(40px) saturate(180%)",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4)",
+            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.boxShadow = "0 12px 40px rgba(99, 102, 241, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4)"
+            e.currentTarget.style.borderColor = "rgba(99, 102, 241, 0.3)"
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.boxShadow = "0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4)"
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)"
+          }}
+        />
+        {searchTerm && (
+          <p style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "0.5rem" }}>
+            Found {filteredTickets.length} ticket{filteredTickets.length !== 1 ? 's' : ''}
+          </p>
+        )}
+      </div>
+
       <div
         style={{
           backgroundColor: "rgba(255, 255, 255, 0.72)",
@@ -270,7 +337,7 @@ function AllTickets() {
               </tr>
             </thead>
             <tbody>
-              {tickets.length === 0 ? (
+              {filteredTickets.length === 0 ? (
                 <tr>
                   <td
                     colSpan="9"
@@ -281,12 +348,12 @@ function AllTickets() {
                     }}
                   >
                     <div style={{ fontSize: "0.875rem", fontWeight: 500 }}>
-                      No tickets found
+                      {searchTerm ? `No tickets found matching "${searchTerm}"` : 'No tickets found'}
                     </div>
                   </td>
                 </tr>
               ) : (
-                tickets.map((ticket) => (
+                filteredTickets.map((ticket) => (
                   <tr
                     key={ticket.id}
                     style={{ borderBottom: "1px solid #f3f4f6" }}
@@ -383,40 +450,73 @@ function AllTickets() {
                         <button
                           type="button"
                           onClick={() =>
-                            navigate(`/admin/tickets/edit/${ticket.id}`)
+                            navigate(`/admin/tickets/${ticket.id}`)
                           }
                           style={{
                             padding: "0.5rem 1rem",
                             fontSize: "0.8rem",
                             fontWeight: 500,
-                            backgroundColor: "rgba(59, 130, 246, 0.08)",
-                            color: "#2563eb",
-                            border: "1px solid rgba(59, 130, 246, 0.2)",
+                            backgroundColor: "rgba(99, 102, 241, 0.08)",
+                            color: "#6366f1",
+                            border: "1px solid rgba(99, 102, 241, 0.2)",
                             borderRadius: "14px",
                             cursor: "pointer",
                             transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                             backdropFilter: "blur(40px) saturate(200%)",
                             boxShadow:
-                              "0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(59, 130, 246, 0.1)",
+                              "0 8px 32px rgba(99, 102, 241, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(99, 102, 241, 0.1)",
                           }}
                           onMouseOver={(e) => {
                             e.currentTarget.style.backgroundColor =
-                              "rgba(59, 130, 246, 0.15)";
+                              "rgba(99, 102, 241, 0.15)";
                             e.currentTarget.style.transform =
                               "translateY(-1px)";
                           }}
                           onMouseOut={(e) => {
                             e.currentTarget.style.backgroundColor =
-                              "rgba(59, 130, 246, 0.08)";
+                              "rgba(99, 102, 241, 0.08)";
                             e.currentTarget.style.transform = "translateY(0)";
                           }}
                         >
-                          Edit
+                          View
                         </button>
+                        {ticket.status !== "in_progress" && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(`/admin/tickets/edit/${ticket.id}`)
+                            }
+                            style={{
+                              padding: "0.5rem 1rem",
+                              fontSize: "0.8rem",
+                              fontWeight: 500,
+                              backgroundColor: "rgba(59, 130, 246, 0.08)",
+                              color: "#2563eb",
+                              border: "1px solid rgba(59, 130, 246, 0.2)",
+                              borderRadius: "14px",
+                              cursor: "pointer",
+                              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                              backdropFilter: "blur(40px) saturate(200%)",
+                              boxShadow:
+                                "0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(59, 130, 246, 0.1)",
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.backgroundColor =
+                                "rgba(59, 130, 246, 0.15)";
+                              e.currentTarget.style.transform =
+                                "translateY(-1px)";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.backgroundColor =
+                                "rgba(59, 130, 246, 0.08)";
+                              e.currentTarget.style.transform = "translateY(0)";
+                            }}
+                          >
+                            Edit
+                          </button>
+                        )}
                         {(() => {
-                          const canAssign =
-                            ticket.status === "open" ||
-                            ticket.status === "assigned";
+                          const canAssign = ticket.status === "open";
                           if (!canAssign) return null;
                           return (
                             <button
@@ -456,7 +556,7 @@ function AllTickets() {
                         })()}
                         <button
                           type="button"
-                          onClick={() => handleDelete(ticket.id)}
+                          onClick={() => handleDeleteClick(ticket.id)}
                           style={{
                             padding: "0.5rem 1rem",
                             fontSize: "0.8rem",
@@ -509,6 +609,110 @@ function AllTickets() {
           message={notification.message}
           onClose={() => setNotification(null)}
         />
+      )}
+
+      {deleteConfirmModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={() => setDeleteConfirmModal(null)}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: "12px",
+              padding: "2rem",
+              maxWidth: "400px",
+              width: "90%",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              style={{
+                fontSize: "1.25rem",
+                fontWeight: 600,
+                color: "#111827",
+                marginBottom: "1rem",
+              }}
+            >
+              Xác nhận xóa
+            </h3>
+            <p
+              style={{
+                color: "#6b7280",
+                marginBottom: "1.5rem",
+                lineHeight: "1.5",
+              }}
+            >
+              Bạn có chắc chắn muốn xóa ticket này không? Hành động này không thể hoàn tác.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: "0.75rem",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmModal(null)}
+                style={{
+                  padding: "0.625rem 1.25rem",
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  backgroundColor: "#f3f4f6",
+                  color: "#374151",
+                  border: "1px solid #d1d5db",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = "#e5e7eb";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = "#f3f4f6";
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConfirm}
+                style={{
+                  padding: "0.625rem 1.25rem",
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  backgroundColor: "#ef4444",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = "#dc2626";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = "#ef4444";
+                }}
+              >
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

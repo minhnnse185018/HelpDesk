@@ -201,12 +201,24 @@ function MyTickets() {
                   style={{
                     padding: '0.75rem',
                     fontSize: '0.875rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
+                    fontWeight: 500,
+                    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+                    color: '#374151',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    borderRadius: '14px',
+                    backdropFilter: 'blur(40px) saturate(180%)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     outline: 'none'
                   }}
-                  onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                  onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                  onFocus={(e) => {
+                    e.target.style.boxShadow = '0 12px 40px rgba(99, 102, 241, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4)'
+                    e.target.style.borderColor = 'rgba(99, 102, 241, 0.3)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.boxShadow = '0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4)'
+                    e.target.style.borderColor = 'rgba(255,255,255,0.18)'
+                  }}
                 />
                 <select
                   value={categoryFilter}

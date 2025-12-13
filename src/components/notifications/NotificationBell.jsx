@@ -1,12 +1,20 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useNotificationSocket } from '../../context/NotificationSocketContext'
 
 function NotificationBell() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { unreadCount } = useNotificationSocket()
 
   const handleClick = () => {
-    navigate('/notifications')
+    // Determine the correct base path based on current location
+    const pathPrefix = location.pathname.startsWith('/admin') 
+      ? '/admin' 
+      : location.pathname.startsWith('/staff') 
+      ? '/staff' 
+      : '/student'
+    
+    navigate(`${pathPrefix}/notifications`)
   }
 
   const displayCount = unreadCount > 99 ? '99+' : unreadCount

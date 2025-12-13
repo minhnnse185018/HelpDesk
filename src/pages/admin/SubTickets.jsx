@@ -1,131 +1,155 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
-import { formatDate, getPriorityBadge, getStatusBadge } from "../../utils/ticketHelpers.jsx";
 import AssignTicketModal from "../../components/modals/AssignTicketModal";
 import NotificationModal from "../../components/modals/NotificationModal";
 
-function StatusTickets({ status }) {
+function SubTickets() {
   const navigate = useNavigate();
-  const [tickets, setTickets] = useState([]);
+  const [subTickets, setSubTickets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
   const [assignModal, setAssignModal] = useState(null);
   const [notification, setNotification] = useState(null);
-  const [sortOrder, setSortOrder] = useState("asc");
   const [deleteConfirmModal, setDeleteConfirmModal] = useState(null);
 
-  const handleSortByPriority = () => {
-    const priorityMap = { low: 1, medium: 2, high: 3, critical: 4 };
-    const sorted = [...tickets].sort((a, b) => {
-      const aVal = priorityMap[a.priority] || 0;
-      const bVal = priorityMap[b.priority] || 0;
-      return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
-    });
-    setTickets(sorted);
-    setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-  };
+  useEffect(() => {
+    fetchSubTickets();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchSubTickets();
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
-  const loadTickets = async () => {
-    setLoading(true);
-    setError("");
+  const fetchSubTickets = async () => {
     try {
-      const res = await apiClient.get("/api/v1/tickets");
-      let data = res?.data || res;
+      setLoading(true);
+      const response = await apiClient.get("/api/v1/tickets/with-subtickets");
 
-      if (data && !Array.isArray(data)) {
-        data = Object.values(data).filter(Boolean);
+      // Extract all sub-tickets from all tickets
+      const allSubTickets = [];
+
+      // Data is directly in response.data, not response.data.data
+      const ticketsData = response?.data;
+
+      if (ticketsData && typeof ticketsData === "object") {
+        const tickets = Array.isArray(ticketsData)
+          ? ticketsData
+          : Object.values(ticketsData);
+
+        tickets.forEach((ticket) => {
+          if (ticket && ticket.subTickets && ticket.subTickets.length > 0) {
+            ticket.subTickets.forEach((subTicket) => {
+              allSubTickets.push({
+                ...subTicket,
+                parentTicket: {
+                  id: ticket.id,
+                  title: ticket.title,
+                  description: ticket.description,
+                  room: ticket.room,
+                  creator: ticket.creator,
+                  attachments: ticket.attachments || [],
+                },
+              });
+            });
+          }
+        });
       }
 
-      let ticketsArray = Array.isArray(data) ? data : [];
-
-      // Filter by status
-      if (status) {
-        ticketsArray = ticketsArray.filter((ticket) => ticket.status === status);
-      }
-
-      setTickets(ticketsArray);
+      setSubTickets(allSubTickets);
     } catch (err) {
-      console.error("Failed to load tickets:", err);
-      setError("Failed to load tickets. Please try again later.");
+      setError(err.message || "Failed to fetch sub-tickets");
+      console.error("Error fetching sub-tickets:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadTickets();
-    
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(() => {
-      loadTickets();
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [status]);
-
-  const handleDeleteClick = (ticketId) => {
-    setDeleteConfirmModal(ticketId);
+  const getStatusColor = (status) => {
+    const colors = {
+      assigned: { bg: "#dbeafe", text: "#1e40af" },
+      in_progress: { bg: "#fef3c7", text: "#92400e" },
+      resolved: { bg: "#d1fae5", text: "#065f46" },
+      denied: { bg: "#fee2e2", text: "#991b1b" },
+    };
+    return colors[status] || { bg: "#f3f4f6", text: "#374151" };
   };
 
-  const handleDeleteConfirm = async () => {
-    const ticketId = deleteConfirmModal;
-    setDeleteConfirmModal(null);
+  const getPriorityColor = (priority) => {
+    const colors = {
+      low: { bg: "#dbeafe", text: "#1e40af" },
+      medium: { bg: "#fef3c7", text: "#92400e" },
+      high: { bg: "#fed7aa", text: "#9a3412" },
+      urgent: { bg: "#fecaca", text: "#991b1b" },
+    };
+    return colors[priority] || { bg: "#f3f4f6", text: "#374151" };
+  };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleString("vi-VN");
+  };
+
+  const handleAssign = async (subTicketId, staffId, priority) => {
     try {
-      await apiClient.delete(`/api/v1/tickets/${ticketId}`);
-      setNotification({ type: "success", message: "Xóa ticket thành công!" });
-      loadTickets();
+      await apiClient.post(
+        `/api/v1/sub-tickets/${subTicketId}/assign-category`,
+        {
+          staffId,
+          priority,
+        }
+      );
+      setNotification({
+        type: "success",
+        message: "Sub-ticket assigned successfully!",
+      });
+      setAssignModal(null);
+      fetchSubTickets();
     } catch (err) {
-      console.error("Failed to delete:", err);
-      setNotification({ type: "error", message: "Xóa ticket thất bại" });
+      console.error("Failed to assign sub-ticket:", err);
+      console.error("Error details:", err.response?.data);
+      setNotification({
+        type: "error",
+        message: err?.response?.data?.message || "Failed to assign sub-ticket",
+      });
     }
   };
 
-  const handleAssign = async (ticketId, staffId, priority) => {
+  const handleView = (subTicketId) => {
+    navigate(`/admin/sub-tickets/${subTicketId}`);
+  };
+
+  const handleDeleteClick = (subTicketId) => {
+    setDeleteConfirmModal(subTicketId);
+  };
+
+  const handleDeleteConfirm = async () => {
+    const subTicketId = deleteConfirmModal;
+    setDeleteConfirmModal(null);
+
     try {
-      await apiClient.post(`/api/v1/tickets/${ticketId}/assign-category`, { staffId, priority });
-      setNotification({ type: "success", message: "Ticket assigned successfully!" });
-      setAssignModal(null);
-      loadTickets();
+      await apiClient.delete(`/api/v1/sub-tickets/${subTicketId}`);
+      setNotification({
+        type: "success",
+        message: "Xóa sub-ticket thành công!",
+      });
+      fetchSubTickets();
     } catch (err) {
-      console.error("Failed to assign:", err);
-      console.error("Error details:", err.response?.data);
-      setNotification({ type: "error", message: err.response?.data?.message || "Failed to assign ticket" });
+      console.error("Failed to delete sub-ticket:", err);
+      setNotification({
+        type: "error",
+        message: err?.response?.data?.message || "Xóa sub-ticket thất bại",
+      });
     }
   };
 
   if (loading) {
     return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "400px",
-          backgroundColor: "rgba(255, 255, 255, 0.72)",
-          borderRadius: "16px",
-          backdropFilter: "blur(40px) saturate(180%)",
-          border: "1px solid rgba(255,255,255,0.18)",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              width: "48px",
-              height: "48px",
-              border: "3px solid rgba(0,0,0,0.1)",
-              borderTopColor: "#000",
-              borderRadius: "50%",
-              animation: "spin 0.8s linear infinite",
-              margin: "0 auto 1rem",
-            }}
-          />
-          <p style={{ color: "#6b7280", margin: 0 }}>Loading tickets...</p>
-        </div>
-        <style>
-          {`@keyframes spin { to { transform: rotate(360deg); } }`}
-        </style>
+      <div style={{ textAlign: "center", padding: "3rem", color: "#6b7280" }}>
+        Loading sub-tickets...
       </div>
     );
   }
@@ -134,20 +158,19 @@ function StatusTickets({ status }) {
     return (
       <div
         style={{
-          padding: "2rem",
-          textAlign: "center",
+          padding: "1rem",
           backgroundColor: "#fee2e2",
-          borderRadius: "12px",
-          color: "#dc2626",
+          color: "#991b1b",
+          borderRadius: "0.5rem",
         }}
       >
-        <p style={{ margin: 0, fontWeight: 500 }}>{error}</p>
+        {error}
       </div>
     );
   }
 
   return (
-    <>
+    <div>
       <div
         style={{
           backgroundColor: "rgba(255, 255, 255, 0.72)",
@@ -181,7 +204,7 @@ function StatusTickets({ status }) {
                     color: "#374151",
                   }}
                 >
-                  Title
+                  Parent Ticket
                 </th>
                 <th
                   style={{
@@ -201,27 +224,7 @@ function StatusTickets({ status }) {
                     color: "#374151",
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={handleSortByPriority}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.25rem",
-                      fontWeight: 600,
-                      color: "#374151",
-                      fontSize: "0.875rem",
-                      padding: 0,
-                    }}
-                  >
-                    Priority
-                    <span style={{ fontSize: "0.7rem" }}>
-                      {sortOrder === "asc" ? "▲" : "▼"}
-                    </span>
-                  </button>
+                  Priority
                 </th>
                 <th
                   style={{
@@ -241,37 +244,17 @@ function StatusTickets({ status }) {
                     color: "#374151",
                   }}
                 >
-                  Department
-                </th>
-                <th
-                  style={{
-                    padding: "1rem",
-                    textAlign: "left",
-                    fontWeight: 600,
-                    color: "#374151",
-                  }}
-                >
-                  Categories
-                </th>
-                <th
-                  style={{
-                    padding: "1rem",
-                    textAlign: "left",
-                    fontWeight: 600,
-                    color: "#374151",
-                  }}
-                >
-                  Assignee
-                </th>
-                <th
-                  style={{
-                    padding: "1rem",
-                    textAlign: "left",
-                    fontWeight: 600,
-                    color: "#374151",
-                  }}
-                >
                   Created At
+                </th>
+                <th
+                  style={{
+                    padding: "1rem",
+                    textAlign: "left",
+                    fontWeight: 600,
+                    color: "#374151",
+                  }}
+                >
+                  Due Date
                 </th>
                 <th
                   style={{
@@ -286,10 +269,10 @@ function StatusTickets({ status }) {
               </tr>
             </thead>
             <tbody>
-              {tickets.length === 0 ? (
+              {subTickets.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="9"
+                    colSpan="7"
                     style={{
                       padding: "3rem",
                       textAlign: "center",
@@ -297,42 +280,31 @@ function StatusTickets({ status }) {
                     }}
                   >
                     <div style={{ fontSize: "0.875rem", fontWeight: 500 }}>
-                      No {status} tickets found
+                      No sub-tickets found
                     </div>
                   </td>
                 </tr>
               ) : (
-                tickets.map((ticket) => (
-                  <tr
-                    key={ticket.id}
-                    style={{ borderBottom: "1px solid #f3f4f6" }}
-                  >
-                    <td style={{ padding: "1rem" }}>
-                      <div
-                        style={{
-                          color: "#111827",
-                          fontWeight: 500,
-                          marginBottom: "0.25rem",
-                        }}
-                      >
-                        {ticket.title}
-                      </div>
-                      {ticket.deniedReason && (
+                subTickets.map((subTicket) => {
+                  const statusColor = getStatusColor(subTicket.status);
+                  const priorityColor = getPriorityColor(subTicket.priority);
+
+                  return (
+                    <tr
+                      key={subTicket.id}
+                      style={{ borderBottom: "1px solid #f3f4f6" }}
+                    >
+                      <td style={{ padding: "1rem" }}>
                         <div
                           style={{
-                            fontSize: "0.75rem",
-                            color: "#dc2626",
-                            backgroundColor: "#fee2e2",
-                            padding: "0.25rem 0.5rem",
-                            borderRadius: "4px",
-                            marginTop: "0.5rem",
+                            color: "#111827",
+                            fontWeight: 500,
+                            marginBottom: "0.25rem",
                           }}
                         >
-                          <strong>Denied:</strong> {ticket.deniedReason}
+                          {subTicket.parentTicket.title}
                         </div>
-                      )}
-                      {ticket.status === "resolved" &&
-                        ticket.resolutionNote && (
+                        {subTicket.resolutionNote && (
                           <div
                             style={{
                               fontSize: "0.75rem",
@@ -340,78 +312,99 @@ function StatusTickets({ status }) {
                               backgroundColor: "#dcfce7",
                               padding: "0.25rem 0.5rem",
                               borderRadius: "4px",
-                              marginTop: "0.5rem",
+                              marginTop: "0.25rem",
                             }}
                           >
-                            <strong>Resolution:</strong> {ticket.resolutionNote}
+                            <strong>Resolution:</strong>{" "}
+                            {subTicket.resolutionNote}
                           </div>
                         )}
-                    </td>
-                    <td style={{ padding: "1rem" }}>
-                      {getStatusBadge(ticket.status)}
-                    </td>
-                    <td style={{ padding: "1rem" }}>
-                      {getPriorityBadge(ticket.priority)}
-                    </td>
-                    <td style={{ padding: "1rem", color: "#6b7280" }}>
-                      {ticket.room?.name || "N/A"}
-                    </td>
-                    <td style={{ padding: "1rem", color: "#6b7280" }}>
-                      {ticket.department?.name || "N/A"}
-                    </td>
-                    <td
-                      style={{
-                        padding: "1rem",
-                        color: "#6b7280",
-                        fontSize: "0.8rem",
-                      }}
-                    >
-                      {Array.isArray(ticket.ticketCategories) &&
-                      ticket.ticketCategories.length > 0
-                        ? ticket.ticketCategories
-                            .map((tc) => tc.category?.name)
-                            .filter(Boolean)
-                            .join(", ")
-                        : "N/A"}
-                    </td>
-                    <td style={{ padding: "1rem", color: "#6b7280" }}>
-                      {ticket.assignee?.username ||
-                        ticket.assignee?.fullName ||
-                        "N/A"}
-                    </td>
-                    <td
-                      style={{
-                        padding: "1rem",
-                        color: "#6b7280",
-                        fontSize: "0.8rem",
-                      }}
-                    >
-                      {formatDate(ticket.createdAt)}
-                    </td>
-                    <td style={{ padding: "1rem" }}>
-                      <div
+                        {subTicket.deniedReason && (
+                          <div
+                            style={{
+                              fontSize: "0.75rem",
+                              color: "#dc2626",
+                              backgroundColor: "#fee2e2",
+                              padding: "0.25rem 0.5rem",
+                              borderRadius: "4px",
+                              marginTop: "0.25rem",
+                            }}
+                          >
+                            <strong>Denied:</strong> {subTicket.deniedReason}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: "1rem" }}>
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                            padding: "0.25rem 0.75rem",
+                            borderRadius: "9999px",
+                            backgroundColor: statusColor.bg,
+                            color: statusColor.text,
+                          }}
+                        >
+                          {subTicket.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ padding: "1rem" }}>
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            fontWeight: 600,
+                            padding: "0.25rem 0.75rem",
+                            borderRadius: "9999px",
+                            backgroundColor: priorityColor.bg,
+                            color: priorityColor.text,
+                          }}
+                        >
+                          {subTicket.priority?.toUpperCase() || "N/A"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "1rem", color: "#6b7280" }}>
+                        {subTicket.parentTicket.room?.name || "N/A"}
+                      </td>
+                      <td
                         style={{
-                          display: "flex",
-                          gap: "0.5rem",
-                          justifyContent: "center",
+                          padding: "1rem",
+                          color: "#6b7280",
+                          fontSize: "0.8rem",
                         }}
                       >
-                        {ticket.status !== "in_progress" && (
+                        {formatDate(subTicket.createdAt)}
+                      </td>
+                      <td
+                        style={{
+                          padding: "1rem",
+                          color: "#6b7280",
+                          fontSize: "0.8rem",
+                        }}
+                      >
+                        {formatDate(subTicket.dueDate)}
+                      </td>
+                      <td style={{ padding: "1rem" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "0.5rem",
+                            justifyContent: "center",
+                          }}
+                        >
                           <button
                             type="button"
-                            onClick={() =>
-                              navigate(`/admin/tickets/edit/${ticket.id}`)
-                            }
+                            onClick={() => handleView(subTicket.id)}
                             style={{
                               padding: "0.5rem 1rem",
                               fontSize: "0.8rem",
                               fontWeight: 500,
                               backgroundColor: "rgba(59, 130, 246, 0.08)",
-                              color: "#2563eb",
+                              color: "#3b82f6",
                               border: "1px solid rgba(59, 130, 246, 0.2)",
                               borderRadius: "14px",
                               cursor: "pointer",
-                              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                              transition:
+                                "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                               backdropFilter: "blur(40px) saturate(200%)",
                               boxShadow:
                                 "0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(59, 130, 246, 0.1)",
@@ -425,20 +418,16 @@ function StatusTickets({ status }) {
                             onMouseOut={(e) => {
                               e.currentTarget.style.backgroundColor =
                                 "rgba(59, 130, 246, 0.08)";
-                              e.currentTarget.style.transform = "translateY(0)";
+                              e.currentTarget.style.transform =
+                                "translateY(0)";
                             }}
                           >
-                            Edit
+                            View
                           </button>
-                        )}
-                        {(() => {
-                          const canAssign =
-                            ticket.status === "open";
-                          if (!canAssign) return null;
-                          return (
+                          {subTicket.status === "open" && (
                             <button
                               type="button"
-                              onClick={() => setAssignModal(ticket)}
+                              onClick={() => setAssignModal(subTicket)}
                               style={{
                                 padding: "0.5rem 1rem",
                                 fontSize: "0.8rem",
@@ -452,7 +441,7 @@ function StatusTickets({ status }) {
                                   "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                                 backdropFilter: "blur(40px) saturate(200%)",
                                 boxShadow:
-                                  "0 8px 32px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(16, 185, 129, 0.1)",
+                                  "0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(16, 185, 129, 0.1)",
                               }}
                               onMouseOver={(e) => {
                                 e.currentTarget.style.backgroundColor =
@@ -469,49 +458,52 @@ function StatusTickets({ status }) {
                             >
                               Assign
                             </button>
-                          );
-                        })()}
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteClick(ticket.id)}
-                          style={{
-                            padding: "0.5rem 1rem",
-                            fontSize: "0.8rem",
-                            fontWeight: 500,
-                            backgroundColor: "rgba(239, 68, 68, 0.08)",
-                            color: "#dc2626",
-                            border: "1px solid rgba(239, 68, 68, 0.2)",
-                            borderRadius: "14px",
-                            cursor: "pointer",
-                            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                            backdropFilter: "blur(40px) saturate(200%)",
-                            boxShadow:
-                              "0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(239, 68, 68, 0.1)",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.backgroundColor =
-                              "rgba(239, 68, 68, 0.15)";
-                            e.currentTarget.style.transform =
-                              "translateY(-1px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.backgroundColor =
-                              "rgba(239, 68, 68, 0.08)";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClick(subTicket.id)}
+                            style={{
+                              padding: "0.5rem 1rem",
+                              fontSize: "0.8rem",
+                              fontWeight: 500,
+                              backgroundColor: "rgba(239, 68, 68, 0.08)",
+                              color: "#ef4444",
+                              border: "1px solid rgba(239, 68, 68, 0.2)",
+                              borderRadius: "14px",
+                              cursor: "pointer",
+                              transition:
+                                "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                              backdropFilter: "blur(40px) saturate(200%)",
+                              boxShadow:
+                                "0 8px 32px rgba(239, 68, 68, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(239, 68, 68, 0.1)",
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.backgroundColor =
+                                "rgba(239, 68, 68, 0.15)";
+                              e.currentTarget.style.transform =
+                                "translateY(-1px)";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.backgroundColor =
+                                "rgba(239, 68, 68, 0.08)";
+                              e.currentTarget.style.transform =
+                                "translateY(0)";
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
+      {/* Assign Modal */}
       {assignModal && (
         <AssignTicketModal
           ticket={assignModal}
@@ -520,6 +512,7 @@ function StatusTickets({ status }) {
         />
       )}
 
+      {/* Notification Modal */}
       {notification && (
         <NotificationModal
           type={notification.type}
@@ -528,6 +521,7 @@ function StatusTickets({ status }) {
         />
       )}
 
+      {/* Delete Confirmation Modal */}
       {deleteConfirmModal && (
         <div
           style={{
@@ -572,7 +566,7 @@ function StatusTickets({ status }) {
                 lineHeight: "1.5",
               }}
             >
-              Bạn có chắc chắn muốn xóa ticket này không? Hành động này không thể hoàn tác.
+              Bạn có chắc chắn muốn xóa sub-ticket này không? Hành động này không thể hoàn tác.
             </p>
             <div
               style={{
@@ -631,8 +625,8 @@ function StatusTickets({ status }) {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
-export default StatusTickets;
+export default SubTickets;

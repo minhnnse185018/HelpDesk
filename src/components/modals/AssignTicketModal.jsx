@@ -10,21 +10,65 @@ function AssignTicketModal({ ticket, onClose, onSubmit }) {
   useEffect(() => {
     const loadData = async () => {
       try {
+        // Get department IDs from ticket categories
+        const ticketDepartmentIds = new Set();
+        
+        if (Array.isArray(ticket.ticketCategories) && ticket.ticketCategories.length > 0) {
+          // Fetch full category details to get department info
+          for (const tc of ticket.ticketCategories) {
+            const categoryId = tc.categoryId || tc.category?.id;
+            if (categoryId) {
+              try {
+                const categoryRes = await apiClient.get(`/api/v1/categories/${categoryId}`);
+                const categoryData = categoryRes?.data || categoryRes;
+                const departmentId = categoryData?.departmentId || categoryData?.department?.id;
+                
+                if (departmentId) {
+                  ticketDepartmentIds.add(departmentId);
+                }
+              } catch (err) {
+                console.error(`Failed to fetch category ${categoryId}:`, err);
+              }
+            }
+          }
+        }
+
+        console.log("Ticket Department IDs:", Array.from(ticketDepartmentIds));
+
+        // Fetch all users and filter by department
         const staffRes = await apiClient.get("/api/v1/users");
-
         let staffData = staffRes?.data || staffRes;
-
-        // Convert to array if needed
+        
         if (staffData && !Array.isArray(staffData)) {
           staffData = Object.values(staffData).filter(Boolean);
         }
+        
+        let allStaff = [];
+        
+        if (ticketDepartmentIds.size > 0) {
+          // Filter staff by department
+          allStaff = (Array.isArray(staffData) ? staffData : []).filter((user) => {
+            const isStaff = String(user.role || "").toLowerCase() === "staff";
+            const userDeptId = user.departmentId || user.department?.id;
+            
+            console.log(`User ${user.fullName || user.username} - Role: ${user.role}, DeptId: ${userDeptId}`);
+            
+            return isStaff && userDeptId && ticketDepartmentIds.has(userDeptId);
+          });
+        } else {
+          // No department found, show all staff
+          allStaff = (Array.isArray(staffData) ? staffData : []).filter(
+            (user) => String(user.role || "").toLowerCase() === "staff"
+          );
+        }
 
-        // Filter only staff role users
-        const filteredStaff = (
-          Array.isArray(staffData) ? staffData : []
-        ).filter((user) => String(user.role || "").toLowerCase() === "staff");
+        // Remove duplicates
+        const uniqueStaff = Array.from(
+          new Map(allStaff.map(staff => [staff.id, staff])).values()
+        );
 
-        setStaffList(filteredStaff);
+        console.log("Final staff list:", uniqueStaff);
+        setStaffList(uniqueStaff);
       } catch (err) {
         console.error("Failed to load staff:", err);
       }
@@ -196,9 +240,15 @@ function AssignTicketModal({ ticket, onClose, onSubmit }) {
                 }}
               >
                 <option value="">-- Select staff --</option>
+                {staffList.length === 0 && (
+                  <option value="" disabled>
+                    No staff available in ticket's department
+                  </option>
+                )}
                 {staffList.map((staff) => (
                   <option key={staff.id} value={staff.id}>
                     {staff.fullName || staff.username}
+                    {staff.department?.name && ` - ${staff.department.name}`}
                   </option>
                 ))}
               </select>

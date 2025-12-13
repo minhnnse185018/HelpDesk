@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { logout } from "../api/auth";
 import { useAuthProfile } from "../hooks/useAuthProfile";
 import ProfileModal from "../components/ProfileModal";
+import NotificationBell from "../components/notifications/NotificationBell";
 
 function AdminLayout() {
   const navigate = useNavigate();
@@ -105,6 +106,7 @@ function AdminLayout() {
             <span className="page-title-prefix">Admin</span>
           </div>
           <div className="top-bar-right">
+            <NotificationBell />
             <div
               className="user-info"
               onClick={() => setShowProfileModal(true)}

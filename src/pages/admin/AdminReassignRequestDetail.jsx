@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 
 function formatDate(dateString) {
@@ -42,6 +42,7 @@ function getStatusBadge(status) {
 function AdminReassignRequestDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [request, setRequest] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -57,14 +58,50 @@ function AdminReassignRequestDetail() {
         setLoading(true)
         setError('')
 
-        const [requestRes, staffRes] = await Promise.all([
-          apiClient.get(`/api/v1/reassign-requests/${id}`),
-          apiClient.get('/api/v1/users?role=staff'),
-        ])
-
+        // First get the reassign request
+        const requestRes = await apiClient.get(`/api/v1/reassign-requests/${id}`)
         const requestData = requestRes?.data || requestRes
         setRequest(requestData)
-        setStaffList(staffRes?.data || staffRes || [])
+
+        // Get department ID - prioritize navigation state, then API data
+        let departmentId = location.state?.departmentId
+        
+        // If no state, extract from request data
+        if (!departmentId) {
+          // For regular ticket
+          if (requestData?.ticket?.departmentId) {
+            departmentId = requestData.ticket.departmentId
+          }
+          // For sub-ticket, get from parent ticket
+          else if (requestData?.subTicket?.parentTicket?.departmentId) {
+            departmentId = requestData.subTicket.parentTicket.departmentId
+          }
+        }
+
+        console.log('🔍 Department ID:', departmentId)
+
+        // Fetch all staff
+        const staffRes = await apiClient.get('/api/v1/users?role=staff')
+        const staffData = staffRes?.data || staffRes || []
+        
+        // Convert to array
+        let allStaff = typeof staffData === 'object' && !Array.isArray(staffData)
+          ? Object.values(staffData)
+          : (Array.isArray(staffData) ? staffData : [])
+
+        console.log('📋 Total staff fetched:', allStaff.length)
+
+        // Filter staff by department
+        let filteredStaff = allStaff
+        if (departmentId) {
+          filteredStaff = allStaff.filter(staff => staff.departmentId === departmentId)
+          console.log(`✅ Filtered staff for department ${departmentId}:`, filteredStaff.length, 'staff')
+          console.log('👥 Filtered staff list:', filteredStaff.map(s => ({ name: s.username, dept: s.departmentId })))
+        } else {
+          console.log('⚠️ No department ID found, showing all staff')
+        }
+
+        setStaffList(filteredStaff)
 
         // Pre-fill if already specified
         if (requestData?.newAssigneeUser?.id) {
@@ -88,7 +125,7 @@ function AdminReassignRequestDetail() {
       setSubmitting(true)
 
       const payload = {
-        status: reviewStatus,
+        action: reviewStatus === 'approved' ? 'approve' : 'reject',
         reviewNote: reviewNote.trim() || undefined,
       }
 
@@ -152,7 +189,10 @@ function AdminReassignRequestDetail() {
 
   const isPending = request.status === 'pending'
   const itemType = request.ticketId ? 'Ticket' : 'Sub-ticket'
-  const itemTitle = request.ticket?.title || request.subTicket?.category?.name || 'N/A'
+  const itemTitle = request.ticket?.title || 
+    (request.subTicket?.parentTicket?.title 
+      ? `${request.subTicket.parentTicket.title} (${request.subTicket.category?.name || 'Sub-ticket'})`
+      : request.subTicket?.category?.name || 'N/A')
 
   return (
     <div className="page">
@@ -165,7 +205,7 @@ function AdminReassignRequestDetail() {
         <button
           type="button"
           className="btn btn-secondary"
-          onClick={() => navigate('/admin/reassign-requests')}
+          onClick={() => navigate('/admin/tickets')}
         >
           Back to List
         </button>
@@ -205,10 +245,10 @@ function AdminReassignRequestDetail() {
           }}
         >
           <InfoItem label="Requested By">
-            {request.requestedBy?.fullName || 'N/A'}
+            {request.requester?.fullName || request.requester?.username || 'N/A'}
           </InfoItem>
           <InfoItem label="Preferred New Assignee">
-            {request.newAssigneeUser?.fullName || 'Not specified'}
+            {request.newAssigneeUser?.fullName || request.newAssigneeUser?.username || 'Not specified'}
           </InfoItem>
           <InfoItem label="Created At">
             {formatDate(request.createdAt)}
@@ -289,16 +329,28 @@ function AdminReassignRequestDetail() {
                 >
                   Select New Assignee (Optional)
                 </label>
+                <div style={{ marginBottom: '0.5rem' }}>
+                  {(request.ticket?.department?.name || request.subTicket?.parentTicket?.department?.name) && (
+                    <p style={{ fontSize: '0.75rem', color: '#374151', marginBottom: '0.25rem', fontWeight: 500 }}>
+                      <strong>Department:</strong> {request.ticket?.department?.name || request.subTicket?.parentTicket?.department?.name}
+                    </p>
+                  )}
+                  {request.subTicket?.category?.name && (
+                    <p style={{ fontSize: '0.75rem', color: '#374151', marginBottom: '0.25rem', fontWeight: 500 }}>
+                      <strong>Category:</strong> {request.subTicket.category.name}
+                    </p>
+                  )}
+                </div>
                 <select
                   id="newAssignee"
                   className="input"
                   value={newAssignee}
                   onChange={(e) => setNewAssignee(e.target.value)}
                 >
-                  <option value="">-- Select Staff --</option>
+                  <option value="">-- Select Staff ({staffList.length} available) --</option>
                   {staffList.map((staff) => (
                     <option key={staff.id} value={staff.id}>
-                      {staff.fullName || staff.username}
+                      {staff.fullName || staff.username} ({staff.email})
                     </option>
                   ))}
                 </select>
@@ -328,16 +380,85 @@ function AdminReassignRequestDetail() {
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
               <button
                 type="button"
-                className="btn btn-secondary"
                 onClick={() => navigate(-1)}
                 disabled={submitting}
+                style={{
+                  padding: "0.5rem 1rem",
+                  fontSize: "0.8rem",
+                  fontWeight: 500,
+                  backgroundColor: "rgba(107, 114, 128, 0.08)",
+                  color: "#6b7280",
+                  border: "1px solid rgba(107, 114, 128, 0.2)",
+                  borderRadius: "14px",
+                  cursor: submitting ? "not-allowed" : "pointer",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  backdropFilter: "blur(40px) saturate(200%)",
+                  boxShadow:
+                    "0 8px 32px rgba(107, 114, 128, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(107, 114, 128, 0.1)",
+                  opacity: submitting ? 0.5 : 1,
+                }}
+                onMouseOver={(e) => {
+                  if (!submitting) {
+                    e.currentTarget.style.backgroundColor = "rgba(107, 114, 128, 0.12)"
+                    e.currentTarget.style.transform = "translateY(-2px)"
+                    e.currentTarget.style.boxShadow = "0 12px 40px rgba(107, 114, 128, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(107, 114, 128, 0.1)"
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!submitting) {
+                    e.currentTarget.style.backgroundColor = "rgba(107, 114, 128, 0.08)"
+                    e.currentTarget.style.transform = "translateY(0)"
+                    e.currentTarget.style.boxShadow = "0 8px 32px rgba(107, 114, 128, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(107, 114, 128, 0.1)"
+                  }
+                }}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className={`btn ${reviewStatus === 'approved' ? 'btn-success' : 'btn-danger'}`}
                 disabled={submitting}
+                style={{
+                  padding: "0.5rem 1rem",
+                  fontSize: "0.8rem",
+                  fontWeight: 500,
+                  backgroundColor: reviewStatus === 'approved' 
+                    ? "rgba(34, 197, 94, 0.08)" 
+                    : "rgba(239, 68, 68, 0.08)",
+                  color: reviewStatus === 'approved' ? "#16a34a" : "#dc2626",
+                  border: reviewStatus === 'approved' 
+                    ? "1px solid rgba(34, 197, 94, 0.2)" 
+                    : "1px solid rgba(239, 68, 68, 0.2)",
+                  borderRadius: "14px",
+                  cursor: submitting ? "not-allowed" : "pointer",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  backdropFilter: "blur(40px) saturate(200%)",
+                  boxShadow: reviewStatus === 'approved'
+                    ? "0 8px 32px rgba(34, 197, 94, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(34, 197, 94, 0.1)"
+                    : "0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(239, 68, 68, 0.1)",
+                  opacity: submitting ? 0.5 : 1,
+                }}
+                onMouseOver={(e) => {
+                  if (!submitting) {
+                    e.currentTarget.style.backgroundColor = reviewStatus === 'approved'
+                      ? "rgba(34, 197, 94, 0.12)"
+                      : "rgba(239, 68, 68, 0.12)"
+                    e.currentTarget.style.transform = "translateY(-2px)"
+                    e.currentTarget.style.boxShadow = reviewStatus === 'approved'
+                      ? "0 12px 40px rgba(34, 197, 94, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(34, 197, 94, 0.1)"
+                      : "0 12px 40px rgba(239, 68, 68, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(239, 68, 68, 0.1)"
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!submitting) {
+                    e.currentTarget.style.backgroundColor = reviewStatus === 'approved'
+                      ? "rgba(34, 197, 94, 0.08)"
+                      : "rgba(239, 68, 68, 0.08)"
+                    e.currentTarget.style.transform = "translateY(0)"
+                    e.currentTarget.style.boxShadow = reviewStatus === 'approved'
+                      ? "0 8px 32px rgba(34, 197, 94, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(34, 197, 94, 0.1)"
+                      : "0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(239, 68, 68, 0.1)"
+                  }
+                }}
               >
                 {submitting ? 'Submitting...' : `${reviewStatus === 'approved' ? 'Approve' : 'Reject'} Request`}
               </button>

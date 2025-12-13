@@ -23,7 +23,22 @@ export function NotificationSocketProvider({ children }) {
     try {
       const response = await apiClient.get('/api/v1/notifications/unread/count')
       const data = response?.data || response
-      setUnreadCount(data?.count || 0)
+      
+      console.log('🔔 Unread count API response:', data)
+      
+      // Handle different response formats
+      let count = 0
+      if (typeof data === 'number') {
+        count = data
+      } else if (data && typeof data.count === 'number') {
+        count = data.count
+      } else if (data && typeof data === 'object') {
+        // If data is object, check all possible keys
+        count = data.count || data.unreadCount || data.total || 0
+      }
+      
+      console.log('🔢 Setting unread count to:', count)
+      setUnreadCount(count)
     } catch (error) {
       console.error('Failed to fetch unread count:', error)
     }
@@ -42,8 +57,8 @@ export function NotificationSocketProvider({ children }) {
     // Fetch initial unread count
     fetchUnreadCount()
 
-    // Connect to socket.io
-    const socketInstance = io(`${API_BASE_URL}/ws`, {
+    // Connect to socket.io - connect to base URL without /ws namespace
+    const socketInstance = io(API_BASE_URL, {
       auth: { token },
       transports: ['websocket', 'polling'],
     })

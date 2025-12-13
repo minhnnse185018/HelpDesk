@@ -75,6 +75,7 @@ function StaffSubTicketDetail() {
   const [denyModal, setDenyModal] = useState(false)
   const [resolveModal, setResolveModal] = useState(false)
   const [reassignModal, setReassignModal] = useState(false)
+  const [alertModal, setAlertModal] = useState(null)
 
   const loadSubTicket = async () => {
     if (!id) return
@@ -102,7 +103,7 @@ function StaffSubTicketDetail() {
       await loadSubTicket()
     } catch (err) {
       console.error('Failed to accept sub-ticket:', err)
-      alert('Failed to accept sub-ticket: ' + (err?.message || 'Unknown error'))
+      setAlertModal({ message: 'Failed to accept sub-ticket: ' + (err?.message || 'Unknown error') })
     }
   }
 
@@ -113,7 +114,7 @@ function StaffSubTicketDetail() {
       await loadSubTicket()
     } catch (err) {
       console.error('Failed to deny sub-ticket:', err)
-      alert('Failed to deny sub-ticket: ' + (err?.message || 'Unknown error'))
+      setAlertModal({ message: 'Failed to deny sub-ticket: ' + (err?.message || 'Unknown error') })
     }
   }
 
@@ -124,22 +125,21 @@ function StaffSubTicketDetail() {
       await loadSubTicket()
     } catch (err) {
       console.error('Failed to resolve sub-ticket:', err)
-      alert('Failed to resolve sub-ticket: ' + (err?.message || 'Unknown error'))
+      setAlertModal({ message: 'Failed to resolve sub-ticket: ' + (err?.message || 'Unknown error') })
     }
   }
 
-  const handleReassignRequest = async (reason, newAssignee) => {
+  const handleReassignRequest = async (reason) => {
     try {
       await apiClient.post('/api/v1/reassign-requests', {
         subTicketId: id,
         reason,
-        newAssignee: newAssignee || undefined,
       })
       setReassignModal(false)
-      alert('Reassign request submitted successfully')
+      setAlertModal({ message: 'Reassign request submitted successfully' })
     } catch (err) {
       console.error('Failed to submit reassign request:', err)
-      alert('Failed to submit reassign request: ' + (err?.message || 'Unknown error'))
+      setAlertModal({ message: 'Failed to submit reassign request: ' + (err?.message || 'Unknown error') })
     }
   }
 
@@ -233,6 +233,16 @@ function StaffSubTicketDetail() {
                 type="button"
                 className="btn btn-success"
                 onClick={handleAccept}
+                style={{
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.875rem',
+                  backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                  color: '#059669',
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  borderRadius: '14px',
+                  backdropFilter: 'blur(40px) saturate(200%)',
+                  boxShadow: '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
+                }}
               >
                 Accept Sub-Ticket
               </button>
@@ -240,6 +250,16 @@ function StaffSubTicketDetail() {
                 type="button"
                 className="btn btn-danger"
                 onClick={() => setDenyModal(true)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.875rem',
+                  backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                  color: '#dc2626',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  borderRadius: '14px',
+                  backdropFilter: 'blur(40px) saturate(200%)',
+                  boxShadow: '0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
+                }}
               >
                 Deny Sub-Ticket
               </button>
@@ -251,6 +271,16 @@ function StaffSubTicketDetail() {
               type="button"
               className="btn btn-success"
               onClick={() => setResolveModal(true)}
+              style={{
+                padding: '0.5rem 1rem',
+                fontSize: '0.875rem',
+                backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                color: '#059669',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                borderRadius: '14px',
+                backdropFilter: 'blur(40px) saturate(200%)',
+                boxShadow: '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
+              }}
             >
               Resolve Sub-Ticket
             </button>
@@ -261,6 +291,16 @@ function StaffSubTicketDetail() {
               type="button"
               className="btn btn-warning"
               onClick={() => setReassignModal(true)}
+              style={{
+                padding: '0.5rem 1rem',
+                fontSize: '0.875rem',
+                backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                color: '#d97706',
+                border: '1px solid rgba(245, 158, 11, 0.2)',
+                borderRadius: '14px',
+                backdropFilter: 'blur(40px) saturate(200%)',
+                boxShadow: '0 8px 32px rgba(245, 158, 11, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
+              }}
             >
               Request Reassignment
             </button>
@@ -365,6 +405,14 @@ function StaffSubTicketDetail() {
         </div>
       )}
 
+      {/* Alert Modal */}
+      {alertModal && (
+        <AlertModal
+          message={alertModal.message}
+          onClose={() => setAlertModal(null)}
+        />
+      )}
+
       {/* Modals */}
       {denyModal && (
         <DenyModal
@@ -384,6 +432,7 @@ function StaffSubTicketDetail() {
         <ReassignModal
           onClose={() => setReassignModal(false)}
           onSubmit={handleReassignRequest}
+          subTicket={subTicket}
         />
       )}
     </div>
@@ -409,7 +458,6 @@ function DenyModal({ onClose, onSubmit }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!reason.trim()) {
-      alert('Please provide a reason.')
       return
     }
     setSubmitting(true)
@@ -487,7 +535,6 @@ function ResolveModal({ onClose, onSubmit }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!resolutionNote.trim()) {
-      alert('Please provide resolution notes.')
       return
     }
     setSubmitting(true)
@@ -561,19 +608,17 @@ function ResolveModal({ onClose, onSubmit }) {
 }
 
 // Reassign Modal
-function ReassignModal({ onClose, onSubmit }) {
+function ReassignModal({ onClose, onSubmit, subTicket }) {
   const [reason, setReason] = useState('')
-  const [newAssignee, setNewAssignee] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!reason.trim()) {
-      alert('Please provide a reason for reassignment.')
       return
     }
     setSubmitting(true)
-    await onSubmit(reason, newAssignee)
+    await onSubmit(reason)
     setSubmitting(false)
   }
 
@@ -618,23 +663,15 @@ function ReassignModal({ onClose, onSubmit }) {
               placeholder="Explain why you need reassignment..."
               required
             />
-          </div>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <label
-              htmlFor="newAssignee"
-              style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}
+            <p
+              style={{
+                fontSize: '0.75rem',
+                color: '#6b7280',
+                marginTop: '0.25rem',
+              }}
             >
-              Preferred New Assignee (Optional)
-            </label>
-            <input
-              type="text"
-              id="newAssignee"
-              className="input"
-              value={newAssignee}
-              onChange={(e) => setNewAssignee(e.target.value)}
-              placeholder="Leave empty for admin to decide"
-            />
+              Admin will review and assign a suitable staff member
+            </p>
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
@@ -651,6 +688,58 @@ function ReassignModal({ onClose, onSubmit }) {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+// Alert Modal Component
+function AlertModal({ message, onClose }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="card"
+        style={{
+          width: '100%',
+          maxWidth: '400px',
+          padding: '1.5rem',
+          margin: '1rem',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(40px) saturate(180%)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+          borderRadius: '20px',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: 600, textAlign: 'center' }}>
+          Notice
+        </div>
+        <div style={{ marginBottom: '1.5rem', color: '#374151', textAlign: 'center' }}>
+          {message}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onClose}
+            style={{ minWidth: '100px' }}
+          >
+            OK
+          </button>
+        </div>
       </div>
     </div>
   )

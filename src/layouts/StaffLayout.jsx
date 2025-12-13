@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { logout } from "../api/auth";
 import { useAuthProfile } from "../hooks/useAuthProfile";
 import ProfileModal from "../components/ProfileModal";
+import NotificationBell from "../components/notifications/NotificationBell";
 
 function StaffLayout() {
   const navigate = useNavigate();
@@ -58,6 +59,7 @@ function StaffLayout() {
         </div>
 
         <div className="top-bar-right">
+          <NotificationBell />
           <div className="user-info" onClick={() => setShowProfileModal(true)}>
             <div className="user-avatar">{displayAvatar}</div>
             <div className="user-meta">

@@ -53,6 +53,7 @@ function StaffSubTickets() {
   const [denyModal, setDenyModal] = useState(null);
   const [resolveModal, setResolveModal] = useState(null);
   const [reassignModal, setReassignModal] = useState(null);
+  const [alertModal, setAlertModal] = useState(null);
 
   const loadSubTickets = async () => {
     try {
@@ -61,8 +62,12 @@ function StaffSubTickets() {
       const response = await apiClient.get(
         "/api/v1/sub-tickets/assigned-to-me"
       );
-      const data = response?.data || response;
-      setSubTickets(Array.isArray(data) ? data : []);
+      const data = response?.data?.data || response?.data || response;
+      // Convert object with numeric keys to array
+      const subTicketsArray = Array.isArray(data) 
+        ? data 
+        : (data && typeof data === 'object' ? Object.values(data) : []);
+      setSubTickets(subTicketsArray);
     } catch (err) {
       console.error("Failed to load sub-tickets:", err);
       setError(err?.message || "Failed to load sub-tickets");
@@ -73,6 +78,13 @@ function StaffSubTickets() {
 
   useEffect(() => {
     loadSubTickets();
+    
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      loadSubTickets();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const handleAccept = async (subTicketId) => {
@@ -81,9 +93,9 @@ function StaffSubTickets() {
       await loadSubTickets();
     } catch (err) {
       console.error("Failed to accept sub-ticket:", err);
-      alert(
-        "Failed to accept sub-ticket: " + (err?.message || "Unknown error")
-      );
+      setAlertModal({
+        message: "Failed to accept sub-ticket: " + (err?.message || "Unknown error")
+      });
     }
   };
 
@@ -96,7 +108,7 @@ function StaffSubTickets() {
       await loadSubTickets();
     } catch (err) {
       console.error("Failed to deny sub-ticket:", err);
-      alert("Failed to deny sub-ticket: " + (err?.message || "Unknown error"));
+      setAlertModal({ message: "Failed to deny sub-ticket: " + (err?.message || "Unknown error") });
     }
   };
 
@@ -109,27 +121,25 @@ function StaffSubTickets() {
       await loadSubTickets();
     } catch (err) {
       console.error("Failed to resolve sub-ticket:", err);
-      alert(
-        "Failed to resolve sub-ticket: " + (err?.message || "Unknown error")
-      );
+      setAlertModal({
+        message: "Failed to resolve sub-ticket: " + (err?.message || "Unknown error")
+      });
     }
   };
 
-  const handleReassignRequest = async (subTicketId, reason, newAssignee) => {
+  const handleReassignRequest = async (subTicketId, reason) => {
     try {
       await apiClient.post("/api/v1/reassign-requests", {
         subTicketId,
         reason,
-        newAssignee: newAssignee || undefined,
       });
       setReassignModal(null);
-      alert("Reassign request submitted successfully");
+      setAlertModal({ message: "Reassign request submitted successfully" });
     } catch (err) {
       console.error("Failed to submit reassign request:", err);
-      alert(
-        "Failed to submit reassign request: " +
-          (err?.message || "Unknown error")
-      );
+      setAlertModal({
+        message: "Failed to submit reassign request: " + (err?.message || "Unknown error")
+      });
     }
   };
 
@@ -144,30 +154,7 @@ function StaffSubTickets() {
           <h2 className="page-title">My Sub-Tickets</h2>
           <p className="page-subtitle">Sub-tickets assigned to you</p>
         </div>
-        <div style={{ display: "flex", gap: "0.75rem" }}>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => navigate("/staff/dashboard")}
-          >
-            Dashboard
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => navigate("/staff/tickets")}
-          >
-            Assigned Tickets
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={loadSubTickets}
-            disabled={loading}
-          >
-            {loading ? "Loading..." : "Refresh"}
-          </button>
-        </div>
+        
       </div>
 
       {loading && (
@@ -242,6 +229,27 @@ function StaffSubTickets() {
                           onClick={() =>
                             navigate(`/staff/sub-tickets/${subTicket.id}`)
                           }
+                          style={{
+                            padding: '0.5rem 1rem',
+                            fontSize: '0.8rem',
+                            fontWeight: 500,
+                            backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                            color: '#2563eb',
+                            border: '1px solid rgba(59, 130, 246, 0.2)',
+                            borderRadius: '14px',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            backdropFilter: 'blur(40px) saturate(200%)',
+                            boxShadow: '0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(59, 130, 246, 0.1)',
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)'
+                            e.currentTarget.style.boxShadow = '0 12px 40px rgba(59, 130, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4)'
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)'
+                            e.currentTarget.style.boxShadow = '0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(59, 130, 246, 0.1)'
+                          }}
                         >
                           Details
                         </button>
@@ -252,6 +260,27 @@ function StaffSubTickets() {
                               type="button"
                               className="btn btn-sm btn-success"
                               onClick={() => handleAccept(subTicket.id)}
+                              style={{
+                                padding: '0.5rem 1rem',
+                                fontSize: '0.8rem',
+                                fontWeight: 500,
+                                backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                color: '#059669',
+                                border: '1px solid rgba(16, 185, 129, 0.2)',
+                                borderRadius: '14px',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                backdropFilter: 'blur(40px) saturate(200%)',
+                                boxShadow: '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(16, 185, 129, 0.1)',
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)'
+                                e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4)'
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)'
+                                e.currentTarget.style.boxShadow = '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(16, 185, 129, 0.1)'
+                              }}
                             >
                               Accept
                             </button>
@@ -264,13 +293,106 @@ function StaffSubTickets() {
                                   category: subTicket.category?.name,
                                 })
                               }
+                              style={{
+                                padding: '0.5rem 1rem',
+                                fontSize: '0.8rem',
+                                fontWeight: 500,
+                                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                                color: '#dc2626',
+                                border: '1px solid rgba(239, 68, 68, 0.2)',
+                                borderRadius: '14px',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                backdropFilter: 'blur(40px) saturate(200%)',
+                                boxShadow: '0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(239, 68, 68, 0.1)',
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)'
+                                e.currentTarget.style.boxShadow = '0 12px 40px rgba(239, 68, 68, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4)'
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)'
+                                e.currentTarget.style.boxShadow = '0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(239, 68, 68, 0.1)'
+                              }}
                             >
                               Deny
                             </button>
                           </>
                         )}
 
-                        {/* các nút khác giữ nguyên */}
+                        {subTicket.status === "in_progress" && (
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-success"
+                              onClick={() =>
+                                setResolveModal({
+                                  id: subTicket.id,
+                                  category: subTicket.category?.name,
+                                })
+                              }
+                              style={{
+                                padding: '0.5rem 1rem',
+                                fontSize: '0.8rem',
+                                fontWeight: 500,
+                                backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                color: '#059669',
+                                border: '1px solid rgba(16, 185, 129, 0.2)',
+                                borderRadius: '14px',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                backdropFilter: 'blur(40px) saturate(200%)',
+                                boxShadow: '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(16, 185, 129, 0.1)',
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)'
+                                e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4)'
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)'
+                                e.currentTarget.style.boxShadow = '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(16, 185, 129, 0.1)'
+                              }}
+                            >
+                              Resolve
+                            </button>
+                            {canReassign(subTicket.status) && (
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-warning"
+                                onClick={() =>
+                                  setReassignModal({
+                                    id: subTicket.id,
+                                    category: subTicket.category?.name,
+                                    subTicket: subTicket,
+                                  })
+                                }
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 500,
+                                  backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                                  color: '#d97706',
+                                  border: '1px solid rgba(245, 158, 11, 0.2)',
+                                  borderRadius: '14px',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                  backdropFilter: 'blur(40px) saturate(200%)',
+                                  boxShadow: '0 8px 32px rgba(245, 158, 11, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(245, 158, 11, 0.1)',
+                                }}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(-2px)'
+                                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(245, 158, 11, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4)'
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.transform = 'translateY(0)'
+                                  e.currentTarget.style.boxShadow = '0 8px 32px rgba(245, 158, 11, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(245, 158, 11, 0.1)'
+                                }}
+                              >
+                                Reassign
+                              </button>
+                            )}
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -279,6 +401,14 @@ function StaffSubTickets() {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Alert Modal */}
+      {alertModal && (
+        <AlertModal
+          message={alertModal.message}
+          onClose={() => setAlertModal(null)}
+        />
       )}
 
       {/* Deny Modal */}
@@ -305,9 +435,10 @@ function StaffSubTickets() {
       {reassignModal && (
         <ReassignRequestModal
           category={reassignModal.category}
+          subTicket={reassignModal.subTicket}
           onClose={() => setReassignModal(null)}
-          onSubmit={(reason, newAssignee) =>
-            handleReassignRequest(reassignModal.id, reason, newAssignee)
+          onSubmit={(reason) =>
+            handleReassignRequest(reassignModal.id, reason)
           }
         />
       )}
@@ -323,7 +454,6 @@ function DenySubTicketModal({ category, onClose, onSubmit }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!reason.trim()) {
-      alert("Please provide a reason for denying this sub-ticket.");
       return;
     }
     setSubmitting(true);
@@ -430,7 +560,6 @@ function ResolveSubTicketModal({ category, onClose, onSubmit }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!resolutionNote.trim()) {
-      alert("Please provide resolution notes.");
       return;
     }
     setSubmitting(true);
@@ -530,19 +659,17 @@ function ResolveSubTicketModal({ category, onClose, onSubmit }) {
 }
 
 // Reassign Request Modal
-function ReassignRequestModal({ category, onClose, onSubmit }) {
+function ReassignRequestModal({ category, subTicket, onClose, onSubmit }) {
   const [reason, setReason] = useState("");
-  const [newAssignee, setNewAssignee] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!reason.trim()) {
-      alert("Please provide a reason for reassignment.");
       return;
     }
     setSubmitting(true);
-    await onSubmit(reason, newAssignee);
+    await onSubmit(reason);
     setSubmitting(false);
   };
 
@@ -607,27 +734,6 @@ function ReassignRequestModal({ category, onClose, onSubmit }) {
               placeholder="Please explain why you need reassignment..."
               required
             />
-          </div>
-
-          <div style={{ marginBottom: "1rem" }}>
-            <label
-              htmlFor="newAssignee"
-              style={{
-                display: "block",
-                marginBottom: "0.5rem",
-                fontWeight: 500,
-              }}
-            >
-              Preferred New Assignee (Optional)
-            </label>
-            <input
-              type="text"
-              id="newAssignee"
-              className="input"
-              value={newAssignee}
-              onChange={(e) => setNewAssignee(e.target.value)}
-              placeholder="Leave empty for admin to decide"
-            />
             <p
               style={{
                 fontSize: "0.75rem",
@@ -635,7 +741,7 @@ function ReassignRequestModal({ category, onClose, onSubmit }) {
                 marginTop: "0.25rem",
               }}
             >
-              Admin will review and assign appropriately
+              Admin will review and assign a suitable staff member
             </p>
           </div>
 
@@ -663,6 +769,59 @@ function ReassignRequestModal({ category, onClose, onSubmit }) {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// Alert Modal Component
+function AlertModal({ message, onClose }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.4)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="card"
+        style={{
+          width: "100%",
+          maxWidth: "400px",
+          padding: "1.5rem",
+          margin: "1rem",
+          backgroundColor: "rgba(255, 255, 255, 0.95)",
+          backdropFilter: "blur(40px) saturate(180%)",
+          WebkitBackdropFilter: "blur(40px) saturate(180%)",
+          border: "1px solid rgba(255, 255, 255, 0.3)",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ marginBottom: "1rem", fontSize: "1.125rem", fontWeight: 600, textAlign: "center" }}>
+          Notice
+        </div>
+        <div style={{ marginBottom: "1.5rem", color: "#374151", textAlign: "center" }}>
+          {message}
+        </div>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onClose}
+            style={{ minWidth: "100px" }}
+          >
+            OK
+          </button>
+        </div>
       </div>
     </div>
   );

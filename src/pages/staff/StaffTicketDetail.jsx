@@ -71,10 +71,13 @@ function StaffTicketDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [ticket, setTicket] = useState(null)
+  const [subTickets, setSubTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [denyModal, setDenyModal] = useState(false)
   const [resolveModal, setResolveModal] = useState(false)
+  const [imageModal, setImageModal] = useState(null)
+  const [alertModal, setAlertModal] = useState(null)
 
   const loadTicket = async () => {
     if (!id) return
@@ -92,8 +95,21 @@ function StaffTicketDetail() {
     }
   }
 
+  const loadSubTickets = async () => {
+    if (!id) return
+    try {
+      const response = await apiClient.get(`/api/v1/tickets/${id}/sub-tickets`)
+      const data = response?.data || response
+      setSubTickets(Array.isArray(data) ? data : [])
+    } catch (err) {
+      console.error('Failed to load sub-tickets:', err)
+      setSubTickets([])
+    }
+  }
+
   useEffect(() => {
     loadTicket()
+    loadSubTickets()
   }, [id])
 
   const handleAccept = async () => {
@@ -102,7 +118,7 @@ function StaffTicketDetail() {
       await loadTicket()
     } catch (err) {
       console.error('Failed to accept ticket:', err)
-      alert('Failed to accept ticket: ' + (err?.message || 'Unknown error'))
+      setAlertModal({ message: 'Failed to accept ticket: ' + (err?.message || 'Unknown error') })
     }
   }
 
@@ -113,7 +129,7 @@ function StaffTicketDetail() {
       await loadTicket()
     } catch (err) {
       console.error('Failed to deny ticket:', err)
-      alert('Failed to deny ticket: ' + (err?.message || 'Unknown error'))
+      setAlertModal({ message: 'Failed to deny ticket: ' + (err?.message || 'Unknown error') })
     }
   }
 
@@ -124,7 +140,7 @@ function StaffTicketDetail() {
       await loadTicket()
     } catch (err) {
       console.error('Failed to resolve ticket:', err)
-      alert('Failed to resolve ticket: ' + (err?.message || 'Unknown error'))
+      setAlertModal({ message: 'Failed to resolve ticket: ' + (err?.message || 'Unknown error') })
     }
   }
 
@@ -299,7 +315,254 @@ function StaffTicketDetail() {
             </div>
           </div>
         )}
+
+        {ticket.attachments && ticket.attachments.length > 0 && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <div style={{ fontWeight: 600, marginBottom: '0.75rem', color: '#374151' }}>Attachments ({ticket.attachments.length})</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+              {ticket.attachments.map((attachment) => {
+                const isImage = attachment.mimeType?.startsWith('image/')
+                return (
+                  <div
+                    key={attachment.id}
+                    style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      backgroundColor: '#fff',
+                      transition: 'transform 0.2s, box-shadow 0.2s',
+                      cursor: 'pointer',
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                    onClick={() => {
+                      if (isImage) {
+                        setImageModal(attachment)
+                      } else {
+                        window.open(attachment.filePath, '_blank')
+                      }
+                    }}
+                  >
+                    {isImage ? (
+                      <img
+                        src={attachment.filePath}
+                        alt={attachment.fileName}
+                        style={{
+                          width: '100%',
+                          height: '150px',
+                          objectFit: 'cover',
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '150px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#f3f4f6',
+                        }}
+                      >
+                        <span style={{ fontSize: '3rem', color: '#9ca3af' }}>📄</span>
+                      </div>
+                    )}
+                    <div style={{ padding: '0.75rem' }}>
+                      <div
+                        style={{
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                          color: '#111827',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          marginBottom: '0.25rem',
+                        }}
+                        title={attachment.fileName}
+                      >
+                        {attachment.fileName}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        {(parseInt(attachment.fileSize) / 1024).toFixed(1)} KB
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Sub-Tickets Section */}
+      {subTickets.length > 0 && (
+        <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1rem' }}>
+            Sub-Tickets ({subTickets.length})
+          </h3>
+          <div className="table-responsive">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Assignee</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Assigned At</th>
+                  <th>Due Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subTickets.map((subTicket) => (
+                  <tr key={subTicket.id}>
+                    <td>{subTicket.category?.name || 'N/A'}</td>
+                    <td>{subTicket.assignee?.fullName || subTicket.assignee?.username || 'N/A'}</td>
+                    <td>{getPriorityBadge(subTicket.priority)}</td>
+                    <td>
+                      {(() => {
+                        const statusConfigs = {
+                          assigned: { bg: '#fef3c7', text: '#92400e', label: 'Assigned' },
+                          in_progress: { bg: '#e0f2fe', text: '#075985', label: 'In Progress' },
+                          resolved: { bg: '#dcfce7', text: '#166534', label: 'Resolved' },
+                          denied: { bg: '#fee2e2', text: '#991b1b', label: 'Denied' },
+                          escalated: { bg: '#fef08a', text: '#854d0e', label: 'Escalated' },
+                        }
+                        const config = statusConfigs[subTicket.status] || { bg: '#e5e7eb', text: '#374151', label: subTicket.status }
+                        return (
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '999px',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              backgroundColor: config.bg,
+                              color: config.text,
+                            }}
+                          >
+                            {config.label}
+                          </span>
+                        )
+                      })()}
+                    </td>
+                    <td>{formatDate(subTicket.assignedAt)}</td>
+                    <td>{formatDate(subTicket.dueDate)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => navigate(`/staff/sub-tickets/${subTicket.id}`)}
+                        style={{ fontSize: '0.875rem', padding: '0.375rem 0.75rem' }}
+                      >
+                        View Details
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {imageModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '2rem',
+          }}
+          onClick={() => setImageModal(null)}
+        >
+          <div
+            style={{
+              position: 'relative',
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              backgroundColor: '#fff',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setImageModal(null)}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                color: '#fff',
+                border: 'none',
+                fontSize: '1.5rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 10,
+                transition: 'background-color 0.2s',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.8)'
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.6)'
+              }}
+            >
+              ×
+            </button>
+            <img
+              src={imageModal.filePath}
+              alt={imageModal.fileName}
+              style={{
+                maxWidth: '90vw',
+                maxHeight: '90vh',
+                width: 'auto',
+                height: 'auto',
+                display: 'block',
+              }}
+            />
+            <div
+              style={{
+                padding: '1rem',
+                backgroundColor: '#f9fafb',
+                borderTop: '1px solid #e5e7eb',
+              }}
+            >
+              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{imageModal.fileName}</div>
+              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                {(parseInt(imageModal.fileSize) / 1024).toFixed(1)} KB
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Modal */}
+      {alertModal && (
+        <AlertModal
+          message={alertModal.message}
+          onClose={() => setAlertModal(null)}
+        />
+      )}
 
       {/* Deny Modal */}
       {denyModal && (
@@ -486,6 +749,58 @@ function ResolveTicketModal({ ticketTitle, onClose, onSubmit }) {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+// Alert Modal Component
+function AlertModal({ message, onClose }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="card"
+        style={{
+          width: '100%',
+          maxWidth: '400px',
+          padding: '1.5rem',
+          margin: '1rem',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(40px) saturate(180%)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+          borderRadius: '20px',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: 600, textAlign: 'center' }}>
+          Notice
+        </div>
+        <div style={{ marginBottom: '1.5rem', color: '#374151', textAlign: 'center' }}>
+          {message}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onClose}
+            style={{ minWidth: '100px' }}
+          >
+            OK
+          </button>
+        </div>
       </div>
     </div>
   )

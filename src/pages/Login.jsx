@@ -102,6 +102,9 @@ function Login() {
         destination = "/staff/dashboard";
       }
       navigate(destination, { replace: true });
+      
+      // Start auto-refresh sau khi login thành công
+      window.dispatchEvent(new Event("auth-login-success"));
     } catch (error) {
       setServerError(extractErrorMessage(error));
     } finally {
@@ -165,6 +168,9 @@ function Login() {
           destination = "/staff/dashboard";
         }
         navigate(destination, { replace: true });
+        
+        // Start auto-refresh sau khi login thành công
+        window.dispatchEvent(new Event("auth-login-success"));
       }, 100);
     } catch (err) {
       console.error(err);

@@ -41,7 +41,6 @@ function getStatusBadge(status) {
 
 function AdminReassignRequests() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('pending')
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -50,13 +49,13 @@ function AdminReassignRequests() {
     try {
       setLoading(true)
       setError('')
-      const endpoint =
-        activeTab === 'pending'
-          ? '/api/v1/reassign-requests/pending'
-          : '/api/v1/reassign-requests/all'
-      const response = await apiClient.get(endpoint)
+      const response = await apiClient.get('/api/v1/reassign-requests/all')
       const data = response?.data || response
-      setRequests(Array.isArray(data) ? data : [])
+      // API returns data as object with numeric keys, convert to array
+      const dataArray = typeof data === 'object' && !Array.isArray(data) 
+        ? Object.values(data) 
+        : (Array.isArray(data) ? data : [])
+      setRequests(dataArray)
     } catch (err) {
       console.error('Failed to load reassign requests:', err)
       setError(err?.message || 'Failed to load reassign requests')
@@ -67,75 +66,24 @@ function AdminReassignRequests() {
 
   useEffect(() => {
     loadRequests()
-  }, [activeTab])
+  }, [])
 
   const getItemName = (request) => {
     if (request.ticket) {
       return request.ticket.title
     }
     if (request.subTicket) {
+      const parentTitle = request.subTicket.parentTicket?.title || 'Unknown'
       const category = request.subTicket.category?.name || 'Sub-ticket'
-      const parentTitle = request.subTicket.parentTicket?.title || ''
-      return parentTitle ? `${category} - ${parentTitle}` : category
+      return `${parentTitle} (${category})`
     }
     return 'N/A'
   }
 
   return (
     <div className="page">
-      <div className="page-header" style={{ marginBottom: '1.5rem' }}>
-        <div>
-          <h2 className="page-title">Reassign Requests</h2>
-          <p className="page-subtitle">Review and manage staff reassignment requests</p>
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          borderBottom: '2px solid #e5e7eb',
-          marginBottom: '1.5rem',
-          gap: '0.5rem',
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setActiveTab('pending')}
-          style={{
-            padding: '0.75rem 1rem',
-            fontSize: '0.9rem',
-            fontWeight: 500,
-            backgroundColor: 'transparent',
-            border: 'none',
-            borderBottom: activeTab === 'pending' ? '2px solid #3b82f6' : '2px solid transparent',
-            color: activeTab === 'pending' ? '#3b82f6' : '#6b7280',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}
-        >
-          Pending
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('all')}
-          style={{
-            padding: '0.75rem 1rem',
-            fontSize: '0.9rem',
-            fontWeight: 500,
-            backgroundColor: 'transparent',
-            border: 'none',
-            borderBottom: activeTab === 'all' ? '2px solid #3b82f6' : '2px solid transparent',
-            color: activeTab === 'all' ? '#3b82f6' : '#6b7280',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}
-        >
-          All
-        </button>
-      </div>
 
-      {/* Content */}
       {loading && (
         <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
           Loading reassign requests...
@@ -168,9 +116,9 @@ function AdminReassignRequests() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th>Title</th>
                   <th>Type</th>
-                  <th>Item</th>
+                  <th>Category/Department</th>
                   <th>Requested By</th>
                   <th>Preferred Assignee</th>
                   <th>Status</th>
@@ -183,9 +131,14 @@ function AdminReassignRequests() {
                   <tr
                     key={request.id}
                     style={{ cursor: 'pointer' }}
-                    onClick={() => navigate(`/admin/reassign-requests/${request.id}`)}
+                    onClick={() => navigate(`/admin/reassign-requests/${request.id}`, {
+                      state: {
+                        departmentId: request.ticket?.departmentId || request.subTicket?.parentTicket?.departmentId,
+                        departmentName: request.ticket?.department?.name || request.subTicket?.parentTicket?.department?.name
+                      }
+                    })}
                   >
-                    <td>#{request.id.slice(0, 8)}</td>
+                    <td>{request.ticket?.title || request.subTicket?.parentTicket?.title || 'N/A'}</td>
                     <td>
                       <span
                         style={{
@@ -201,18 +154,46 @@ function AdminReassignRequests() {
                         {request.ticketId ? 'Ticket' : 'Sub-ticket'}
                       </span>
                     </td>
-                    <td>{getItemName(request)}</td>
-                    <td>{request.requestedBy?.fullName || 'N/A'}</td>
-                    <td>{request.newAssigneeUser?.fullName || 'Not specified'}</td>
+                    <td>{request.subTicket?.category?.name || request.ticket?.department?.name || 'N/A'}</td>
+                    <td>{request.requester?.fullName || request.requester?.username || 'N/A'}</td>
+                    <td>{request.newAssigneeUser?.fullName || request.newAssigneeUser?.username || 'Not specified'}</td>
                     <td>{getStatusBadge(request.status)}</td>
                     <td>{formatDate(request.createdAt)}</td>
                     <td>
                       <button
                         type="button"
-                        className="btn btn-sm btn-secondary"
                         onClick={(e) => {
                           e.stopPropagation()
-                          navigate(`/admin/reassign-requests/${request.id}`)
+                          navigate(`/admin/reassign-requests/${request.id}`, {
+                            state: {
+                              departmentId: request.ticket?.departmentId || request.subTicket?.parentTicket?.departmentId,
+                              departmentName: request.ticket?.department?.name || request.subTicket?.parentTicket?.department?.name
+                            }
+                          })
+                        }}
+                        style={{
+                          padding: "0.5rem 1rem",
+                          fontSize: "0.8rem",
+                          fontWeight: 500,
+                          backgroundColor: "rgba(99, 102, 241, 0.08)",
+                          color: "#6366f1",
+                          border: "1px solid rgba(99, 102, 241, 0.2)",
+                          borderRadius: "14px",
+                          cursor: "pointer",
+                          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                          backdropFilter: "blur(40px) saturate(200%)",
+                          boxShadow:
+                            "0 8px 32px rgba(99, 102, 241, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(99, 102, 241, 0.1)",
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.backgroundColor = "rgba(99, 102, 241, 0.12)"
+                          e.currentTarget.style.transform = "translateY(-2px)"
+                          e.currentTarget.style.boxShadow = "0 12px 40px rgba(99, 102, 241, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(99, 102, 241, 0.1)"
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.backgroundColor = "rgba(99, 102, 241, 0.08)"
+                          e.currentTarget.style.transform = "translateY(0)"
+                          e.currentTarget.style.boxShadow = "0 8px 32px rgba(99, 102, 241, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(99, 102, 241, 0.1)"
                         }}
                       >
                         Review
