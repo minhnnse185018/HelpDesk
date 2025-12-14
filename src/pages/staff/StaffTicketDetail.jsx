@@ -267,6 +267,7 @@ function StaffTicketDetail() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
           <InfoItem label="Room" value={ticket.room?.name || 'N/A'} />
           <InfoItem label="Department" value={ticket.department?.name || 'N/A'} />
+          <InfoItem label="Category" value={ticket.ticketCategories?.map(tc => tc.category?.name).filter(Boolean).join(', ') || 'N/A'} />
           <InfoItem label="Assigned To" value={ticket.assignee?.fullName || ticket.assignee?.username || 'N/A'} />
           <InfoItem label="Created By" value={ticket.createdBy?.fullName || ticket.createdBy?.username || 'N/A'} />
           <InfoItem label="Created At" value={formatDate(ticket.createdAt)} />

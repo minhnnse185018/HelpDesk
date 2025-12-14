@@ -26,19 +26,21 @@ function Login() {
   };
 
   const extractErrorMessage = (error) => {
-    const rawMessage = error?.message || "";
-    try {
-      const jsonStart = rawMessage.indexOf("{");
-      if (jsonStart !== -1) {
-        const parsed = JSON.parse(rawMessage.slice(jsonStart));
-        if (parsed?.message) return parsed.message;
-      }
-    } catch (err) {
-      // ignore parse errors and fall back below
+    // Try to get message from error response
+    if (error?.response?.data?.message) {
+      return error.response.data.message;
     }
-    const parts = rawMessage.split(" - ");
-    const lastPart = parts[parts.length - 1]?.trim();
-    return lastPart || "Email ho?c m?t kh?u kh?ng ch?nh x?c";
+    
+    if (error?.response?.data?.error) {
+      return error.response.data.error;
+    }
+
+    // Fallback to error.message
+    if (error?.message) {
+      return error.message;
+    }
+
+    return "Email hoặc mật khẩu không chính xác";
   };
 
   const handleStudentLogin = async (event) => {

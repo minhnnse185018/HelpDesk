@@ -4,7 +4,7 @@ import { formatDate } from "../../utils/ticketHelpers.jsx";
 import SplitCategoriesModal from "../../components/modals/SplitCategoriesModal";
 import NotificationModal from "../../components/modals/NotificationModal";
 
-function PendingSplitTickets() {
+function PendingSplitTickets({ searchTerm = "" }) {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -108,6 +108,21 @@ function PendingSplitTickets() {
     );
   }
 
+  // Filter tickets based on search term
+  const filteredTickets = tickets.filter((ticket) => {
+    if (!searchTerm) return true;
+    
+    const search = searchTerm.toLowerCase();
+    return (
+      ticket.title?.toLowerCase().includes(search) ||
+      ticket.description?.toLowerCase().includes(search) ||
+      ticket.creator?.username?.toLowerCase().includes(search) ||
+      ticket.creator?.email?.toLowerCase().includes(search) ||
+      ticket.room?.name?.toLowerCase().includes(search) ||
+      ticket.ticketCategories?.some(tc => tc.category?.name?.toLowerCase().includes(search))
+    );
+  });
+
   return (
     <>
       <div
@@ -209,7 +224,16 @@ function PendingSplitTickets() {
                 </tr>
               </thead>
               <tbody>
-                {tickets.map((ticket) => (
+                {filteredTickets.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" style={{ padding: "3rem", textAlign: "center", color: "#9ca3af" }}>
+                      <div style={{ fontSize: "0.875rem", fontWeight: 500 }}>
+                        {searchTerm ? "No tickets match your search" : "No pending split tickets found"}
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTickets.map((ticket) => (
                   <tr
                     key={ticket.id}
                     style={{ borderBottom: "1px solid #f3f4f6" }}
@@ -279,7 +303,8 @@ function PendingSplitTickets() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>

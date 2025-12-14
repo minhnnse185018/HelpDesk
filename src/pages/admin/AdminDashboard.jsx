@@ -5,9 +5,9 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [tickets, setTickets] = useState([])
   const [kpis, setKpis] = useState([
-    { label: 'Total Tickets / Tổng số ticket', value: 0 },
-    { label: 'On-time SLA / Đúng SLA', value: '0%' },
-    { label: 'Overdue Tickets / Ticket trễ hạn', value: 0 },
+    { label: 'Total Tickets', value: 0 },
+    { label: 'On-time SLA', value: '0%' },
+    { label: 'Overdue Tickets', value: 0 },
   ])
   const [categoryStats, setCategoryStats] = useState([])
   const [slaStats, setSlaStats] = useState({ onTime: 0, overdue: 0 })
@@ -45,9 +45,9 @@ function AdminDashboard() {
         : 0
       
       setKpis([
-        { label: 'Total Tickets / Tổng số ticket', value: totalTickets },
-        { label: 'On-time SLA / Đúng SLA', value: `${onTimePercentage}%` },
-        { label: 'Overdue Tickets / Ticket trễ hạn', value: overdueTickets },
+        { label: 'Total Tickets', value: totalTickets },
+        { label: 'On-time SLA', value: `${onTimePercentage}%` },
+        { label: 'Overdue Tickets', value: overdueTickets },
       ])
       
       // Calculate category statistics
@@ -77,18 +77,39 @@ function AdminDashboard() {
       })
       
       // Get recent tickets (last 5)
-      const recent = ticketsArray
+      const recentTicketsBase = ticketsArray
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
         .slice(0, 5)
-        .map(ticket => ({
-          id: ticket.id,
-          title: ticket.title,
-          category: ticket.ticketCategories?.[0]?.category?.name || 'N/A',
-          room: ticket.room?.name || 'N/A',
-          status: getStatusLabel(ticket.status),
-          statusKey: ticket.status,
-          slaDue: ticket.dueDate ? formatDate(ticket.dueDate) : 'N/A',
-        }))
+      
+      // Fetch room details if needed
+      const recent = await Promise.all(
+        recentTicketsBase.map(async (ticket) => {
+          let roomData = ticket.room || null
+          
+          // Fetch room details if roomId exists and room data is incomplete
+          if (ticket.roomId && (!roomData?.code || !roomData?.floor)) {
+            try {
+              const roomRes = await apiClient.get(`/api/v1/rooms/${ticket.roomId}`)
+              // Handle nested response structure
+              roomData = roomRes?.data?.data || roomRes?.data || roomRes
+              console.log('🏠 Room ID:', ticket.roomId)
+              console.log('🏠 Fetched room data:', roomData)
+            } catch (err) {
+              console.error(`Failed to fetch room ${ticket.roomId}:`, err)
+            }
+          }
+          
+          return {
+            id: ticket.id,
+            title: ticket.title,
+            category: ticket.ticketCategories?.[0]?.category?.name || 'N/A',
+            room: roomData,
+            status: getStatusLabel(ticket.status),
+            statusKey: ticket.status,
+            slaDue: ticket.dueDate ? formatDate(ticket.dueDate) : 'N/A',
+          }
+        })
+      )
       
       setRecentTickets(recent)
       
@@ -176,7 +197,7 @@ function AdminDashboard() {
       <section className="section section-grid-two">
         <div className="card chart-card">
           <h3 className="section-title">
-            Tickets by Category / Ticket theo loại
+            Tickets by Category
           </h3>
           <div className="chart-placeholder bar-chart">
             {categoryStats.length === 0 ? (
@@ -207,18 +228,18 @@ function AdminDashboard() {
 
         <div className="card chart-card">
           <h3 className="section-title">
-            SLA Status / Trạng thái SLA
+            SLA Status
           </h3>
           <div className="chart-placeholder donut-chart">
             <div className="donut" />
             <div className="donut-legend">
               <div className="legend-item">
                 <span className="legend-dot legend-dot-green" />
-                <span>On-time / Đúng SLA: {slaStats.onTime}</span>
+                <span>On-time: {slaStats.onTime}</span>
               </div>
               <div className="legend-item">
                 <span className="legend-dot legend-dot-red" />
-                <span>Overdue / Trễ hạn: {slaStats.overdue}</span>
+                <span>Overdue: {slaStats.overdue}</span>
               </div>
             </div>
           </div>
@@ -229,17 +250,17 @@ function AdminDashboard() {
         <div className="card table-card">
           <div className="section-header">
             <h3 className="section-title">
-              Recent Tickets / Ticket gần đây
+              Recent Tickets
             </h3>
           </div>
           <table className="table">
             <thead>
               <tr>
                 <th>Ticket ID</th>
-                <th>Category / Loại</th>
-                <th>Room / Phòng</th>
-                <th>Status / Trạng thái</th>
-                <th>SLA Due / Hạn SLA</th>
+                <th>Category</th>
+                <th>Room</th>
+                <th>Status</th>
+                <th>SLA Due</th>
               </tr>
             </thead>
             <tbody>
@@ -270,7 +291,24 @@ function AdminDashboard() {
                       </div>
                     </td>
                     <td>{ticket.category}</td>
-                    <td>{ticket.room}</td>
+                    <td>
+                      {ticket.room ? (
+                        <div>
+                          <div style={{ fontWeight: 500, color: '#111827' }}>
+                            {ticket.room.name || 'N/A'}
+                          </div>
+                          {(ticket.room.code || ticket.room.floor) && (
+                            <div style={{ fontSize: '0.75rem', marginTop: '0.125rem', color: '#6b7280' }}>
+                              {ticket.room.code && `(${ticket.room.code})`}
+                              {ticket.room.code && ticket.room.floor && ' - '}
+                              {ticket.room.floor && `Floor ${ticket.room.floor}`}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        'N/A'
+                      )}
+                    </td>
                     <td>
                       <span
                         className={`status-badge status-${ticket.statusKey}`}

@@ -1,11 +1,35 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
-import { formatDate, getPriorityBadge, getStatusBadge } from "../../utils/ticketHelpers.jsx";
+import {
+  formatDate,
+} from "../../utils/ticketHelpers.jsx";
 import AssignTicketModal from "../../components/modals/AssignTicketModal";
 import NotificationModal from "../../components/modals/NotificationModal";
 
-function AllTickets() {
+const getStatusColor = (status) => {
+  const colors = {
+    open: { bg: "#e0e7ff", text: "#3730a3" },
+    assigned: { bg: "#dbeafe", text: "#1e40af" },
+    in_progress: { bg: "#fef3c7", text: "#92400e" },
+    resolved: { bg: "#d1fae5", text: "#065f46" },
+    denied: { bg: "#fee2e2", text: "#991b1b" },
+    closed: { bg: "#f3f4f6", text: "#374151" },
+  };
+  return colors[status] || { bg: "#f3f4f6", text: "#374151" };
+};
+
+const getPriorityColor = (priority) => {
+  const colors = {
+    low: { bg: "#dbeafe", text: "#1e40af" },
+    medium: { bg: "#fef3c7", text: "#92400e" },
+    high: { bg: "#fed7aa", text: "#9a3412" },
+    critical: { bg: "#fecaca", text: "#991b1b" },
+  };
+  return colors[priority] || { bg: "#f3f4f6", text: "#374151" };
+};
+
+function AllTickets({ searchTerm = "" }) {
   const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,7 +38,6 @@ function AllTickets() {
   const [notification, setNotification] = useState(null);
   const [sortOrder, setSortOrder] = useState("asc");
   const [deleteConfirmModal, setDeleteConfirmModal] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
 
   const handleSortByPriority = () => {
     const priorityMap = { low: 1, medium: 2, high: 3, critical: 4 };
@@ -38,7 +61,25 @@ function AllTickets() {
         data = Object.values(data).filter(Boolean);
       }
 
-      const ticketsArray = Array.isArray(data) ? data : [];
+      let ticketsArray = Array.isArray(data) ? data : [];
+
+      // Fetch room details for tickets with incomplete room data
+      ticketsArray = await Promise.all(
+        ticketsArray.map(async (ticket) => {
+          if (ticket.roomId && (!ticket.room?.code || !ticket.room?.floor)) {
+            try {
+              const roomRes = await apiClient.get(
+                `/api/v1/rooms/${ticket.roomId}`
+              );
+              ticket.room = roomRes.data || roomRes;
+            } catch (err) {
+              console.error(`Failed to fetch room ${ticket.roomId}:`, err);
+            }
+          }
+          return ticket;
+        })
+      );
+
       setTickets(ticketsArray);
     } catch (err) {
       console.error("Failed to load tickets:", err);
@@ -54,12 +95,12 @@ function AllTickets() {
 
   useEffect(() => {
     loadTickets();
-    
+
     // Auto-refresh every 30 seconds
     const interval = setInterval(() => {
       loadTickets();
     }, 30000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -83,14 +124,23 @@ function AllTickets() {
 
   const handleAssign = async (ticketId, staffId, priority) => {
     try {
-      await apiClient.post(`/api/v1/tickets/${ticketId}/assign-category`, { staffId, priority });
-      setNotification({ type: "success", message: "Ticket assigned successfully!" });
+      await apiClient.post(`/api/v1/tickets/${ticketId}/assign-category`, {
+        staffId,
+        priority,
+      });
+      setNotification({
+        type: "success",
+        message: "Ticket assigned successfully!",
+      });
       setAssignModal(null);
       loadTickets();
     } catch (err) {
       console.error("Failed to assign:", err);
       console.error("Error details:", err.response?.data);
-      setNotification({ type: "error", message: err.response?.data?.message || "Failed to assign ticket" });
+      setNotification({
+        type: "error",
+        message: err.response?.data?.message || "Failed to assign ticket",
+      });
     }
   };
 
@@ -138,9 +188,7 @@ function AllTickets() {
           />
           <p style={{ color: "#6b7280", margin: 0 }}>Loading tickets...</p>
         </div>
-        <style>
-          {`@keyframes spin { to { transform: rotate(360deg); } }`}
-        </style>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -163,42 +211,6 @@ function AllTickets() {
 
   return (
     <>
-      {/* Search Box */}
-      <div style={{ marginBottom: "1rem" }}>
-        <input
-          type="text"
-          placeholder="Search tickets by title, room, department, assignee, status, priority..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "0.75rem 1rem",
-            fontSize: "0.875rem",
-            fontWeight: 500,
-            backgroundColor: "rgba(255, 255, 255, 0.72)",
-            color: "#374151",
-            border: "1px solid rgba(255,255,255,0.18)",
-            borderRadius: "14px",
-            backdropFilter: "blur(40px) saturate(180%)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4)",
-            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.boxShadow = "0 12px 40px rgba(99, 102, 241, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4)"
-            e.currentTarget.style.borderColor = "rgba(99, 102, 241, 0.3)"
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.boxShadow = "0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4)"
-            e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)"
-          }}
-        />
-        {searchTerm && (
-          <p style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "0.5rem" }}>
-            Found {filteredTickets.length} ticket{filteredTickets.length !== 1 ? 's' : ''}
-          </p>
-        )}
-      </div>
-
       <div
         style={{
           backgroundColor: "rgba(255, 255, 255, 0.72)",
@@ -207,6 +219,7 @@ function AllTickets() {
           boxShadow: "0 2px 16px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)",
           backdropFilter: "blur(40px) saturate(180%)",
           border: "1px solid rgba(255,255,255,0.18)",
+          width:"100%"
         }}
       >
         <div style={{ overflowX: "auto" }}>
@@ -215,6 +228,8 @@ function AllTickets() {
               width: "100%",
               borderCollapse: "collapse",
               fontSize: "0.875rem",
+              minWidth: "500px",
+              
             }}
           >
             <thead>
@@ -230,6 +245,7 @@ function AllTickets() {
                     textAlign: "left",
                     fontWeight: 600,
                     color: "#374151",
+                    minWidth: "200px",
                   }}
                 >
                   Title
@@ -300,6 +316,8 @@ function AllTickets() {
                     textAlign: "left",
                     fontWeight: 600,
                     color: "#374151",
+                    width:"120px",
+                    minWidth:"120px"
                   }}
                 >
                   Categories
@@ -348,7 +366,9 @@ function AllTickets() {
                     }}
                   >
                     <div style={{ fontSize: "0.875rem", fontWeight: 500 }}>
-                      {searchTerm ? `No tickets found matching "${searchTerm}"` : 'No tickets found'}
+                      {searchTerm
+                        ? `No tickets found matching "${searchTerm}"`
+                        : "No tickets found"}
                     </div>
                   </td>
                 </tr>
@@ -367,6 +387,18 @@ function AllTickets() {
                         }}
                       >
                         {ticket.title}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.75rem",
+                          color: "#6b7280",
+                          marginTop: "0.25rem",
+                        }}
+                      >
+                        Created by:{" "}
+                        {ticket.creator?.username ||
+                          ticket.creator?.email ||
+                          "N/A"}
                       </div>
                       {ticket.deniedReason && (
                         <div
@@ -399,16 +431,72 @@ function AllTickets() {
                         )}
                     </td>
                     <td style={{ padding: "1rem" }}>
-                      {getStatusBadge(ticket.status)}
+                      <span
+                        style={{
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          padding: "0.25rem 0.75rem",
+                          borderRadius: "9999px",
+                          backgroundColor: getStatusColor(ticket.status).bg,
+                          color: getStatusColor(ticket.status).text,
+                        }}
+                      >
+                        {ticket.status?.toUpperCase() || "N/A"}
+                      </span>
                     </td>
                     <td style={{ padding: "1rem" }}>
-                      {getPriorityBadge(ticket.priority)}
+                      <span
+                        style={{
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          padding: "0.25rem 0.75rem",
+                          borderRadius: "9999px",
+                          backgroundColor: getPriorityColor(ticket.priority).bg,
+                          color: getPriorityColor(ticket.priority).text,
+                        }}
+                      >
+                        {ticket.priority?.toUpperCase() || "N/A"}
+                      </span>
                     </td>
                     <td style={{ padding: "1rem", color: "#6b7280" }}>
-                      {ticket.room?.name || "N/A"}
+                      {ticket.room ? (
+                        <div>
+                          <div style={{ fontWeight: 500, color: "#111827", whiteSpace: "nowrap" }}>
+                            {ticket.room.name || "N/A"}
+                          </div>
+                          {(ticket.room.code || ticket.room.floor) && (
+                            <div style={{ fontSize: "0.75rem", marginTop: "0.125rem", whiteSpace: "nowrap" }}>
+                              {ticket.room.code && `(${ticket.room.code})`}
+                              {ticket.room.code && ticket.room.floor && " - "}
+                              {ticket.room.floor && `Floor ${ticket.room.floor}`}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        "N/A"
+                      )}
                     </td>
+
                     <td style={{ padding: "1rem", color: "#6b7280" }}>
-                      {ticket.department?.name || "N/A"}
+                      {ticket.department ? (
+                        <div>
+                          <div style={{ fontWeight: 500, color: "#6b7280" }}>
+                            {ticket.department.name || "N/A"}
+                          </div>
+                          {ticket.department.code && (
+                            <div
+                              style={{
+                                fontSize: "0.75rem",
+                                marginTop: "0.125rem",
+                              }}
+                            >
+                              ({ticket.department.code})
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        "N/A"
+                      )}
                     </td>
                     <td
                       style={{
@@ -426,9 +514,14 @@ function AllTickets() {
                         : "N/A"}
                     </td>
                     <td style={{ padding: "1rem", color: "#6b7280" }}>
-                      {ticket.assignee?.username ||
-                        ticket.assignee?.fullName ||
-                        "N/A"}
+                      <div style={{ fontWeight: 500, color: "#6b7280" }}>
+                        {ticket.assignee?.username || "N/A"}
+                      </div>
+                      {ticket.assignee?.fullName && (
+                        <div style={{ fontSize: "0.75rem", marginTop: "0.125rem" }}>
+                          {ticket.assignee.fullName}
+                        </div>
+                      )}
                     </td>
                     <td
                       style={{
@@ -495,7 +588,8 @@ function AllTickets() {
                               border: "1px solid rgba(59, 130, 246, 0.2)",
                               borderRadius: "14px",
                               cursor: "pointer",
-                              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                              transition:
+                                "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                               backdropFilter: "blur(40px) saturate(200%)",
                               boxShadow:
                                 "0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(59, 130, 246, 0.1)",
@@ -655,7 +749,8 @@ function AllTickets() {
                 lineHeight: "1.5",
               }}
             >
-              Bạn có chắc chắn muốn xóa ticket này không? Hành động này không thể hoàn tác.
+              Bạn có chắc chắn muốn xóa ticket này không? Hành động này không
+              thể hoàn tác.
             </p>
             <div
               style={{

@@ -15,6 +15,15 @@ function formatDate(dateString) {
   })
 }
 
+function formatDurationMinutes(minutes) {
+  const total = Number(minutes)
+  if (!Number.isFinite(total)) return 'N/A'
+  if (total < 60) return `${total} minutes`
+  const hours = Math.floor(total / 60)
+  const mins = total % 60
+  return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`
+}
+
 function getPriorityBadge(priority) {
   const configs = {
     low: { bg: '#ecfdf3', text: '#166534', label: 'Low' },
@@ -84,6 +93,53 @@ function StaffSubTicketDetail() {
       setError('')
       const response = await apiClient.get(`/api/v1/sub-tickets/${id}`)
       const data = response?.data || response
+      
+      // Fetch category details if categoryId exists but category object is incomplete
+      if (data.categoryId && !data.category?.name) {
+        try {
+          const catRes = await apiClient.get(`/api/v1/categories/${data.categoryId}`)
+          data.category = catRes.data || catRes
+        } catch (err) {
+          console.error('Failed to fetch category:', err)
+        }
+      }
+      
+      // Fetch room details if roomId exists in parent ticket
+      if (data.parentTicket?.roomId && !data.parentTicket?.room?.name) {
+        try {
+          const roomRes = await apiClient.get(`/api/v1/rooms/${data.parentTicket.roomId}`)
+          data.parentTicket.room = roomRes.data || roomRes
+        } catch (err) {
+          console.error('Failed to fetch room:', err)
+        }
+      }
+      
+      // Fetch department details from category's departmentId
+      if (data.category?.departmentId && !data.department) {
+        try {
+          const deptRes = await apiClient.get(`/api/v1/departments/${data.category.departmentId}`)
+          data.department = deptRes.data || deptRes
+        } catch (err) {
+          console.error('Failed to fetch department:', err)
+        }
+      }
+      
+      // Fetch creator details if parentTicket.createdBy exists
+      let creatorId = null;
+      if (data.parentTicket?.createdBy) {
+        creatorId = data.parentTicket.createdBy;
+      } else if (data.createdBy) {
+        creatorId = data.createdBy;
+      }
+      if (creatorId) {
+        try {
+          const creatorRes = await apiClient.get(`/api/v1/users/${creatorId}`)
+          data.creator = creatorRes.data || creatorRes
+        } catch (err) {
+          console.error('Failed to fetch creator:', err)
+        }
+      }
+      
       setSubTicket(data)
     } catch (err) {
       console.error('Failed to load sub-ticket:', err)
@@ -202,39 +258,81 @@ function StaffSubTicketDetail() {
 
       {/* Header Card */}
       <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-        <div style={{ marginBottom: '0.75rem' }}>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem' }}>
-            {subTicket.parentTicket?.title || 'Parent Ticket'}
-          </h3>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span
-              style={{
-                display: 'inline-block',
-                padding: '0.25rem 0.75rem',
-                borderRadius: '999px',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                backgroundColor: '#dbeafe',
-                color: '#1e40af',
-              }}
-            >
-              {subTicket.category?.name}
-            </span>
-            {getStatusBadge(subTicket.status)}
-            {getPriorityBadge(subTicket.priority)}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+          {/* Left: Title and badges */}
+          <div style={{ flex: 1 }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+              {subTicket.parentTicket?.title || 'Parent Ticket'}
+            </h3>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: '999px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  backgroundColor: '#dbeafe',
+                  color: '#1e40af',
+                }}
+              >
+                {subTicket.category?.name || 'N/A'}
+              </span>
+              {getStatusBadge(subTicket.status)}
+              {getPriorityBadge(subTicket.priority)}
+            </div>
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-          {subTicket.status === 'assigned' && (
-            <>
+          {/* Right: Action Buttons */}
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {subTicket.status === 'assigned' && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={handleAccept}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    marginTop:"50px",
+                    fontSize: '0.875rem',
+                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                    color: '#059669',
+                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                    borderRadius: '14px',
+                    backdropFilter: 'blur(40px) saturate(200%)',
+                    boxShadow: '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
+                  }}
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={() => setDenyModal(true)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                    color: '#dc2626',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    borderRadius: '14px',
+                    backdropFilter: 'blur(40px) saturate(200%)',
+                    boxShadow: '0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
+                  }}
+                >
+                  Deny
+                </button>
+              </>
+            )}
+
+            {subTicket.status === 'in_progress' && (
               <button
                 type="button"
                 className="btn btn-success"
-                onClick={handleAccept}
+                onClick={() => setResolveModal(true)}
                 style={{
                   padding: '0.5rem 1rem',
+                  marginTop:"20px",
                   fontSize: '0.875rem',
                   backgroundColor: 'rgba(16, 185, 129, 0.08)',
                   color: '#059669',
@@ -244,67 +342,32 @@ function StaffSubTicketDetail() {
                   boxShadow: '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
                 }}
               >
-                Accept Sub-Ticket
+                Resolve
               </button>
+            )}
+
+            {canReassign(subTicket.status) && (
               <button
                 type="button"
-                className="btn btn-danger"
-                onClick={() => setDenyModal(true)}
+                className="btn btn-warning"
+                onClick={() => setReassignModal(true)}
                 style={{
                   padding: '0.5rem 1rem',
                   fontSize: '0.875rem',
-                  backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                  color: '#dc2626',
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  marginTop:"20px",
+
+                  backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                  color: '#d97706',
+                  border: '1px solid rgba(245, 158, 11, 0.2)',
                   borderRadius: '14px',
                   backdropFilter: 'blur(40px) saturate(200%)',
-                  boxShadow: '0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
+                  boxShadow: '0 8px 32px rgba(245, 158, 11, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
                 }}
               >
-                Deny Sub-Ticket
+                Reassign
               </button>
-            </>
-          )}
-
-          {subTicket.status === 'in_progress' && (
-            <button
-              type="button"
-              className="btn btn-success"
-              onClick={() => setResolveModal(true)}
-              style={{
-                padding: '0.5rem 1rem',
-                fontSize: '0.875rem',
-                backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                color: '#059669',
-                border: '1px solid rgba(16, 185, 129, 0.2)',
-                borderRadius: '14px',
-                backdropFilter: 'blur(40px) saturate(200%)',
-                boxShadow: '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-              }}
-            >
-              Resolve Sub-Ticket
-            </button>
-          )}
-
-          {canReassign(subTicket.status) && (
-            <button
-              type="button"
-              className="btn btn-warning"
-              onClick={() => setReassignModal(true)}
-              style={{
-                padding: '0.5rem 1rem',
-                fontSize: '0.875rem',
-                backgroundColor: 'rgba(245, 158, 11, 0.08)',
-                color: '#d97706',
-                border: '1px solid rgba(245, 158, 11, 0.2)',
-                borderRadius: '14px',
-                backdropFilter: 'blur(40px) saturate(200%)',
-                boxShadow: '0 8px 32px rgba(245, 158, 11, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-              }}
-            >
-              Request Reassignment
-            </button>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
@@ -319,16 +382,46 @@ function StaffSubTicketDetail() {
           }}
         >
           <InfoItem label="Assignee">
-            {subTicket.assignee?.fullName || 'N/A'}
+            <div>
+              <div style={{ fontWeight: 500 }}>
+                {subTicket.assignee?.fullName || subTicket.assignee?.username || 'N/A'}
+              </div>
+            </div>
           </InfoItem>
           <InfoItem label="Room">
             {subTicket.parentTicket?.room?.name || 'N/A'}
+            {subTicket.parentTicket?.room?.code ? ` (${subTicket.parentTicket.room.code})` : ''}
             {typeof subTicket.parentTicket?.room?.floor === 'number'
               ? ` - Floor ${subTicket.parentTicket.room.floor}`
               : ''}
           </InfoItem>
+          <InfoItem label="Department">
+            {subTicket.department?.name || subTicket.category?.department?.name || 'N/A'}
+            {(subTicket.department?.code || subTicket.category?.department?.code) 
+              ? ` (${subTicket.department?.code || subTicket.category?.department?.code})` 
+              : ''}
+          </InfoItem>
+          <InfoItem label="Problems">
+            <div>
+          
+              {subTicket.category?.code && (
+                <div style={{ fontSize: '0.75rem', color: '#2b2c2eff' }}>
+                  Code: {subTicket.category.code}
+                </div>
+              )}
+              {subTicket.category?.description && (
+                <div style={{ fontSize: '0.75rem', color: '#000000ff', marginTop: '0.25rem' }}>
+                  {subTicket.category.description}
+                </div>
+              )}
+            </div>
+          </InfoItem>
+
           <InfoItem label="Creator">
-            {subTicket.parentTicket?.creator?.fullName || 'N/A'}
+            {subTicket.creator?.fullName || subTicket.creator?.username || subTicket.creator?.email || 'N/A'}
+          </InfoItem>
+          <InfoItem label="Created At">
+            {formatDate(subTicket.createdAt)}
           </InfoItem>
           <InfoItem label="Assigned At">
             {formatDate(subTicket.assignedAt)}
@@ -337,20 +430,58 @@ function StaffSubTicketDetail() {
             {formatDate(subTicket.acceptedAt)}
           </InfoItem>
           <InfoItem label="Due Date">
-            {formatDate(subTicket.dueDate)}
+            <span style={{ 
+              color: subTicket.dueDate && new Date(subTicket.dueDate) < new Date() ? '#dc2626' : 'inherit',
+              fontWeight: subTicket.dueDate && new Date(subTicket.dueDate) < new Date() ? 600 : 'inherit'
+            }}>
+              {formatDate(subTicket.dueDate)}
+              {subTicket.dueDate && new Date(subTicket.dueDate) < new Date() && ' (Overdue)'}
+            </span>
           </InfoItem>
+          {subTicket.escalatedAt && (
+            <InfoItem label="Escalated At">
+              <span style={{ color: '#dc2626', fontWeight: 600 }}>
+                ⚠️ {formatDate(subTicket.escalatedAt)}
+              </span>
+            </InfoItem>
+          )}
           {subTicket.resolvedAt && (
             <InfoItem label="Resolved At">
-              {formatDate(subTicket.resolvedAt)}
+              <span style={{ color: '#059669', fontWeight: 500 }}>
+                ✓ {formatDate(subTicket.resolvedAt)}
+              </span>
             </InfoItem>
           )}
           {subTicket.deniedAt && (
             <InfoItem label="Denied At">
-              {formatDate(subTicket.deniedAt)}
+              <span style={{ color: '#dc2626', fontWeight: 500 }}>
+                ✗ {formatDate(subTicket.deniedAt)}
+              </span>
             </InfoItem>
           )}
         </div>
       </div>
+
+      {/* SLA Policy Info */}
+      {subTicket.slaPolicy && (
+        <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+          <h4 style={{ fontWeight: 600, marginBottom: '1rem' }}>SLA Policy</h4>
+          {subTicket.slaPolicy.description && (
+            <div
+              style={{
+                marginTop: '1rem',
+                padding: '0.75rem',
+                backgroundColor: '#f9fafb',
+                borderRadius: '0.5rem',
+                fontSize: '0.875rem',
+                color: '#4b5563',
+              }}
+            >
+              <strong>Description:</strong> {subTicket.slaPolicy.description}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Description */}
       <div className="card" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
@@ -445,7 +576,7 @@ function InfoItem({ label, children }) {
       <p style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.15rem' }}>
         {label}
       </p>
-      <p style={{ fontSize: '0.9rem', color: '#111827' }}>{children}</p>
+      <div style={{ fontSize: '0.9rem', color: '#111827' }}>{children}</div>
     </div>
   )
 }

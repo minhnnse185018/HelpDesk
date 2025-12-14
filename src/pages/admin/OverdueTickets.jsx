@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { apiClient } from "../../api/client";
 import { formatDate, getPriorityBadge, getStatusBadge } from "../../utils/ticketHelpers.jsx";
 
-function OverdueTickets() {
+function OverdueTickets({ searchTerm = "" }) {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -84,6 +84,25 @@ function OverdueTickets() {
       </div>
     );
   }
+
+  // Filter tickets based on search term
+  const filteredTickets = tickets.filter((ticket) => {
+    if (!searchTerm) return true;
+    
+    const search = searchTerm.toLowerCase();
+    return (
+      ticket.title?.toLowerCase().includes(search) ||
+      ticket.description?.toLowerCase().includes(search) ||
+      ticket.creator?.username?.toLowerCase().includes(search) ||
+      ticket.creator?.email?.toLowerCase().includes(search) ||
+      ticket.assignee?.username?.toLowerCase().includes(search) ||
+      ticket.assignee?.email?.toLowerCase().includes(search) ||
+      ticket.room?.name?.toLowerCase().includes(search) ||
+      ticket.department?.name?.toLowerCase().includes(search) ||
+      ticket.status?.toLowerCase().includes(search) ||
+      ticket.priority?.toLowerCase().includes(search)
+    );
+  });
 
   return (
     <div
@@ -202,7 +221,16 @@ function OverdueTickets() {
               </tr>
             </thead>
             <tbody>
-              {tickets.map((ticket) => (
+              {filteredTickets.length === 0 ? (
+                <tr>
+                  <td colSpan="8" style={{ padding: "3rem", textAlign: "center", color: "#9ca3af" }}>
+                    <div style={{ fontSize: "0.875rem", fontWeight: 500 }}>
+                      {searchTerm ? "No overdue tickets match your search" : "No overdue tickets found"}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredTickets.map((ticket) => (
                 <tr
                   key={ticket.id}
                   style={{
@@ -253,7 +281,8 @@ function OverdueTickets() {
                     {formatDate(ticket.createdAt)}
                   </td>
                 </tr>
-              ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>

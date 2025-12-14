@@ -4,7 +4,7 @@ import { apiClient } from "../../api/client";
 import AssignTicketModal from "../../components/modals/AssignTicketModal";
 import NotificationModal from "../../components/modals/NotificationModal";
 
-function SubTickets() {
+function SubTickets({ searchTerm = "" }) {
   const navigate = useNavigate();
   const [subTickets, setSubTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +59,42 @@ function SubTickets() {
         });
       }
 
-      setSubTickets(allSubTickets);
+      // Fetch additional details for each sub-ticket (category and department)
+      const enrichedSubTickets = await Promise.all(
+        allSubTickets.map(async (subTicket) => {
+          const enriched = { ...subTicket };
+
+          // Fetch category details
+          if (subTicket.categoryId) {
+            try {
+              const categoryResponse = await apiClient.get(
+                `/api/v1/categories/${subTicket.categoryId}`
+              );
+              enriched.category = categoryResponse.data;
+            } catch (error) {
+              console.error("Error fetching category:", error);
+              enriched.category = null;
+            }
+          }
+
+          // Fetch department details from assignee's departmentId
+          if (subTicket.assignee?.departmentId) {
+            try {
+              const deptResponse = await apiClient.get(
+                `/api/v1/departments/${subTicket.assignee.departmentId}`
+              );
+              enriched.department = deptResponse.data;
+            } catch (error) {
+              console.error("Error fetching department:", error);
+              enriched.department = null;
+            }
+          }
+
+          return enriched;
+        })
+      );
+
+      setSubTickets(enrichedSubTickets);
     } catch (err) {
       setError(err.message || "Failed to fetch sub-tickets");
       console.error("Error fetching sub-tickets:", err);
@@ -169,6 +204,27 @@ function SubTickets() {
     );
   }
 
+  // Filter subTickets based on searchTerm
+  const filteredSubTickets = subTickets.filter((subTicket) => {
+    if (!searchTerm) return true;
+    
+    const search = searchTerm.toLowerCase();
+    return (
+      subTicket.parentTicket?.title?.toLowerCase().includes(search) ||
+      subTicket.parentTicket?.description?.toLowerCase().includes(search) ||
+      subTicket.category?.name?.toLowerCase().includes(search) ||
+      subTicket.assignee?.username?.toLowerCase().includes(search) ||
+      subTicket.assignee?.fullName?.toLowerCase().includes(search) ||
+      subTicket.assignee?.email?.toLowerCase().includes(search) ||
+      subTicket.department?.name?.toLowerCase().includes(search) ||
+      subTicket.status?.toLowerCase().includes(search) ||
+      subTicket.priority?.toLowerCase().includes(search) ||
+      subTicket.parentTicket?.room?.name?.toLowerCase().includes(search) ||
+      subTicket.resolutionNote?.toLowerCase().includes(search) ||
+      subTicket.deniedReason?.toLowerCase().includes(search)
+    );
+  });
+
   return (
     <div>
       <div
@@ -204,7 +260,7 @@ function SubTickets() {
                     color: "#374151",
                   }}
                 >
-                  Parent Ticket
+                  Title
                 </th>
                 <th
                   style={{
@@ -244,7 +300,7 @@ function SubTickets() {
                     color: "#374151",
                   }}
                 >
-                  Created At
+                  Department
                 </th>
                 <th
                   style={{
@@ -254,7 +310,27 @@ function SubTickets() {
                     color: "#374151",
                   }}
                 >
-                  Due Date
+                  Categories
+                </th>
+                <th
+                  style={{
+                    padding: "1rem",
+                    textAlign: "left",
+                    fontWeight: 600,
+                    color: "#374151",
+                  }}
+                >
+                  Assignee
+                </th>
+                <th
+                  style={{
+                    padding: "1rem",
+                    textAlign: "left",
+                    fontWeight: 600,
+                    color: "#374151",
+                  }}
+                >
+                  Created At
                 </th>
                 <th
                   style={{
@@ -269,10 +345,10 @@ function SubTickets() {
               </tr>
             </thead>
             <tbody>
-              {subTickets.length === 0 ? (
+              {filteredSubTickets.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="7"
+                    colSpan="9"
                     style={{
                       padding: "3rem",
                       textAlign: "center",
@@ -280,12 +356,12 @@ function SubTickets() {
                     }}
                   >
                     <div style={{ fontSize: "0.875rem", fontWeight: 500 }}>
-                      No sub-tickets found
+                      {searchTerm ? "No sub-tickets match your search" : "No sub-tickets found"}
                     </div>
                   </td>
                 </tr>
               ) : (
-                subTickets.map((subTicket) => {
+                filteredSubTickets.map((subTicket) => {
                   const statusColor = getStatusColor(subTicket.status);
                   const priorityColor = getPriorityColor(subTicket.priority);
 
@@ -303,6 +379,9 @@ function SubTickets() {
                           }}
                         >
                           {subTicket.parentTicket.title}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "0.25rem" }}>
+                          Created by: {subTicket.parentTicket.creator?.username || subTicket.parentTicket.creator?.email || "N/A"}
                         </div>
                         {subTicket.resolutionNote && (
                           <div
@@ -363,7 +442,51 @@ function SubTickets() {
                         </span>
                       </td>
                       <td style={{ padding: "1rem", color: "#6b7280" }}>
-                        {subTicket.parentTicket.room?.name || "N/A"}
+                        {subTicket.parentTicket.room ? (
+                          <div>
+                            <div style={{ fontWeight: 500, color: "#111827" }}>
+                              {subTicket.parentTicket.room.name || "N/A"}
+                            </div>
+                            {(subTicket.parentTicket.room.code || subTicket.parentTicket.room.floor) && (
+                              <div style={{ fontSize: "0.75rem", marginTop: "0.125rem" }}>
+                                {subTicket.parentTicket.room.code && `(${subTicket.parentTicket.room.code})`}
+                                {subTicket.parentTicket.room.code && subTicket.parentTicket.room.floor && " - "}
+                                {subTicket.parentTicket.room.floor && `Floor ${subTicket.parentTicket.room.floor}`}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          "N/A"
+                        )}
+                      </td>
+                      <td style={{ padding: "1rem", color: "#6b7280" }}>
+                        {subTicket.department ? (
+                          <div>
+                            <div style={{ fontWeight: 500, color: "#111827" }}>
+                              {subTicket.department.name || "N/A"}
+                            </div>
+                            {subTicket.department.code && (
+                              <div style={{ fontSize: "0.75rem", marginTop: "0.125rem" }}>
+                                ({subTicket.department.code})
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          "N/A"
+                        )}
+                      </td>
+                      <td style={{ padding: "1rem", color: "#6b7280" }}>
+                        {subTicket.category?.name || "N/A"}
+                      </td>
+                      <td style={{ padding: "1rem", color: "#6b7280" }}>
+                        <div style={{ fontWeight: 500, color: "#111827" }}>
+                          {subTicket.assignee?.username || "N/A"}
+                        </div>
+                        {subTicket.assignee?.fullName && (
+                          <div style={{ fontSize: "0.75rem", marginTop: "0.125rem" }}>
+                            {subTicket.assignee.fullName}
+                          </div>
+                        )}
                       </td>
                       <td
                         style={{
@@ -373,15 +496,6 @@ function SubTickets() {
                         }}
                       >
                         {formatDate(subTicket.createdAt)}
-                      </td>
-                      <td
-                        style={{
-                          padding: "1rem",
-                          color: "#6b7280",
-                          fontSize: "0.8rem",
-                        }}
-                      >
-                        {formatDate(subTicket.dueDate)}
                       </td>
                       <td style={{ padding: "1rem" }}>
                         <div

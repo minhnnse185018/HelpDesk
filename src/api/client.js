@@ -83,9 +83,35 @@ async function request(path, options = {}) {
   // ===============================
   if (response.status === 401) {
     const refreshToken = getRefreshToken();
+    
+    // Skip auto-refresh if user is on auth pages (login, register, etc.)
+    const currentPath = window.location.pathname;
+    const isAuthPage = ['/login', '/register', '/verify-email', '/forgot-password'].some(p => currentPath.startsWith(p));
+    
+    // 🔥 Nếu đang ở trang auth (login, register...) → KHÔNG refresh, chỉ throw error
+    // Điều này tránh việc reload trang khi login sai mật khẩu
+    if (isAuthPage) {
+      const contentType = response.headers.get("content-type") || "";
+      let errorData = null;
+      
+      if (contentType.includes("application/json")) {
+        errorData = await response.json().catch(() => null);
+      }
+      
+      const error = new Error(errorData?.message || "Unauthorized");
+      error.response = { 
+        data: errorData,
+        status: 401,
+        statusText: "Unauthorized"
+      };
+      throw error;
+    }
+    
+    // Không có refresh token → redirect về login
     if (!refreshToken) {
+      localStorage.clear();
       window.location.href = "/login";
-      throw new Error("Unauthorized");
+      throw new Error("No refresh token, redirecting to login");
     }
 
     // Nếu đang refresh → xếp request vào hàng đợi
@@ -132,12 +158,22 @@ async function request(path, options = {}) {
     const contentType = response.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
       const errorData = await response.json().catch(() => null);
-      const error = new Error(errorData?.message || response.statusText);
-      error.response = { data: errorData };
+      const error = new Error(errorData?.message || errorData?.error || response.statusText);
+      error.response = { 
+        data: errorData,
+        status: response.status,
+        statusText: response.statusText
+      };
       throw error;
     }
     const text = await response.text().catch(() => "");
-    throw new Error(text || response.statusText);
+    const error = new Error(text || response.statusText);
+    error.response = {
+      data: { message: text || response.statusText },
+      status: response.status,
+      statusText: response.statusText
+    };
+    throw error;
   }
 
   if (response.status === 204) return null;

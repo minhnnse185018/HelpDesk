@@ -44,6 +44,28 @@ function TicketDetail() {
         }
       }
       
+      // Fetch category details for each ticketCategory
+      if (ticketData.ticketCategories && ticketData.ticketCategories.length > 0) {
+        try {
+          const categoryPromises = ticketData.ticketCategories.map(async (tc) => {
+            if (tc.categoryId && !tc.category) {
+              try {
+                const catRes = await apiClient.get(`/api/v1/categories/${tc.categoryId}`);
+                tc.category = catRes.data || catRes;
+                console.log(' Category data fetched:', tc.category);
+              } catch (err) {
+                console.error(`Failed to fetch category ${tc.categoryId}:`, err);
+              }
+            }
+            return tc;
+          });
+          
+          await Promise.all(categoryPromises);
+        } catch (err) {
+          console.error('Failed to fetch categories:', err);
+        }
+      }
+      
       setTicket(ticketData);
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || "Failed to load ticket details");
@@ -220,9 +242,7 @@ function TicketDetail() {
             >
               {ticket.title}
             </h1>
-            <p style={{ fontSize: "0.875rem", color: "#6b7280", margin: 0 }}>
-              Ticket ID: {ticket.id}
-            </p>
+
           </div>
 
           {/* Two Column Layout */}
@@ -430,52 +450,437 @@ function TicketDetail() {
                   >
                     Sub-Tickets ({ticket.subTickets.length})
                   </h3>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                    {ticket.subTickets.map((subTicket) => {
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    {ticket.subTickets.map((subTicket, index) => {
                       const subStatusColor = getStatusColor(subTicket.status);
                       const subPriorityColor = getPriorityColor(subTicket.priority);
                       return (
                         <div
                           key={subTicket.id}
                           style={{
-                            padding: "1rem",
+                            padding: "1.25rem",
                             backgroundColor: "#f9fafb",
-                            borderRadius: "0.5rem",
+                            borderRadius: "0.75rem",
                             border: "1px solid #e5e7eb",
                           }}
                         >
-                          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                            <span
-                              style={{
-                                padding: "0.25rem 0.625rem",
-                                fontSize: "0.625rem",
-                                fontWeight: 600,
-                                borderRadius: "9999px",
-                                backgroundColor: subStatusColor.bg,
-                                color: subStatusColor.text,
-                              }}
-                            >
-                              {subTicket.status.toUpperCase()}
+                          {/* Sub-ticket header */}
+                          <div style={{ 
+                            display: "flex", 
+                            justifyContent: "space-between", 
+                            alignItems: "center",
+                            marginBottom: "1rem",
+                            paddingBottom: "0.75rem",
+                            borderBottom: "1px solid #e5e7eb"
+                          }}>
+                            <span style={{ 
+                              fontSize: "0.875rem", 
+                              fontWeight: 600, 
+                              color: "#374151" 
+                            }}>
+                              Sub-Ticket #{index + 1}
                             </span>
-                            <span
-                              style={{
-                                padding: "0.25rem 0.625rem",
-                                fontSize: "0.625rem",
-                                fontWeight: 600,
-                                borderRadius: "9999px",
-                                backgroundColor: subPriorityColor.bg,
-                                color: subPriorityColor.text,
-                              }}
-                            >
-                              {subTicket.priority?.toUpperCase() || "N/A"}
-                            </span>
+                            <div style={{ display: "flex", gap: "0.5rem" }}>
+                              <span
+                                style={{
+                                  padding: "0.25rem 0.75rem",
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  borderRadius: "9999px",
+                                  backgroundColor: subStatusColor.bg,
+                                  color: subStatusColor.text,
+                                }}
+                              >
+                                {subTicket.status?.toUpperCase() || "N/A"}
+                              </span>
+                              <span
+                                style={{
+                                  padding: "0.25rem 0.75rem",
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  borderRadius: "9999px",
+                                  backgroundColor: subPriorityColor.bg,
+                                  color: subPriorityColor.text,
+                                }}
+                              >
+                                {subTicket.priority?.toUpperCase() || "N/A"}
+                              </span>
+                            </div>
                           </div>
-                          <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: 0 }}>
-                            ID: {subTicket.id}
-                          </p>
-                          <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0.25rem 0 0 0" }}>
-                            Assigned: {formatDate(subTicket.assignedAt)}
-                          </p>
+
+                          {/* Sub-ticket details grid */}
+                          <div style={{ 
+                            display: "grid", 
+                            gridTemplateColumns: "repeat(2, 1fr)", 
+                            gap: "1rem" 
+                          }}>
+                            {/* Assigned To */}
+                            <div>
+                              <p style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 600,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                                margin: "0 0 0.25rem 0",
+                              }}>
+                                Assigned To
+                              </p>
+                              <p style={{ fontSize: "0.8rem", color: "#111827", margin: 0, fontWeight: 500 }}>
+                                {subTicket.assignee?.username || subTicket.assignee?.email || "N/A"}
+                              </p>
+                              {subTicket.assignee?.fullName && (
+                                <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0.125rem 0 0 0" }}>
+                                  {subTicket.assignee.fullName}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Category */}
+                            <div>
+                              <p style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 600,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                                margin: "0 0 0.25rem 0",
+                              }}>
+                                Category
+                              </p>
+                              <p style={{ fontSize: "0.8rem", color: "#111827", margin: 0, fontWeight: 500 }}>
+                                {subTicket.category?.name || `Category ID: ${subTicket.categoryId?.slice(0, 8)}...` || "N/A"}
+                              </p>
+                            </div>
+
+                            {/* Room (from parent ticket) */}
+                            {ticket.room && (
+                              <div>
+                                <p style={{
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  color: "#6b7280",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  margin: "0 0 0.25rem 0",
+                                }}>
+                                  Room
+                                </p>
+                                <p style={{ fontSize: "0.8rem", color: "#111827", margin: 0, fontWeight: 500 }}>
+                                  {ticket.room.name} {ticket.room.code && `(${ticket.room.code})`} {ticket.room.floor && `- Floor ${ticket.room.floor}`}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Created At */}
+                            <div>
+                              <p style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 600,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                                margin: "0 0 0.25rem 0",
+                              }}>
+                                Created At
+                              </p>
+                              <p style={{ fontSize: "0.8rem", color: "#111827", margin: 0 }}>
+                                {formatDate(subTicket.createdAt)}
+                              </p>
+                            </div>
+
+                            {/* Assigned At */}
+                            <div>
+                              <p style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 600,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                                margin: "0 0 0.25rem 0",
+                              }}>
+                                Assigned At
+                              </p>
+                              <p style={{ fontSize: "0.8rem", color: "#111827", margin: 0 }}>
+                                {formatDate(subTicket.assignedAt)}
+                              </p>
+                            </div>
+
+                            {/* Due Date */}
+                            {subTicket.dueDate && (
+                              <div>
+                                <p style={{
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  color: "#6b7280",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  margin: "0 0 0.25rem 0",
+                                }}>
+                                  Due Date
+                                </p>
+                                <p style={{ 
+                                  fontSize: "0.8rem", 
+                                  color: new Date(subTicket.dueDate) < new Date() ? "#dc2626" : "#111827", 
+                                  margin: 0,
+                                  fontWeight: new Date(subTicket.dueDate) < new Date() ? 600 : 400
+                                }}>
+                                  {formatDate(subTicket.dueDate)}
+                                  {new Date(subTicket.dueDate) < new Date() && " (Overdue)"}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Accepted At */}
+                            {subTicket.acceptedAt && (
+                              <div>
+                                <p style={{
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  color: "#6b7280",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  margin: "0 0 0.25rem 0",
+                                }}>
+                                  Accepted At
+                                </p>
+                                <p style={{ fontSize: "0.8rem", color: "#111827", margin: 0 }}>
+                                  {formatDate(subTicket.acceptedAt)}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Escalated At */}
+                            {subTicket.escalatedAt && (
+                              <div>
+                                <p style={{
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  color: "#dc2626",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  margin: "0 0 0.25rem 0",
+                                }}>
+                                  ⚠️ Escalated At
+                                </p>
+                                <p style={{ fontSize: "0.8rem", color: "#dc2626", margin: 0, fontWeight: 500 }}>
+                                  {formatDate(subTicket.escalatedAt)}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Resolved At */}
+                            {subTicket.resolvedAt && (
+                              <div>
+                                <p style={{
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  color: "#059669",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  margin: "0 0 0.25rem 0",
+                                }}>
+                                  ✓ Resolved At
+                                </p>
+                                <p style={{ fontSize: "0.8rem", color: "#059669", margin: 0, fontWeight: 500 }}>
+                                  {formatDate(subTicket.resolvedAt)}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Resolution Note */}
+                          {subTicket.resolutionNote && (
+                            <div style={{
+                              marginTop: "1rem",
+                              padding: "0.75rem",
+                              backgroundColor: "#dcfce7",
+                              borderRadius: "0.5rem",
+                              border: "1px solid #86efac"
+                            }}>
+                              <p style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 600,
+                                color: "#166534",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                                margin: "0 0 0.25rem 0",
+                              }}>
+                                Resolution Note
+                              </p>
+                              <p style={{ fontSize: "0.8rem", color: "#166534", margin: 0, whiteSpace: "pre-wrap" }}>
+                                {subTicket.resolutionNote}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Denied Reason */}
+                          {subTicket.deniedReason && (
+                            <div style={{
+                              marginTop: "1rem",
+                              padding: "0.75rem",
+                              backgroundColor: "#fee2e2",
+                              borderRadius: "0.5rem",
+                              border: "1px solid #fca5a5"
+                            }}>
+                              <p style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 600,
+                                color: "#991b1b",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                                margin: "0 0 0.25rem 0",
+                              }}>
+                                Denied Reason
+                              </p>
+                              <p style={{ fontSize: "0.8rem", color: "#991b1b", margin: 0, whiteSpace: "pre-wrap" }}>
+                                {subTicket.deniedReason}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Sub-ticket Attachments */}
+                          {subTicket.attachments && subTicket.attachments.length > 0 && (
+                            <div style={{ marginTop: "1rem" }}>
+                              <p style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 600,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                                margin: "0 0 0.5rem 0",
+                              }}>
+                                📎 Attachments ({subTicket.attachments.length})
+                              </p>
+                              <div style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+                                gap: "0.75rem",
+                              }}>
+                                {subTicket.attachments.map((attachment) => {
+                                  const isImage = attachment.mimeType?.startsWith("image/");
+                                  return (
+                                    <div
+                                      key={attachment.id}
+                                      style={{
+                                        position: "relative",
+                                        borderRadius: "0.5rem",
+                                        overflow: "hidden",
+                                        border: "1px solid #e5e7eb",
+                                        cursor: isImage ? "pointer" : "default",
+                                        transition: "all 0.2s ease",
+                                        backgroundColor: "white",
+                                      }}
+                                      onClick={() => isImage && setImagePopup(attachment)}
+                                      onMouseEnter={(e) => {
+                                        if (isImage) {
+                                          e.currentTarget.style.transform = "translateY(-2px)";
+                                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+                                          e.currentTarget.style.borderColor = "#3b82f6";
+                                        }
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        if (isImage) {
+                                          e.currentTarget.style.transform = "translateY(0)";
+                                          e.currentTarget.style.boxShadow = "none";
+                                          e.currentTarget.style.borderColor = "#e5e7eb";
+                                        }
+                                      }}
+                                    >
+                                      {isImage ? (
+                                        <>
+                                          <div style={{ position: "relative", paddingTop: "75%", backgroundColor: "#f9fafb" }}>
+                                            <img
+                                              src={attachment.filePath}
+                                              alt={attachment.fileName}
+                                              loading="lazy"
+                                              onError={(e) => {
+                                                e.target.style.display = "none";
+                                                e.target.parentElement.innerHTML = '<div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#fee2e2;color:#991b1b;font-size:0.75rem;">❌ Failed</div>';
+                                              }}
+                                              style={{
+                                                position: "absolute",
+                                                top: 0,
+                                                left: 0,
+                                                width: "100%",
+                                                height: "100%",
+                                                objectFit: "cover",
+                                              }}
+                                            />
+                                          </div>
+                                          <div
+                                            style={{
+                                              position: "absolute",
+                                              top: "0.25rem",
+                                              right: "0.25rem",
+                                              backgroundColor: "rgba(0,0,0,0.6)",
+                                              color: "white",
+                                              borderRadius: "4px",
+                                              padding: "0.125rem 0.375rem",
+                                              fontSize: "0.625rem",
+                                              fontWeight: 600,
+                                            }}
+                                          >
+                                            🔍
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <div
+                                          style={{
+                                            height: "100px",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            backgroundColor: "#f9fafb",
+                                            gap: "0.25rem",
+                                          }}
+                                        >
+                                          <span style={{ fontSize: "2rem" }}>📄</span>
+                                          <a
+                                            href={attachment.filePath}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{
+                                              color: "#3b82f6",
+                                              fontSize: "0.7rem",
+                                              fontWeight: 500,
+                                              textDecoration: "none",
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            Download
+                                          </a>
+                                        </div>
+                                      )}
+                                      <div
+                                        style={{
+                                          padding: "0.5rem",
+                                          backgroundColor: "white",
+                                          borderTop: "1px solid #e5e7eb",
+                                        }}
+                                      >
+                                        <p
+                                          style={{
+                                            fontSize: "0.7rem",
+                                            fontWeight: 500,
+                                            color: "#374151",
+                                            margin: 0,
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            whiteSpace: "nowrap",
+                                          }}
+                                          title={attachment.fileName}
+                                        >
+                                          {attachment.fileName}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

@@ -39,7 +39,7 @@ function getStatusBadge(status) {
   )
 }
 
-function AdminReassignRequests() {
+function AdminReassignRequests({ searchTerm = "" }) {
   const navigate = useNavigate()
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
@@ -80,8 +80,34 @@ function AdminReassignRequests() {
     return 'N/A'
   }
 
+  const getRequestType = (request) => {
+    return request.ticket ? 'Ticket' : 'Sub-ticket'
+  }
+
+  const getCategoryOrDepartment = (request) => {
+    if (request.subTicket) {
+      return request.subTicket.category?.name || 'N/A'
+    }
+    if (request.ticket) {
+      return request.ticket.department?.name || 'N/A'
+    }
+    return 'N/A'
+  }
+
+  // Filter requests based on searchTerm
+  const filteredRequests = requests.filter((request) => {
+    if (!searchTerm) return true
+    const search = searchTerm.toLowerCase()
+    const title = (request.ticket?.title || request.subTicket?.parentTicket?.title || '').toLowerCase()
+    const requester = (request.requester?.fullName || request.requester?.username || '').toLowerCase()
+    const assignee = (request.newAssigneeUser?.fullName || request.newAssigneeUser?.username || '').toLowerCase()
+    const category = (request.subTicket?.category?.name || request.ticket?.department?.name || '').toLowerCase()
+    const status = (request.status || '').toLowerCase()
+    return title.includes(search) || requester.includes(search) || assignee.includes(search) || category.includes(search) || status.includes(search)
+  })
+
   return (
-    <div className="page">
+    <div className="page" style={{ maxWidth: 'none', marginLeft: 0, paddingLeft: 0 }}>
 
 
       {loading && (
@@ -127,7 +153,16 @@ function AdminReassignRequests() {
                 </tr>
               </thead>
               <tbody>
-                {requests.map((request) => (
+                {filteredRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af' }}>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                        {searchTerm ? 'No reassign requests match your search' : 'No reassign requests found'}
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRequests.map((request) => (
                   <tr
                     key={request.id}
                     style={{ cursor: 'pointer' }}
@@ -200,7 +235,8 @@ function AdminReassignRequests() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>

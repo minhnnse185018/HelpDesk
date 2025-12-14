@@ -21,10 +21,13 @@ export function NotificationSocketProvider({ children }) {
   // Fetch initial unread count
   const fetchUnreadCount = useCallback(async () => {
     try {
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        return
+      }
+
       const response = await apiClient.get('/api/v1/notifications/unread/count')
       const data = response?.data || response
-      
-      console.log('🔔 Unread count API response:', data)
       
       // Handle different response formats
       let count = 0
@@ -37,10 +40,10 @@ export function NotificationSocketProvider({ children }) {
         count = data.count || data.unreadCount || data.total || 0
       }
       
-      console.log('🔢 Setting unread count to:', count)
       setUnreadCount(count)
     } catch (error) {
       console.error('Failed to fetch unread count:', error)
+      setUnreadCount(0)
     }
   }, [])
 
@@ -50,12 +53,18 @@ export function NotificationSocketProvider({ children }) {
     const token = getAccessToken()
 
     if (!token) {
-      console.warn('No access token found, skipping socket connection')
       return
     }
 
-    // Fetch initial unread count
-    fetchUnreadCount()
+    // Fetch initial unread count with small delay to ensure token is ready
+    const fetchTimer = setTimeout(() => {
+      fetchUnreadCount()
+    }, 100)
+
+    // Also fetch again after 1 second as backup
+    const retryTimer = setTimeout(() => {
+      fetchUnreadCount()
+    }, 1000)
 
     // Connect to socket.io - connect to base URL without /ws namespace
     const socketInstance = io(API_BASE_URL, {
@@ -64,12 +73,12 @@ export function NotificationSocketProvider({ children }) {
     })
 
     socketInstance.on('connect', () => {
-      console.log('Socket.io connected')
       setIsConnected(true)
+      // Re-fetch unread count when socket reconnects
+      fetchUnreadCount()
     })
 
     socketInstance.on('disconnect', () => {
-      console.log('Socket.io disconnected')
       setIsConnected(false)
     })
 
@@ -79,8 +88,6 @@ export function NotificationSocketProvider({ children }) {
 
     // Listen for new notifications
     socketInstance.on('notification:new', (payload) => {
-      console.log('New notification received:', payload)
-
       // Prepend to notifications array
       setNotifications((prev) => [payload, ...prev])
 
@@ -88,7 +95,7 @@ export function NotificationSocketProvider({ children }) {
       setUnreadCount((prev) => prev + 1)
 
       // Optional: Show browser notification
-      if ('Notification' in window && Notification.permission === 'granted') {
+if ('Notification' in window && Notification.permission === 'granted') {
         new Notification(payload.title, {
           body: payload.message,
           icon: '/favicon.ico',
@@ -100,16 +107,52 @@ export function NotificationSocketProvider({ children }) {
 
     // Cleanup on unmount
     return () => {
+      clearTimeout(fetchTimer)
+      clearTimeout(retryTimer)
       socketInstance.disconnect()
+    }
+  }, [fetchUnreadCount])
+
+  // Listen for login success to refresh unread count
+  useEffect(() => {
+    const handleLoginSuccess = () => {
+      // Wait a bit for token to be properly set
+      setTimeout(() => {
+        fetchUnreadCount()
+      }, 500)
+    }
+
+    window.addEventListener('auth-login-success', handleLoginSuccess)
+    
+    return () => {
+      window.removeEventListener('auth-login-success', handleLoginSuccess)
+    }
+  }, [fetchUnreadCount])
+
+  // Listen for userId changes to reset notifications
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'userId' && e.newValue !== e.oldValue) {
+        setNotifications([])
+        setUnreadCount(0)
+        // Fetch new user's unread count
+        setTimeout(() => {
+          fetchUnreadCount()
+        }, 500)
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
     }
   }, [fetchUnreadCount])
 
   // Request browser notification permission
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().then((permission) => {
-        console.log('Notification permission:', permission)
-      })
+      Notification.requestPermission()
     }
   }, [])
 

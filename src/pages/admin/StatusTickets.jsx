@@ -5,7 +5,7 @@ import { formatDate, getPriorityBadge, getStatusBadge } from "../../utils/ticket
 import AssignTicketModal from "../../components/modals/AssignTicketModal";
 import NotificationModal from "../../components/modals/NotificationModal";
 
-function StatusTickets({ status }) {
+function StatusTickets({ status, searchTerm = "" }) {
   const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +43,21 @@ function StatusTickets({ status }) {
       if (status) {
         ticketsArray = ticketsArray.filter((ticket) => ticket.status === status);
       }
+      
+      // Fetch room details for tickets with incomplete room data
+      ticketsArray = await Promise.all(
+        ticketsArray.map(async (ticket) => {
+          if (ticket.roomId && (!ticket.room?.code || !ticket.room?.floor)) {
+            try {
+              const roomRes = await apiClient.get(`/api/v1/rooms/${ticket.roomId}`);
+              ticket.room = roomRes.data || roomRes;
+            } catch (err) {
+              console.error(`Failed to fetch room ${ticket.roomId}:`, err);
+            }
+          }
+          return ticket;
+        })
+      );
 
       setTickets(ticketsArray);
     } catch (err) {
@@ -145,6 +160,26 @@ function StatusTickets({ status }) {
       </div>
     );
   }
+
+  // Filter tickets based on search term
+  const filteredTickets = tickets.filter((ticket) => {
+    if (!searchTerm) return true;
+    
+    const search = searchTerm.toLowerCase();
+    return (
+      ticket.title?.toLowerCase().includes(search) ||
+      ticket.description?.toLowerCase().includes(search) ||
+      ticket.creator?.username?.toLowerCase().includes(search) ||
+      ticket.creator?.email?.toLowerCase().includes(search) ||
+      ticket.assignee?.username?.toLowerCase().includes(search) ||
+      ticket.assignee?.email?.toLowerCase().includes(search) ||
+      ticket.room?.name?.toLowerCase().includes(search) ||
+      ticket.department?.name?.toLowerCase().includes(search) ||
+      ticket.status?.toLowerCase().includes(search) ||
+      ticket.priority?.toLowerCase().includes(search) ||
+      ticket.deniedReason?.toLowerCase().includes(search)
+    );
+  });
 
   return (
     <>
@@ -286,7 +321,7 @@ function StatusTickets({ status }) {
               </tr>
             </thead>
             <tbody>
-              {tickets.length === 0 ? (
+              {filteredTickets.length === 0 ? (
                 <tr>
                   <td
                     colSpan="9"
@@ -297,12 +332,12 @@ function StatusTickets({ status }) {
                     }}
                   >
                     <div style={{ fontSize: "0.875rem", fontWeight: 500 }}>
-                      No {status} tickets found
+                      {searchTerm ? `No ${status} tickets match your search` : `No ${status} tickets found`}
                     </div>
                   </td>
                 </tr>
               ) : (
-                tickets.map((ticket) => (
+                filteredTickets.map((ticket) => (
                   <tr
                     key={ticket.id}
                     style={{ borderBottom: "1px solid #f3f4f6" }}
@@ -316,6 +351,9 @@ function StatusTickets({ status }) {
                         }}
                       >
                         {ticket.title}
+                      </div>
+                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "0.25rem" }}>
+                        Created by: {ticket.creator?.username || ticket.creator?.email || "N/A"}
                       </div>
                       {ticket.deniedReason && (
                         <div
@@ -354,10 +392,38 @@ function StatusTickets({ status }) {
                       {getPriorityBadge(ticket.priority)}
                     </td>
                     <td style={{ padding: "1rem", color: "#6b7280" }}>
-                      {ticket.room?.name || "N/A"}
+                      {ticket.room ? (
+                        <div>
+                          <div style={{ fontWeight: 500, color: "#111827" }}>
+                            {ticket.room.name || "N/A"}
+                          </div>
+                          {(ticket.room.code || ticket.room.floor) && (
+                            <div style={{ fontSize: "0.75rem", marginTop: "0.125rem" }}>
+                              {ticket.room.code && `(${ticket.room.code})`}
+                              {ticket.room.code && ticket.room.floor && " - "}
+                              {ticket.room.floor && `Floor ${ticket.room.floor}`}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        "N/A"
+                      )}
                     </td>
                     <td style={{ padding: "1rem", color: "#6b7280" }}>
-                      {ticket.department?.name || "N/A"}
+                      {ticket.department ? (
+                        <div>
+                          <div style={{ fontWeight: 500, color: "#111827" }}>
+                            {ticket.department.name || "N/A"}
+                          </div>
+                          {ticket.department.code && (
+                            <div style={{ fontSize: "0.75rem", marginTop: "0.125rem" }}>
+                              ({ticket.department.code})
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        "N/A"
+                      )}
                     </td>
                     <td
                       style={{
