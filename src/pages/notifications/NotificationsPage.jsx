@@ -24,6 +24,7 @@ function NotificationsPage() {
   const [error, setError] = useState("");
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [ticketTitles, setTicketTitles] = useState({});
+  const [showAll, setShowAll] = useState(false);
 
   // Load notifications from API
   useEffect(() => {
@@ -42,11 +43,17 @@ function NotificationsPage() {
           notificationsArray = Object.values(data);
         }
 
+        // Sort notifications by newest first once here
+        notificationsArray.sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        );
+
         setNotifications(notificationsArray);
 
-        // Fetch ticket titles for notifications with ticketId
+        // Fetch ticket titles ONLY for the first 10 notifications
         const titles = {};
-        const fetchPromises = notificationsArray
+        const visibleNotifications = notificationsArray.slice(0, 10);
+        const fetchPromises = visibleNotifications
           .filter((n) => n.ticketId)
           .map(async (notification) => {
             try {
@@ -80,7 +87,7 @@ function NotificationsPage() {
   // Mark single notification as read
   const handleMarkAsRead = async (notificationId) => {
     try {
-      await apiClient.patch(`/api/v1/notifications/${notificationId}/read`);
+await apiClient.patch(`/api/v1/notifications/${notificationId}/read`);
 
       // Update local state
       setNotifications((prev) =>
@@ -181,8 +188,7 @@ function NotificationsPage() {
           {error}
         </div>
       )}
-
-      {!loading && !error && notifications.length === 0 && (
+{!loading && !error && notifications.length === 0 && (
         <div className="card" style={{ padding: "2rem", textAlign: "center" }}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -213,7 +219,8 @@ function NotificationsPage() {
         <div
           style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
         >
-          {notifications.map((notification) => (
+          {(showAll ? notifications : notifications.slice(0, 10)).map(
+            (notification) => (
             <div
               key={notification.id}
               className="card"
@@ -262,8 +269,8 @@ function NotificationsPage() {
                         margin: 0,
                       }}
                     >
-                      {notification.title}
-                    </h4>
+{notification.title}
+</h4>
                     {!notification.isRead && (
                       <span
                         style={{
@@ -345,7 +352,29 @@ function NotificationsPage() {
                 )}
               </div>
             </div>
-          ))}
+            )
+          )}
+
+          {!showAll && notifications.length > 10 && (
+<button
+              type="button"
+onClick={() => setShowAll(true)}
+              style={{
+                marginTop: "0.5rem",
+                alignSelf: "center",
+                padding: "0.5rem 1rem",
+                fontSize: "0.9rem",
+                backgroundColor: "#f3f4f6",
+                border: "1px solid #d1d5db",
+                borderRadius: "0.375rem",
+                color: "#374151",
+                cursor: "pointer",
+                fontWeight: 500,
+              }}
+            >
+              Review the previous announcement
+            </button>
+          )}
         </div>
       )}
     </div>

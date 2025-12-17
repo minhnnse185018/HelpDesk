@@ -367,7 +367,7 @@ function TicketDetail() {
                                   gap: "0.25rem",
                                 }}
                               >
-                                🔍 View
+                                 View
                               </div>
                             </>
                           ) : (

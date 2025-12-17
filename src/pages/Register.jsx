@@ -5,6 +5,7 @@ import {
   validateRegisterPayload,
   isValidPassword,
 } from '../api/auth'
+import { useCapsLockWarning } from '../hooks/useCapsLockWarning'
 
 function Register() {
   const navigate = useNavigate()
@@ -19,6 +20,16 @@ function Register() {
   const [serverError, setServerError] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const {
+    capsLockOn: capsLockOnPassword,
+    handlePasswordKeyEvent: handlePasswordKeyEventPassword,
+    resetCapsLock: resetCapsPassword,
+  } = useCapsLockWarning()
+  const {
+    capsLockOn: capsLockOnConfirm,
+    handlePasswordKeyEvent: handlePasswordKeyEventConfirm,
+    resetCapsLock: resetCapsConfirm,
+  } = useCapsLockWarning()
 
   const goToVerifyPage = () => {
     navigate('/verify-email', {
@@ -122,7 +133,7 @@ function Register() {
               {errors.phoneNumber && <span className="form-error">{errors.phoneNumber}</span>}
             </div>
 
-            <div className="form-field">
+            <div className="form-field" style={{ position: 'relative' }}>
               <label htmlFor="reg-password" className="form-label">Mật khẩu</label>
               <input
                 id="reg-password"
@@ -131,13 +142,36 @@ function Register() {
                 className="input"
                 value={form.password}
                 onChange={handleChange}
+                onKeyDown={handlePasswordKeyEventPassword}
+                onKeyUp={handlePasswordKeyEventPassword}
+                onBlur={resetCapsPassword}
                 aria-invalid={Boolean(errors.password)}
                 placeholder="Ít nhất 8 ký tự"
               />
+              {capsLockOnPassword && !errors.password && (
+                <span
+                  className="form-error"
+                  style={{
+                    position: 'absolute',
+                    right: '0.75rem',
+                    top: '58%',
+                    transform: 'translateY(-50%)',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    backgroundColor: '#f97316',
+                    color: 'white',
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  CAPS LOCK ON
+                </span>
+              )}
               {errors.password && <span className="form-error">{errors.password}</span>}
             </div>
 
-            <div className="form-field">
+            <div className="form-field" style={{ position: 'relative' }}>
               <label htmlFor="reg-confirm" className="form-label">Xác nhận mật khẩu</label>
               <input
                 id="reg-confirm"
@@ -146,8 +180,31 @@ function Register() {
                 className="input"
                 value={form.confirmPassword}
                 onChange={handleChange}
+                onKeyDown={handlePasswordKeyEventConfirm}
+                onKeyUp={handlePasswordKeyEventConfirm}
+                onBlur={resetCapsConfirm}
                 aria-invalid={Boolean(errors.confirmPassword)}
               />
+              {capsLockOnConfirm && !errors.confirmPassword && (
+                <span
+                  className="form-error"
+                  style={{
+                    position: 'absolute',
+                    right: '0.75rem',
+                    top: '58%',
+                    transform: 'translateY(-50%)',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    backgroundColor: '#f97316',
+                    color: 'white',
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  CAPS
+                </span>
+              )}
               {errors.confirmPassword && <span className="form-error">{errors.confirmPassword}</span>}
             </div>
 

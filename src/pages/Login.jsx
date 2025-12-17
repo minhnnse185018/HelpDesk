@@ -5,6 +5,7 @@ import { getNormalizedRoleFromPayload } from "../utils/roles";
 import { GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import axios from "axios";
+import { useCapsLockWarning } from "../hooks/useCapsLockWarning";
 
 function Login() {
   const navigate = useNavigate();
@@ -13,6 +14,8 @@ function Login() {
   const [serverError, setServerError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const { capsLockOn, handlePasswordKeyEvent, resetCapsLock } =
+    useCapsLockWarning();
 
   const goToVerifyPage = () => {
     navigate("/verify-email", {
@@ -228,7 +231,7 @@ function Login() {
                 <span className="form-error">{errors.email}</span>
               )}
             </div>
-            <div className="form-field">
+            <div className="form-field" style={{ position: "relative" }}>
               <label htmlFor="password" className="form-label">
                 Mật khẩu
               </label>
@@ -240,8 +243,31 @@ function Login() {
                 value={form.password}
                 placeholder="********"
                 onChange={handleChange}
+                onKeyDown={handlePasswordKeyEvent}
+                onKeyUp={handlePasswordKeyEvent}
+                onBlur={resetCapsLock}
                 aria-invalid={Boolean(errors.password)}
               />
+              {capsLockOn && !errors.password && (
+                <span
+                  className="form-error"
+                  style={{
+                    position: "absolute",
+                    right: "0.75rem",
+                    top: "58%",
+                    transform: "translateY(-50%)",
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                    backgroundColor: "#f97316",
+                    color: "white",
+                    fontSize: "0.7rem",
+                    fontWeight: 600,
+                    pointerEvents: "none",
+                  }}
+                >
+                  CAPS LOCK ON
+                </span>
+              )}
               {errors.password && (
                 <span className="form-error">{errors.password}</span>
               )}

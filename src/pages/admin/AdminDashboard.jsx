@@ -256,7 +256,7 @@ function AdminDashboard() {
           <table className="table">
             <thead>
               <tr>
-                <th>Ticket ID</th>
+                <th>Ticket Title</th>
                 <th>Category</th>
                 <th>Room</th>
                 <th>Status</th>

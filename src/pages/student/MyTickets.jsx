@@ -12,6 +12,46 @@ function MyTickets() {
   const [imagePopup, setImagePopup] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
 
+  const fetchRoomsForTickets = useCallback(async (ticketsList) => {
+    const roomIds = [
+      ...new Set(
+        ticketsList
+          .filter(
+            (t) =>
+              t.roomId &&
+              (!t.room || t.room.code === undefined || t.room.floor === undefined)
+          )
+          .map((t) => t.roomId),
+      ),
+    ]
+
+    if (roomIds.length === 0) return ticketsList
+
+    const roomMap = {}
+    await Promise.all(
+      roomIds.map(async (roomId) => {
+        try {
+          const res = await apiClient.get(`/api/v1/rooms/${roomId}`)
+          roomMap[roomId] = res?.data || res
+        } catch (err) {
+          console.error('Failed to fetch room detail', roomId, err)
+        }
+      }),
+    )
+
+    return ticketsList.map((ticket) => {
+      const roomDetail = ticket.roomId ? roomMap[ticket.roomId] : null
+      if (!roomDetail) return ticket
+      return {
+        ...ticket,
+        room: {
+          ...(ticket.room || {}),
+          ...roomDetail,
+        },
+      }
+    })
+  }, [])
+
   const loadTickets = useCallback(async () => {
     try {
       setLoading(true)
@@ -20,7 +60,8 @@ function MyTickets() {
       const ticketsList = Array.isArray(ticketsData)
         ? ticketsData
         : Object.values(ticketsData).filter(Boolean)
-      setTickets(ticketsList)
+      const hydratedTickets = await fetchRoomsForTickets(ticketsList)
+      setTickets(hydratedTickets)
       setError('')
     } catch (err) {
       setError(err?.message || 'Failed to load tickets')
@@ -28,7 +69,7 @@ function MyTickets() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [fetchRoomsForTickets])
 
   useEffect(() => {
     loadTickets()
@@ -46,14 +87,28 @@ function MyTickets() {
     })
   }
 
+  const formatRoom = (room) => {
+    if (!room) return 'N/A'
+    const name = room.name || ''
+    const codePart = room.code ? `code (${room.code})` : ''
+    const floorPart =
+      room.floor !== undefined && room.floor !== null
+        ? `Floor ${room.floor}`
+        : ''
+    if (!codePart && !floorPart) return name || 'N/A'
+    return `${name}\n${[codePart, floorPart].filter(Boolean).join(' ')}`.trim()
+  }
+
   const getStatusLabel = (status) => {
     const statusMap = {
       open: 'New',
       assigned: 'Assigned',
       accepted: 'In Progress',
+      in_progress: 'In Progress',
       denied: 'Denied',
       resolved: 'Resolved',
       closed: 'Closed',
+      escalated: 'Escalated',
     }
     return statusMap[status] || status
   }
@@ -63,9 +118,11 @@ function MyTickets() {
       open: { bg: '#dbeafe', text: '#1e40af', border: '#93c5fd' },
       assigned: { bg: '#fef3c7', text: '#92400e', border: '#fcd34d' },
       accepted: { bg: '#e0e7ff', text: '#3730a3', border: '#a5b4fc' },
+      in_progress: { bg: '#e0e7ff', text: '#3730a3', border: '#a5b4fc' },
       denied: { bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' },
       resolved: { bg: '#d1fae5', text: '#065f46', border: '#6ee7b7' },
       closed: { bg: '#e5e7eb', text: '#374151', border: '#d1d5db' },
+      escalated: { bg: '#ffe4e6', text: '#be123c', border: '#fecdd3' },
     }
     return statusColorMap[status] || statusColorMap.open
   }
@@ -253,6 +310,7 @@ function MyTickets() {
                   <option value="New">New</option>
                   <option value="Assigned">Assigned</option>
                   <option value="In Progress">In Progress</option>
+                  <option value="Escalated">Escalated</option>
                   <option value="Denied">Denied</option>
                   <option value="Resolved">Resolved</option>
                   <option value="Closed">Closed</option>
@@ -269,11 +327,11 @@ function MyTickets() {
             }}>
               {loading ? (
                 <div style={{ padding: '3rem', textAlign: 'center', color: '#6b7280' }}>
-                  ⏳ Loading tickets...
+                  Loading tickets...
                 </div>
               ) : filteredTickets.length === 0 ? (
                 <div style={{ padding: '3rem', textAlign: 'center', color: '#6b7280' }}>
-                  📭 No tickets found
+                  No tickets found
                 </div>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
@@ -379,7 +437,12 @@ function MyTickets() {
                               fontSize: '0.875rem',
                               color: '#6b7280'
                             }}>
-                              {ticket.room?.name} ({ticket.room?.code})
+                              {formatRoom(ticket.room).split('\n').map((line, idx) => (
+                                <span key={idx}>
+                                  {line}
+                                  {idx === 0 && <br />}
+                                </span>
+                              ))}
                             </td>
                             <td style={{
                               padding: '1rem',
@@ -499,8 +562,12 @@ function MyTickets() {
                     fontSize: '0.875rem',
                     color: '#111827'
                   }}>
-                    {selectedTicket.room?.name} ({selectedTicket.room?.code}) - Floor{' '}
-                    {selectedTicket.room?.floor}
+                    {formatRoom(selectedTicket.room).split('\n').map((line, idx) => (
+                      <span key={idx}>
+                        {line}
+                        {idx === 0 && <br />}
+                      </span>
+                    ))}
                   </p>
                 </div>
                 {selectedTicket.department && (
@@ -623,94 +690,129 @@ function MyTickets() {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
                     gap: '0.75rem'
                   }}>
-                    {selectedTicket.attachments.map((attachment) => {
-                      const isImage = attachment.mimeType?.startsWith('image/')
-                      return (
-                        <div
-                          key={attachment.id}
-                          onClick={() => isImage && openImagePopup(attachment)}
+                    {selectedTicket.attachments.map((attachment) => (
+                      <div
+                        key={attachment.id}
+                        onClick={() => openImagePopup(attachment)}
+                        style={{
+                          position: 'relative',
+                          aspectRatio: '1',
+                          backgroundColor: '#f9fafb',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          border: '1px solid #e5e7eb',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'scale(1.05)'
+                          e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)'
+                          e.currentTarget.style.boxShadow = 'none'
+                        }}
+                      >
+                        <img
+                          src={attachment.filePath}
+                          alt={attachment.fileName}
                           style={{
-                            position: 'relative',
-                            aspectRatio: '1',
-                            backgroundColor: '#f9fafb',
-                            borderRadius: '8px',
-                            overflow: 'hidden',
-                            cursor: isImage ? 'pointer' : 'default',
-                            border: '1px solid #e5e7eb',
-                            transition: 'all 0.2s'
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
                           }}
-                          onMouseEnter={(e) => {
-                            if (isImage) {
-                              e.currentTarget.style.transform = 'scale(1.05)'
-                              e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)'
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (isImage) {
-                              e.currentTarget.style.transform = 'scale(1)'
-                              e.currentTarget.style.boxShadow = 'none'
-                            }
-                          }}
-                        >
-                          {isImage ? (
-                            <>
-                              <img
-                                src={attachment.filePath}
-                                alt={attachment.fileName}
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover'
-                                }}
-                              />
-                              <div style={{
-                                position: 'absolute',
-                                top: '0.5rem',
-                                right: '0.5rem',
-                                backgroundColor: 'rgba(0,0,0,0.6)',
-                                color: 'white',
-                                borderRadius: '4px',
-                                padding: '0.25rem 0.5rem',
-                                fontSize: '0.625rem',
-                                fontWeight: '600'
-                              }}>
-                                🔍
-                              </div>
-                            </>
-                          ) : (
-                            <a
-                              href={attachment.filePath}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '100%',
-                                height: '100%',
-                                textDecoration: 'none',
-                                color: '#6b7280',
-                                padding: '0.5rem'
-                              }}
-                            >
-                              <span style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>📎</span>
-                              <span style={{
-                                fontSize: '0.625rem',
-                                textAlign: 'center',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical'
-                              }}>
-                                {attachment.fileName}
-                              </span>
-                            </a>
-                          )}
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          top: '0.5rem',
+                          right: '0.5rem',
+                          color: 'white',
+                          borderRadius: '4px',
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.625rem',
+                          fontWeight: '600'
+                        }}>
                         </div>
-                      )
-                    })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-tickets */}
+              {Array.isArray(selectedTicket.subTickets) && selectedTicket.subTickets.length > 0 && (
+                <div style={{
+                  marginBottom: '1.5rem',
+                  paddingTop: '1.5rem',
+                  borderTop: '1px solid #e5e7eb'
+                }}>
+                  <h4 style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#111827',
+                    marginBottom: '0.75rem'
+                  }}>
+                    Sub-tickets ({selectedTicket.subTickets.length})
+                  </h4>
+
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{
+                      width: '100%',
+                      borderCollapse: 'collapse'
+                    }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Category</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Assignee</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priority</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Due Date</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Resolved At</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Resolution Note</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedTicket.subTickets.map((subTicket) => {
+                          const statusColor = getStatusColor(subTicket.status)
+                          return (
+                            <tr key={subTicket.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#111827' }}>
+                                {subTicket.category?.name || 'N/A'}
+                              </td>
+                              <td style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                                {subTicket.assignee?.username || subTicket.assignee?.email || 'Unassigned'}
+                              </td>
+                              <td style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                                {subTicket.priority ? subTicket.priority.toUpperCase() : '-'}
+                              </td>
+                              <td style={{ padding: '0.75rem' }}>
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '0.35rem 0.7rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600',
+                                  borderRadius: '6px',
+                                  backgroundColor: statusColor.bg,
+                                  color: statusColor.text,
+                                  border: `1px solid ${statusColor.border}`
+                                }}>
+                                  {getStatusLabel(subTicket.status)}
+                                </span>
+                              </td>
+                              <td style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                                {formatDate(subTicket.dueDate)}
+                              </td>
+                              <td style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                                {formatDate(subTicket.resolvedAt)}
+                              </td>
+                              <td style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                                {subTicket.resolutionNote || '-'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
