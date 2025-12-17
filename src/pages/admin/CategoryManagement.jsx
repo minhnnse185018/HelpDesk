@@ -6,6 +6,7 @@ import {
   DetailPanelShell,
   FormModalShell,
   DeleteConfirmModal,
+  ActionButton,
 } from '../../components/templates'
 
 function CategoryManagement() {
@@ -256,9 +257,9 @@ function CategoryManagement() {
       title="Category Management"
       subtitle="Create, view, update, and delete categories."
       actions={
-        <button className="btn btn-primary" onClick={openCreateModal}>
+        <ActionButton variant="success" onClick={openCreateModal}>
           Create Category
-        </button>
+        </ActionButton>
       }
     >
       <section className="section section-with-panel">
@@ -297,21 +298,31 @@ function CategoryManagement() {
           subtitle={(item) => item.code}
           selectedItem={selectedCategory}
           emptyMessage="Select a category to view details."
-          onDelete={handleDelete}
           deleting={deleting}
           updating={updating}
           actionError={actionError}
           dangerZoneTitle="Danger Zone"
+          dangerZoneContent={
+            <ActionButton
+              variant="danger"
+              onClick={handleDelete}
+              disabled={deleting || updating}
+            >
+              {deleting ? 'Deleting...' : 'Delete Category'}
+            </ActionButton>
+          }
         >
           <form onSubmit={handleUpdate}>
             {renderFormFields(false)}
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={updating || deleting}
-            >
-              {updating ? 'Updating...' : 'Update Category'}
-            </button>
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+              <ActionButton
+                type="submit"
+                variant="success"
+                disabled={updating || deleting}
+              >
+                {updating ? 'Saving...' : 'Save'}
+              </ActionButton>
+            </div>
           </form>
         </DetailPanelShell>
       </section>

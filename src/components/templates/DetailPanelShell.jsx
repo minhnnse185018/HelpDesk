@@ -38,7 +38,7 @@ function DetailPanelShell({
               </p>
             )}
             {children}
-            {onDelete && (
+            {(onDelete || dangerZoneContent) && (
               <div className="detail-section">
                 <h4 className="detail-section-title">{dangerZoneTitle}</h4>
                 {dangerZoneContent || (

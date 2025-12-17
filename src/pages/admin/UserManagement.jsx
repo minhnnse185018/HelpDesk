@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiClient } from '../../api/client'
+import { ActionButton, DeleteConfirmModal } from '../../components/templates'
 
 const roleOptions = [
   { value: 'staff', label: 'Staff' },
@@ -19,6 +20,12 @@ function UserManagement() {
   const [departments, setDepartments] = useState([])
   const [assigningDepartment, setAssigningDepartment] = useState(false)
   const [activeTab, setActiveTab] = useState('staff')
+  
+  // Form state để lưu giá trị tạm thời trước khi save
+  const [formData, setFormData] = useState({
+    role: '',
+    departmentId: '',
+  })
 
   // Load danh sách departments
   const loadDepartments = useCallback(async () => {
@@ -58,7 +65,14 @@ function UserManagement() {
     setActionError('')
     try {
       const response = await apiClient.get(`/api/v1/users/${selectedId}`)
-      setSelectedUser(response?.data || null)
+      const user = response?.data || null
+      setSelectedUser(user)
+      if (user) {
+        setFormData({
+          role: user.role || '',
+          departmentId: user.departmentId || '',
+        })
+      }
     } catch (err) {
       setActionError(err?.message || 'Failed to load user details')
     }
@@ -73,42 +87,60 @@ function UserManagement() {
     loadSelectedUser()
   }, [loadSelectedUser])
 
-  // Cập nhật role
-  const handleRoleChange = async (event) => {
+  // Handle form input changes (chỉ update state, không gọi API)
+  const handleRoleChange = (event) => {
     const role = event.target.value
-    if (!selectedId) return
-    setUpdating(true)
-    setActionError('')
-    try {
-      await apiClient.patch(`/api/v1/users/${selectedId}/role`, { role })
-      await Promise.all([loadUsers(), loadSelectedUser()])
-    } catch (err) {
-      setActionError(err?.message || 'Failed to update role')
-    } finally {
-      setUpdating(false)
-    }
+    setFormData((prev) => ({ ...prev, role }))
   }
 
-  // Gán staff vào department
-  const handleAssignDepartment = async (event) => {
+  const handleDepartmentChange = (event) => {
     const departmentId = event.target.value
-    if (!selectedId || !departmentId) return
+    setFormData((prev) => ({ ...prev, departmentId }))
+  }
+
+  // Save tất cả thay đổi
+  const handleSave = async () => {
+    if (!selectedId) return
     
-    // Validate: chỉ staff mới được assign vào department
-    if (selectedRole !== 'staff') {
-      setActionError('Only staff users can be assigned to departments')
-      return
-    }
-    
-    setAssigningDepartment(true)
+    setUpdating(true)
     setActionError('')
+    
     try {
-      await apiClient.post(`/api/v1/users/${selectedId}/assign-department`, { departmentId })
-      await Promise.all([loadUsers(), loadSelectedUser()])
+      const promises = []
+      
+      // Update role nếu có thay đổi
+      if (formData.role && formData.role !== selectedUser?.role) {
+        promises.push(
+          apiClient.patch(`/api/v1/users/${selectedId}/role`, { role: formData.role })
+        )
+      }
+      
+      // Assign department nếu có thay đổi và user là staff
+      if (formData.role === 'staff' || selectedRole === 'staff') {
+        const currentDeptId = selectedUser?.departmentId || ''
+        if (formData.departmentId && formData.departmentId !== currentDeptId) {
+          // Validate: chỉ staff mới được assign vào department
+          if (formData.role === 'staff' || selectedRole === 'staff') {
+            promises.push(
+              apiClient.post(`/api/v1/users/${selectedId}/assign-department`, { 
+                departmentId: formData.departmentId 
+              })
+            )
+          }
+        } else if (!formData.departmentId && currentDeptId) {
+          // Nếu bỏ chọn department (chọn empty), có thể cần API để unassign
+          // Tùy vào backend có hỗ trợ không, nếu không thì bỏ qua
+        }
+      }
+      
+      if (promises.length > 0) {
+        await Promise.all(promises)
+        await Promise.all([loadUsers(), loadSelectedUser()])
+      }
     } catch (err) {
-      setActionError(err?.message || 'Failed to assign department')
+      setActionError(err?.message || 'Failed to save changes')
     } finally {
-      setAssigningDepartment(false)
+      setUpdating(false)
     }
   }
 
@@ -306,12 +338,6 @@ function UserManagement() {
                     </p>
                   </div>
                   <div>
-                    <p className="detail-label">Department</p>
-                    <p className="detail-value">
-                      {selectedUser.departmentId || '—'}
-                    </p>
-                  </div>
-                  <div>
                     <p className="detail-label">Created At</p>
                     <p className="detail-value">
                       {selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleString('vi-VN') : '—'}
@@ -324,7 +350,7 @@ function UserManagement() {
                     <label className="form-label">Update Role</label>
                     <select
                       className="input"
-                      value={selectedRole}
+                      value={formData.role}
                       onChange={handleRoleChange}
                       disabled={updating || deleting}
                     >
@@ -340,15 +366,15 @@ function UserManagement() {
                   </div>
                 </div>
 
-                {selectedRole === 'staff' && (
+                {(formData.role === 'staff' || selectedRole === 'staff') && (
                   <div className="detail-section">
                     <div className="form-field">
                       <label className="form-label">Assign Department</label>
                       <select
                         className="input"
-                        value={selectedUser?.departmentId || ''}
-                        onChange={handleAssignDepartment}
-                        disabled={assigningDepartment || updating || deleting}
+                        value={formData.departmentId}
+                        onChange={handleDepartmentChange}
+                        disabled={updating || deleting}
                       >
                         <option value="">
                           {selectedUser?.departmentId ? '-- Change Department --' : '-- Select Department --'}
@@ -369,15 +395,26 @@ function UserManagement() {
                 )}
 
                 <div className="detail-section">
+                  <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                    <ActionButton
+                      variant="success"
+                      onClick={handleSave}
+                      disabled={updating || deleting}
+                    >
+                      {updating ? 'Saving...' : 'Save'}
+                    </ActionButton>
+                  </div>
+                </div>
+
+                <div className="detail-section">
                   <h4 className="detail-section-title">Danger Zone</h4>
-                  <button
-                    type="button"
-                    className="btn btn-secondary subtle"
+                  <ActionButton
+                    variant="danger"
                     onClick={handleDelete}
                     disabled={deleting || updating}
                   >
                     {deleting ? 'Deleting...' : 'Delete User'}
-                  </button>
+                  </ActionButton>
                 </div>
 
                 {actionError && <div className="form-error">{actionError}</div>}
@@ -389,45 +426,21 @@ function UserManagement() {
         </aside>
       </section>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Delete User</h3>
-            </div>
-            <div className="modal-body">
-              <p>Are you sure you want to delete this user?</p>
-              <p className="modal-warning">
-                <strong>Warning:</strong> This action cannot be undone.
-              </p>
-              {selectedUser && (
-                <div className="modal-user-info">
-                  <p><strong>Email:</strong> {selectedUser.email}</p>
-                  <p><strong>Username:</strong> {selectedUser.username}</p>
-                  <p><strong>Role:</strong> {selectedUser.role}</p>
-                </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button
-                className="btn btn-secondary"
-                onClick={() => setShowDeleteModal(false)}
-                disabled={deleting}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-danger"
-                onClick={confirmDelete}
-                disabled={deleting}
-              >
-                {deleting ? 'Deleting...' : 'Delete User'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={confirmDelete}
+        deleting={deleting}
+        title="Delete User"
+        message="Are you sure you want to delete this user?"
+        warningMessage="This action cannot be undone."
+        itemInfo={selectedUser ? {
+          Email: selectedUser.email,
+          Username: selectedUser.username,
+          Role: selectedUser.role,
+        } : null}
+        itemLabel="User"
+      />
     </div>
   )
 }

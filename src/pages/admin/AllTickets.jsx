@@ -211,6 +211,65 @@ function AllTickets({ searchTerm = "" }) {
 
   return (
     <>
+      <style>
+        {`
+          @media (max-width: 1024px) {
+            .ticket-table th:nth-child(5),
+            .ticket-table td:nth-child(5),
+            .ticket-table th:nth-child(6),
+            .ticket-table td:nth-child(6),
+            .ticket-table th:nth-child(8),
+            .ticket-table td:nth-child(8) {
+              display: none;
+            }
+          }
+          
+          @media (max-width: 768px) {
+            .ticket-table th:nth-child(4),
+            .ticket-table td:nth-child(4),
+            .ticket-table th:nth-child(7),
+            .ticket-table td:nth-child(7) {
+              display: none;
+            }
+            
+            .ticket-table th,
+            .ticket-table td {
+              padding: 0.75rem 0.5rem !important;
+              font-size: 0.8rem !important;
+            }
+            
+            .ticket-actions {
+              flex-wrap: wrap !important;
+              gap: 0.25rem !important;
+            }
+            
+            .ticket-actions button {
+              padding: 0.375rem 0.75rem !important;
+              font-size: 0.75rem !important;
+            }
+          }
+          
+          @media (max-width: 640px) {
+            .ticket-table th:nth-child(3),
+            .ticket-table td:nth-child(3) {
+              display: none;
+            }
+            
+            .ticket-table {
+              font-size: 0.75rem !important;
+            }
+            
+            .ticket-table th,
+            .ticket-table td {
+              padding: 0.5rem 0.375rem !important;
+            }
+            
+            .ticket-title {
+              font-size: 0.875rem !important;
+            }
+          }
+        `}
+      </style>
       <div
         style={{
           backgroundColor: "rgba(255, 255, 255, 0.72)",
@@ -219,17 +278,18 @@ function AllTickets({ searchTerm = "" }) {
           boxShadow: "0 2px 16px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)",
           backdropFilter: "blur(40px) saturate(180%)",
           border: "1px solid rgba(255,255,255,0.18)",
-          width:"100%"
+          width: "100%",
+          maxWidth: "100%",
         }}
       >
-        <div style={{ overflowX: "auto" }}>
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
           <table
+            className="ticket-table"
             style={{
               width: "100%",
               borderCollapse: "collapse",
               fontSize: "0.875rem",
-              minWidth: "500px",
-              
+              minWidth: "600px",
             }}
           >
             <thead>
@@ -380,6 +440,7 @@ function AllTickets({ searchTerm = "" }) {
                   >
                     <td style={{ padding: "1rem" }}>
                       <div
+                        className="ticket-title"
                         style={{
                           color: "#111827",
                           fontWeight: 500,
