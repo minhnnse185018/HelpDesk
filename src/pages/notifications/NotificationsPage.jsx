@@ -23,7 +23,6 @@ function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [markingAllRead, setMarkingAllRead] = useState(false);
-  const [ticketTitles, setTicketTitles] = useState({});
   const [showAll, setShowAll] = useState(false);
 
   // Load notifications from API
@@ -43,36 +42,12 @@ function NotificationsPage() {
           notificationsArray = Object.values(data);
         }
 
-        // Sort notifications by newest first once here
+        // Sort notifications by newest first
         notificationsArray.sort(
           (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
 
         setNotifications(notificationsArray);
-
-        // Fetch ticket titles ONLY for the first 10 notifications
-        const titles = {};
-        const visibleNotifications = notificationsArray.slice(0, 10);
-        const fetchPromises = visibleNotifications
-          .filter((n) => n.ticketId)
-          .map(async (notification) => {
-            try {
-              const ticketRes = await apiClient.get(
-                `/api/v1/tickets/${notification.ticketId}`
-              );
-              const ticketData = ticketRes?.data || ticketRes;
-              titles[notification.ticketId] = ticketData.title || "Untitled Ticket";
-            } catch (err) {
-              console.error(
-                `Failed to fetch ticket ${notification.ticketId}:`,
-                err
-              );
-              titles[notification.ticketId] = "Ticket";
-            }
-          });
-
-        await Promise.all(fetchPromises);
-        setTicketTitles(titles);
       } catch (err) {
         console.error("Failed to load notifications:", err);
         setError(err?.message || "Failed to load notifications");
@@ -283,23 +258,6 @@ await apiClient.patch(`/api/v1/notifications/${notificationId}/read`);
                     )}
                   </div>
 
-                  {notification.ticketId && ticketTitles[notification.ticketId] && (
-                    <p
-                      style={{
-                        fontSize: "0.875rem",
-                        fontWeight: 600,
-                        color: "#1f2937",
-                        margin: "0.25rem 0",
-                        padding: "0.25rem 0.5rem",
-                        backgroundColor: "rgba(99, 102, 241, 0.08)",
-                        borderRadius: "6px",
-                        display: "inline-block",
-                      }}
-                    >
-                      {ticketTitles[notification.ticketId]}
-                    </p>
-                  )}
-
                   <p
                     style={{
                       fontSize: "0.85rem",
@@ -321,8 +279,8 @@ await apiClient.patch(`/api/v1/notifications/${notificationId}/read`);
                       color: "#6b7280",
                     }}
                   >
-                    {notification.actorName && (
-                      <span>By {notification.actorName}</span>
+                    {notification.actor?.username && (
+                      <span>By {notification.actor.username}</span>
                     )}
                     <span>{formatDateTime(notification.createdAt)}</span>
                   </div>

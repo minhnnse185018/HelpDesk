@@ -49,22 +49,14 @@ export function NotificationSocketProvider({ children }) {
 
   // Initialize socket connection
   useEffect(() => {
-    const getAccessToken = () => localStorage.getItem('accessToken')
-    const token = getAccessToken()
+    const token = localStorage.getItem('accessToken')
 
     if (!token) {
       return
     }
 
-    // Fetch initial unread count with small delay to ensure token is ready
-    const fetchTimer = setTimeout(() => {
-      fetchUnreadCount()
-    }, 100)
-
-    // Also fetch again after 1 second as backup
-    const retryTimer = setTimeout(() => {
-      fetchUnreadCount()
-    }, 1000)
+    // Fetch initial unread count immediately (không delay)
+    fetchUnreadCount()
 
     // Connect to socket.io - connect to base URL without /ws namespace
     const socketInstance = io(API_BASE_URL, {
@@ -95,7 +87,7 @@ export function NotificationSocketProvider({ children }) {
       setUnreadCount((prev) => prev + 1)
 
       // Optional: Show browser notification
-if ('Notification' in window && Notification.permission === 'granted') {
+      if ('Notification' in window && Notification.permission === 'granted') {
         new Notification(payload.title, {
           body: payload.message,
           icon: '/favicon.ico',
@@ -107,8 +99,6 @@ if ('Notification' in window && Notification.permission === 'granted') {
 
     // Cleanup on unmount
     return () => {
-      clearTimeout(fetchTimer)
-      clearTimeout(retryTimer)
       socketInstance.disconnect()
     }
   }, [fetchUnreadCount])

@@ -226,9 +226,7 @@ function AdminSubTicketDetail() {
             >
               {subTicket.parentTicket?.title || "Sub-Ticket Details"}
             </h1>
-            <p style={{ color: "#6b7280", margin: 0, fontSize: "0.875rem" }}>
-              Sub-Ticket ID: {subTicket.id?.slice(0, 8)}...
-            </p>
+ 
           </div>
 
           {/* Two Column Layout */}

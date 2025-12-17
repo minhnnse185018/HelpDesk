@@ -4,6 +4,7 @@ import { apiClient } from "../../api/client";
 import { formatDate, getPriorityBadge, getStatusBadge } from "../../utils/ticketHelpers.jsx";
 import AssignTicketModal from "../../components/modals/AssignTicketModal";
 import NotificationModal from "../../components/modals/NotificationModal";
+import { ActionButton } from "../../components/templates";
 
 function StatusTickets({ status, searchTerm = "" }) {
   const navigate = useNavigate();
@@ -462,112 +463,38 @@ function StatusTickets({ status, searchTerm = "" }) {
                           justifyContent: "center",
                         }}
                       >
+                        <ActionButton
+                          variant="secondary"
+                          onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
+                        >
+                          View
+                        </ActionButton>
                         {ticket.status !== "in_progress" && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              navigate(`/admin/tickets/edit/${ticket.id}`)
-                            }
-                            style={{
-                              padding: "0.5rem 1rem",
-                              fontSize: "0.8rem",
-                              fontWeight: 500,
-                              backgroundColor: "rgba(59, 130, 246, 0.08)",
-                              color: "#2563eb",
-                              border: "1px solid rgba(59, 130, 246, 0.2)",
-                              borderRadius: "14px",
-                              cursor: "pointer",
-                              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                              backdropFilter: "blur(40px) saturate(200%)",
-                              boxShadow:
-                                "0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(59, 130, 246, 0.1)",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.backgroundColor =
-                                "rgba(59, 130, 246, 0.15)";
-                              e.currentTarget.style.transform =
-                                "translateY(-1px)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.backgroundColor =
-                                "rgba(59, 130, 246, 0.08)";
-                              e.currentTarget.style.transform = "translateY(0)";
-                            }}
+                          <ActionButton
+                            variant="primary"
+                            onClick={() => navigate(`/admin/tickets/edit/${ticket.id}`)}
                           >
                             Edit
-                          </button>
+                          </ActionButton>
                         )}
                         {(() => {
-                          const canAssign =
-                            ticket.status === "open";
+                          const canAssign = ticket.status === "open";
                           if (!canAssign) return null;
                           return (
-                            <button
-                              type="button"
+                            <ActionButton
+                              variant="success"
                               onClick={() => setAssignModal(ticket)}
-                              style={{
-                                padding: "0.5rem 1rem",
-                                fontSize: "0.8rem",
-                                fontWeight: 500,
-                                backgroundColor: "rgba(16, 185, 129, 0.08)",
-                                color: "#10b981",
-                                border: "1px solid rgba(16, 185, 129, 0.2)",
-                                borderRadius: "14px",
-                                cursor: "pointer",
-                                transition:
-                                  "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                                backdropFilter: "blur(40px) saturate(200%)",
-                                boxShadow:
-                                  "0 8px 32px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(16, 185, 129, 0.1)",
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.backgroundColor =
-                                  "rgba(16, 185, 129, 0.15)";
-                                e.currentTarget.style.transform =
-                                  "translateY(-1px)";
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.backgroundColor =
-                                  "rgba(16, 185, 129, 0.08)";
-                                e.currentTarget.style.transform =
-                                  "translateY(0)";
-                              }}
                             >
                               Assign
-                            </button>
+                            </ActionButton>
                           );
                         })()}
-                        <button
-                          type="button"
+                        <ActionButton
+                          variant="danger"
                           onClick={() => handleDeleteClick(ticket.id)}
-                          style={{
-                            padding: "0.5rem 1rem",
-                            fontSize: "0.8rem",
-                            fontWeight: 500,
-                            backgroundColor: "rgba(239, 68, 68, 0.08)",
-                            color: "#dc2626",
-                            border: "1px solid rgba(239, 68, 68, 0.2)",
-                            borderRadius: "14px",
-                            cursor: "pointer",
-                            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                            backdropFilter: "blur(40px) saturate(200%)",
-                            boxShadow:
-                              "0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(239, 68, 68, 0.1)",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.backgroundColor =
-                              "rgba(239, 68, 68, 0.15)";
-                            e.currentTarget.style.transform =
-                              "translateY(-1px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.backgroundColor =
-                              "rgba(239, 68, 68, 0.08)";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
                         >
                           Delete
-                        </button>
+                        </ActionButton>
                       </div>
                     </td>
                   </tr>
