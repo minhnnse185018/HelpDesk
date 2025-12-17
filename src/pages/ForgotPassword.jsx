@@ -6,6 +6,7 @@ import {
   validateForgotPasswordPayload,
   validateResetPasswordPayload,
 } from "../api/auth";
+import { useCapsLockWarning } from "../hooks/useCapsLockWarning";
 
 function ForgotPassword() {
   const navigate = useNavigate();
@@ -20,6 +21,16 @@ function ForgotPassword() {
   const [statusMessage, setStatusMessage] = useState("");
   const [sendingOtp, setSendingOtp] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const {
+    capsLockOn: capsLockNew,
+    handlePasswordKeyEvent: handlePasswordKeyNew,
+    resetCapsLock: resetCapsNew,
+  } = useCapsLockWarning();
+  const {
+    capsLockOn: capsLockConfirm,
+    handlePasswordKeyEvent: handlePasswordKeyConfirm,
+    resetCapsLock: resetCapsConfirm,
+  } = useCapsLockWarning();
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -151,7 +162,7 @@ function ForgotPassword() {
               {errors.otp && <span className="form-error">{errors.otp}</span>}
             </div>
 
-            <div className="form-field">
+            <div className="form-field" style={{ position: "relative" }}>
               <label htmlFor="newPassword" className="form-label">
                 Mật khẩu mới
               </label>
@@ -162,15 +173,38 @@ function ForgotPassword() {
                 className="input"
                 value={form.newPassword}
                 onChange={handleChange}
+                onKeyDown={handlePasswordKeyNew}
+                onKeyUp={handlePasswordKeyNew}
+                onBlur={resetCapsNew}
                 placeholder="Nhập mật khẩu mới"
                 aria-invalid={Boolean(errors.newPassword)}
               />
+              {capsLockNew && !errors.newPassword && (
+                <span
+                  className="form-error"
+                  style={{
+                    position: "absolute",
+                    right: "0.75rem",
+                    top: "58%",
+                    transform: "translateY(-50%)",
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                    backgroundColor: "#f97316",
+                    color: "white",
+                    fontSize: "0.7rem",
+                    fontWeight: 600,
+                    pointerEvents: "none",
+                  }}
+                >
+                  CAPS LOCK ON
+                </span>
+              )}
               {errors.newPassword && (
                 <span className="form-error">{errors.newPassword}</span>
               )}
             </div>
 
-            <div className="form-field">
+            <div className="form-field" style={{ position: "relative" }}>
               <label htmlFor="confirmPassword" className="form-label">
                 Xác nhận mật khẩu
               </label>
@@ -181,9 +215,32 @@ function ForgotPassword() {
                 className="input"
                 value={form.confirmPassword}
                 onChange={handleChange}
+                onKeyDown={handlePasswordKeyConfirm}
+                onKeyUp={handlePasswordKeyConfirm}
+                onBlur={resetCapsConfirm}
                 placeholder="Nhập lại mật khẩu mới"
                 aria-invalid={Boolean(errors.confirmPassword)}
               />
+              {capsLockConfirm && !errors.confirmPassword && (
+                <span
+                  className="form-error"
+                  style={{
+                    position: "absolute",
+                    right: "0.75rem",
+                    top: "58%",
+                    transform: "translateY(-50%)",
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                    backgroundColor: "#f97316",
+                    color: "white",
+                    fontSize: "0.7rem",
+                    fontWeight: 600,
+                    pointerEvents: "none",
+                  }}
+                >
+                  CAPS
+                </span>
+              )}
               {errors.confirmPassword && (
                 <span className="form-error">{errors.confirmPassword}</span>
               )}

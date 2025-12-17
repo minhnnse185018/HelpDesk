@@ -67,7 +67,7 @@ function StudentLayout() {
               <span className="user-role">{displayRole}</span>
             </div>
           </div>
-          <button className="btn btn-secondary" onClick={handleLogout}>Button</button>
+          <button className="btn btn-secondary" onClick={handleLogout}>Logout</button>
         </div>
       </header>
 
