@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
-import { ActionButton } from "../../components/templates";
+import { ActionButton, AlertModal } from "../../components/templates";
 
 function formatDate(dateString) {
   if (!dateString) return "N/A";
@@ -95,6 +95,8 @@ function StaffSubTickets() {
     } catch (err) {
       console.error("Failed to accept sub-ticket:", err);
       setAlertModal({
+        type: 'error',
+        title: 'Error',
         message: "Failed to accept sub-ticket: " + (err?.message || "Unknown error")
       });
     }
@@ -123,22 +125,40 @@ function StaffSubTickets() {
     } catch (err) {
       console.error("Failed to resolve sub-ticket:", err);
       setAlertModal({
+        type: 'error',
+        title: 'Error',
         message: "Failed to resolve sub-ticket: " + (err?.message || "Unknown error")
       });
     }
   };
 
-  const handleReassignRequest = async (subTicketId, reason) => {
+  const handleReassignRequest = async (subTicketId, reason, departmentId, staffId) => {
     try {
-      await apiClient.post("/api/v1/reassign-requests", {
+      const payload = {
         subTicketId,
         reason,
-      });
+      };
+      // Add departmentId if available
+      if (departmentId) {
+        payload.departmentId = departmentId;
+      }
+      // Add staffId if available (suggested staff)
+      if (staffId) {
+        payload.staffId = staffId;
+      }
+      
+      await apiClient.post("/api/v1/reassign-requests", payload);
       setReassignModal(null);
-      setAlertModal({ message: "Reassign request submitted successfully" });
+      setAlertModal({ 
+        type: 'success',
+        title: 'Success',
+        message: "Reassign request submitted successfully" 
+      });
     } catch (err) {
       console.error("Failed to submit reassign request:", err);
       setAlertModal({
+        type: 'error',
+        title: 'Error',
         message: "Failed to submit reassign request: " + (err?.message || "Unknown error")
       });
     }
@@ -319,7 +339,10 @@ function StaffSubTickets() {
       {/* Alert Modal */}
       {alertModal && (
         <AlertModal
+          isOpen={!!alertModal}
           message={alertModal.message}
+          title={alertModal.title || 'Notice'}
+          type={alertModal.type || 'info'}
           onClose={() => setAlertModal(null)}
         />
       )}
@@ -350,8 +373,8 @@ function StaffSubTickets() {
           category={reassignModal.category}
           subTicket={reassignModal.subTicket}
           onClose={() => setReassignModal(null)}
-          onSubmit={(reason) =>
-            handleReassignRequest(reassignModal.id, reason)
+          onSubmit={(reason, staffId) =>
+            handleReassignRequest(reassignModal.id, reason, reassignModal.departmentId, staffId)
           }
         />
       )}
@@ -574,7 +597,73 @@ function ResolveSubTicketModal({ category, onClose, onSubmit }) {
 // Reassign Request Modal
 function ReassignRequestModal({ category, subTicket, onClose, onSubmit }) {
   const [reason, setReason] = useState("");
+  const [staffId, setStaffId] = useState("");
+  const [staffList, setStaffList] = useState([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [departmentId, setDepartmentId] = useState(null);
+
+  useEffect(() => {
+    const loadDepartmentAndStaff = async () => {
+      // Get departmentId from various sources
+      let deptId = null;
+      
+      if (subTicket) {
+        // Try category.departmentId first
+        if (subTicket.category?.departmentId) {
+          deptId = subTicket.category.departmentId;
+        }
+        // Try parentTicket.departmentId
+        else if (subTicket.parentTicket?.departmentId) {
+          deptId = subTicket.parentTicket.departmentId;
+        }
+        // Try direct departmentId
+        else if (subTicket.departmentId) {
+          deptId = subTicket.departmentId;
+        }
+        // If categoryId exists but category object is incomplete, fetch it
+        else if (subTicket.categoryId && !subTicket.category?.departmentId) {
+          try {
+            const catRes = await apiClient.get(`/api/v1/categories/${subTicket.categoryId}`);
+            const catData = catRes?.data || catRes;
+            deptId = catData?.departmentId || catData?.department?.id;
+          } catch (err) {
+            console.error('Failed to fetch category:', err);
+          }
+        }
+      }
+      
+      setDepartmentId(deptId);
+      
+      if (!deptId) return;
+      
+      try {
+        setLoadingStaff(true);
+        const response = await apiClient.get('/api/v1/users?role=staff');
+        let data = response?.data || response;
+        
+        // Convert to array
+        if (data && !Array.isArray(data)) {
+          data = Object.values(data).filter(Boolean);
+        }
+        
+        // Filter staff by department
+        const filteredStaff = (Array.isArray(data) ? data : []).filter((user) => {
+          const isStaff = String(user.role || '').toLowerCase() === 'staff';
+          const userDeptId = user.departmentId || user.department?.id;
+          return isStaff && userDeptId && userDeptId === deptId;
+        });
+        
+        setStaffList(filteredStaff);
+      } catch (err) {
+        console.error('Failed to load staff:', err);
+      } finally {
+        setLoadingStaff(false);
+      }
+    };
+    
+    loadDepartmentAndStaff();
+  }, [subTicket]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -582,7 +671,7 @@ function ReassignRequestModal({ category, subTicket, onClose, onSubmit }) {
       return;
     }
     setSubmitting(true);
-    await onSubmit(reason);
+    await onSubmit(reason, staffId || null);
     setSubmitting(false);
   };
 
@@ -658,6 +747,62 @@ function ReassignRequestModal({ category, subTicket, onClose, onSubmit }) {
             </p>
           </div>
 
+          {departmentId && (
+            <div style={{ marginBottom: "1rem" }}>
+              <label
+                htmlFor="suggestedStaff"
+                style={{
+                  display: "block",
+                  marginBottom: "0.5rem",
+                  fontWeight: 500,
+                }}
+              >
+                Suggest Staff Member (Optional)
+              </label>
+              {loadingStaff ? (
+                <div style={{ padding: "0.75rem", color: "#6b7280", fontSize: "0.875rem" }}>
+                  Loading staff...
+                </div>
+              ) : staffList.length === 0 ? (
+                <div style={{ padding: "0.75rem", color: "#6b7280", fontSize: "0.875rem" }}>
+                  No staff members found in this department
+                </div>
+              ) : (
+                <select
+                  id="suggestedStaff"
+                  className="input"
+                  value={staffId}
+                  onChange={(e) => setStaffId(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "0.75rem",
+                    fontSize: "0.875rem",
+                    border: "1px solid rgba(255,255,255,0.18)",
+                    borderRadius: "8px",
+                    backgroundColor: "rgba(255, 255, 255, 0.72)",
+                    color: "#374151",
+                  }}
+                >
+                  <option value="">-- Select a staff member (optional) --</option>
+                  {staffList.map((staff) => (
+                    <option key={staff.id} value={staff.id}>
+                      {staff.fullName || staff.username} {staff.email ? `(${staff.email})` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <p
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#6b7280",
+                  marginTop: "0.25rem",
+                }}
+              >
+                Suggest a staff member from your department for reassignment
+              </p>
+            </div>
+          )}
+
           <div
             style={{
               display: "flex",
@@ -687,57 +832,5 @@ function ReassignRequestModal({ category, subTicket, onClose, onSubmit }) {
   );
 }
 
-// Alert Modal Component
-function AlertModal({ message, onClose }) {
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.4)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-      }}
-      onClick={onClose}
-    >
-      <div
-        className="card"
-        style={{
-          width: "100%",
-          maxWidth: "400px",
-          padding: "1.5rem",
-          margin: "1rem",
-          backgroundColor: "rgba(255, 255, 255, 0.95)",
-          backdropFilter: "blur(40px) saturate(180%)",
-          WebkitBackdropFilter: "blur(40px) saturate(180%)",
-          border: "1px solid rgba(255, 255, 255, 0.3)",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ marginBottom: "1rem", fontSize: "1.125rem", fontWeight: 600, textAlign: "center" }}>
-          Notice
-        </div>
-        <div style={{ marginBottom: "1.5rem", color: "#374151", textAlign: "center" }}>
-          {message}
-        </div>
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={onClose}
-            style={{ minWidth: "100px" }}
-          >
-            OK
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default StaffSubTickets;

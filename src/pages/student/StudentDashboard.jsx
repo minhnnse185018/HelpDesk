@@ -90,6 +90,7 @@ function StudentDashboard() {
       const statusObj = getStatusDisplay(t.status)
       return {
         id: t.code || t.id,
+        title: t.title || '-',
         category:
           t.ticketCategories?.map((tc) => tc.category?.name).join(', ') || '-',
         room: t.room?.name || '-',
@@ -161,7 +162,7 @@ function StudentDashboard() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Ticket ID</th>
+                  <th>Title</th>
                   <th>Category</th>
                   <th>Room</th>
                   <th>Status</th>
@@ -178,7 +179,7 @@ function StudentDashboard() {
                 ) : (
                   filteredTickets.map((ticket) => (
                     <tr key={ticket.id}>
-                      <td>{ticket.id}</td>
+                      <td>{ticket.title}</td>
                       <td>{ticket.category}</td>
                       <td>{ticket.room}</td>
                       <td>

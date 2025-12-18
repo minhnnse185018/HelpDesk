@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../../api/client'
+import { ActionButton, AlertModal } from '../../components/templates'
 
 function formatDate(dateString) {
   if (!dateString) return 'N/A'
@@ -170,7 +171,11 @@ function StaffSubTicketDetail() {
       await loadSubTicket()
     } catch (err) {
       console.error('Failed to deny sub-ticket:', err)
-      setAlertModal({ message: 'Failed to deny sub-ticket: ' + (err?.message || 'Unknown error') })
+      setAlertModal({ 
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to deny sub-ticket: ' + (err?.message || 'Unknown error') 
+      })
     }
   }
 
@@ -181,21 +186,39 @@ function StaffSubTicketDetail() {
       await loadSubTicket()
     } catch (err) {
       console.error('Failed to resolve sub-ticket:', err)
-      setAlertModal({ message: 'Failed to resolve sub-ticket: ' + (err?.message || 'Unknown error') })
+      setAlertModal({ 
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to resolve sub-ticket: ' + (err?.message || 'Unknown error') 
+      })
     }
   }
 
   const handleReassignRequest = async (reason) => {
     try {
-      await apiClient.post('/api/v1/reassign-requests', {
+      const payload = {
         subTicketId: id,
         reason,
-      })
+      }
+      // Add departmentId if available from subTicket
+      if (subTicket?.parentTicket?.departmentId || subTicket?.parentTicket?.department?.id) {
+        payload.departmentId = subTicket.parentTicket.departmentId || subTicket.parentTicket.department.id
+      }
+      
+      await apiClient.post('/api/v1/reassign-requests', payload)
       setReassignModal(false)
-      setAlertModal({ message: 'Reassign request submitted successfully' })
+      setAlertModal({ 
+        type: 'success',
+        title: 'Success',
+        message: 'Reassign request submitted successfully' 
+      })
     } catch (err) {
       console.error('Failed to submit reassign request:', err)
-      setAlertModal({ message: 'Failed to submit reassign request: ' + (err?.message || 'Unknown error') })
+      setAlertModal({ 
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to submit reassign request: ' + (err?.message || 'Unknown error') 
+      })
     }
   }
 
@@ -494,7 +517,10 @@ function StaffSubTicketDetail() {
       {/* Alert Modal */}
       {alertModal && (
         <AlertModal
+          isOpen={!!alertModal}
           message={alertModal.message}
+          title={alertModal.title || 'Notice'}
+          type={alertModal.type || 'info'}
           onClose={() => setAlertModal(null)}
         />
       )}
@@ -779,55 +805,5 @@ function ReassignModal({ onClose, onSubmit, subTicket }) {
   )
 }
 
-// Alert Modal Component
-function AlertModal({ message, onClose }) {
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.4)',
-        backdropFilter: 'blur(8px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
-      onClick={onClose}
-    >
-      <div
-        className="card"
-        style={{
-          width: '100%',
-          maxWidth: '400px',
-          padding: '1.5rem',
-          margin: '1rem',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(40px) saturate(180%)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-          borderRadius: '20px',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: 600, textAlign: 'center' }}>
-          Notice
-        </div>
-        <div style={{ marginBottom: '1.5rem', color: '#374151', textAlign: 'center' }}>
-          {message}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <ActionButton
-            variant="primary"
-            onClick={onClose}
-            style={{ minWidth: '100px' }}
-          >
-            OK
-          </ActionButton>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export default StaffSubTicketDetail

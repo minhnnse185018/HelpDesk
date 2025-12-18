@@ -62,7 +62,7 @@ function NotificationsPage() {
   // Mark single notification as read
   const handleMarkAsRead = async (notificationId) => {
     try {
-await apiClient.patch(`/api/v1/notifications/${notificationId}/read`);
+      await apiClient.patch(`/api/v1/notifications/${notificationId}/read`);
 
       // Update local state
       setNotifications((prev) =>
@@ -163,7 +163,7 @@ await apiClient.patch(`/api/v1/notifications/${notificationId}/read`);
           {error}
         </div>
       )}
-{!loading && !error && notifications.length === 0 && (
+      {!loading && !error && notifications.length === 0 && (
         <div className="card" style={{ padding: "2rem", textAlign: "center" }}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -196,127 +196,127 @@ await apiClient.patch(`/api/v1/notifications/${notificationId}/read`);
         >
           {(showAll ? notifications : notifications.slice(0, 10)).map(
             (notification) => (
-            <div
-              key={notification.id}
-              className="card"
-              style={{
-                padding: "1rem 1.25rem",
-                backgroundColor: notification.isRead ? "#ffffff" : "#eff6ff",
-                cursor: notification.ticketId ? "pointer" : "default",
-                transition: "background-color 0.2s, transform 0.1s",
-                border: notification.isRead
-                  ? "1px solid #e5e7eb"
-                  : "1px solid #bfdbfe",
-              }}
-              onMouseEnter={(e) => {
-                if (notification.ticketId) {
-                  e.currentTarget.style.transform = "translateX(4px)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateX(0)";
-              }}
-            >
               <div
+                key={notification.id}
+                className="card"
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: "1rem",
+                  padding: "1rem 1.25rem",
+                  backgroundColor: notification.isRead ? "#ffffff" : "#eff6ff",
+                  cursor: notification.ticketId ? "pointer" : "default",
+                  transition: "background-color 0.2s, transform 0.1s",
+                  border: notification.isRead
+                    ? "1px solid #e5e7eb"
+                    : "1px solid #bfdbfe",
+                }}
+                onMouseEnter={(e) => {
+                  if (notification.ticketId) {
+                    e.currentTarget.style.transform = "translateX(4px)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateX(0)";
                 }}
               >
                 <div
-                  style={{ flex: 1 }}
-                  onClick={() => handleNotificationClick(notification)}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: "1rem",
+                  }}
                 >
                   <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      marginBottom: "0.25rem",
-                    }}
+                    style={{ flex: 1 }}
+                    onClick={() => handleNotificationClick(notification)}
                   >
-                    <h4
+                    <div
                       style={{
-                        fontSize: "0.95rem",
-                        fontWeight: notification.isRead ? 500 : 700,
-                        color: "#111827",
-                        margin: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        marginBottom: "0.25rem",
                       }}
                     >
-{notification.title}
-</h4>
-                    {!notification.isRead && (
-                      <span
+                      <h4
                         style={{
-                          width: "0.5rem",
-                          height: "0.5rem",
-                          backgroundColor: "#3b82f6",
-                          borderRadius: "999px",
+                          fontSize: "0.95rem",
+                          fontWeight: notification.isRead ? 500 : 700,
+                          color: "#111827",
+                          margin: 0,
                         }}
-                      />
-                    )}
+                      >
+                        {notification.title}
+                      </h4>
+                      {!notification.isRead && (
+                        <span
+                          style={{
+                            width: "0.5rem",
+                            height: "0.5rem",
+                            backgroundColor: "#3b82f6",
+                            borderRadius: "999px",
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    <p
+                      style={{
+                        fontSize: "0.85rem",
+                        color: "#4b5563",
+                        margin: "0.25rem 0",
+                        lineHeight: "1.4",
+                      }}
+                    >
+                      {notification.message}
+                    </p>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.75rem",
+                        marginTop: "0.5rem",
+                        fontSize: "0.75rem",
+                        color: "#6b7280",
+                      }}
+                    >
+                      {notification.actor?.username && (
+                        <span>By {notification.actor.username}</span>
+                      )}
+                      <span>{formatDateTime(notification.createdAt)}</span>
+                    </div>
                   </div>
 
-                  <p
-                    style={{
-                      fontSize: "0.85rem",
-                      color: "#4b5563",
-                      margin: "0.25rem 0",
-                      lineHeight: "1.4",
-                    }}
-                  >
-                    {notification.message}
-                  </p>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.75rem",
-                      marginTop: "0.5rem",
-                      fontSize: "0.75rem",
-                      color: "#6b7280",
-                    }}
-                  >
-                    {notification.actor?.username && (
-                      <span>By {notification.actor.username}</span>
-                    )}
-                    <span>{formatDateTime(notification.createdAt)}</span>
-                  </div>
+                  {!notification.isRead && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMarkAsRead(notification.id);
+                      }}
+                      style={{
+                        padding: "0.25rem 0.5rem",
+                        fontSize: "0.8rem",
+                        whiteSpace: "nowrap",
+                        backgroundColor: "#eff6ff",
+                        border: "1px solid #eff6ff",
+                        borderRadius: "0.375rem",
+                        color: "#374151",
+                        cursor: "pointer",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Mark as Read
+                    </button>
+                  )}
                 </div>
-
-                {!notification.isRead && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleMarkAsRead(notification.id);
-                    }}
-                    style={{
-                      padding: "0.25rem 0.5rem",
-                      fontSize: "0.8rem",
-                      whiteSpace: "nowrap",
-                      backgroundColor: "#eff6ff",
-                      border: "1px solid #eff6ff",
-                      borderRadius: "0.375rem",
-                      color: "#374151",
-                      cursor: "pointer",
-                      fontWeight: 500,
-                    }}
-                  >
-                    Mark as Read
-                  </button>
-                )}
               </div>
-            </div>
             )
           )}
 
           {!showAll && notifications.length > 10 && (
-<button
+            <button
               type="button"
-onClick={() => setShowAll(true)}
+              onClick={() => setShowAll(true)}
               style={{
                 marginTop: "0.5rem",
                 alignSelf: "center",

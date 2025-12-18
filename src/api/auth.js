@@ -54,7 +54,7 @@ export const changePassword = (payload) =>
 export const validateLoginPayload = ({ email, password }) => {
   const errors = {}
   if (!isValidEmail(email)) errors.email = 'Invalid email'
-  if (!isValidPassword(password)) errors.password = 'Mật khẩu không hợp lệ'
+  if (!isValidPassword(password)) errors.password = 'Invalid password'
   return errors
 }
 
@@ -84,7 +84,7 @@ export const validateRegisterPayload = ({
 export const validateVerifyEmailPayload = ({ email, otp }) => {
   const errors = {}
   if (!isValidEmail(email)) errors.email = 'Invalid email'
-  if (!isNonEmpty(otp)) errors.otp = 'OTP không được bỏ trống'
+  if (!isNonEmpty(otp)) errors.otp = 'OTP cannot be empty'
   return errors
 }
 
@@ -109,7 +109,7 @@ export const validateResetPasswordPayload = ({
   const errors = {}
 
   if (!isValidEmail(email)) errors.email = 'Invalid email'
-  if (!isNonEmpty(otp)) errors.otp = 'OTP không được bỏ trống'
+  if (!isNonEmpty(otp)) errors.otp = 'OTP cannot be empty'
 
   if (!isValidPassword(newPassword))
     errors.newPassword = 'New password must be at least 8 characters'
@@ -123,13 +123,13 @@ export const validateResetPasswordPayload = ({
 export const validateRefreshPayload = ({ refreshToken }) => {
   const errors = {}
   if (!isNonEmpty(refreshToken))
-    errors.refreshToken = 'Refresh token không được bỏ trống'
+    errors.refreshToken = 'Refresh token cannot be empty'
   return errors
 }
 
 export const validateLogoutPayload = ({ refreshToken }) => {
   const errors = {}
   if (!isNonEmpty(refreshToken))
-    errors.refreshToken = 'Refresh token không được bỏ trống'
+    errors.refreshToken = 'Refresh token cannot be empty'
   return errors
 }

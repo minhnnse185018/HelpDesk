@@ -20,8 +20,9 @@ function AdminDashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true)
-      const response = await apiClient.get('/api/v1/tickets')
       
+      // Fetch all tickets
+      const response = await apiClient.get('/api/v1/tickets')
       let data = response?.data || response
       
       // Normalize data to array
@@ -37,9 +38,39 @@ function AdminDashboard() {
       const ticketsArray = Array.isArray(data) ? data : []
       setTickets(ticketsArray)
       
+      // Fetch overdue tickets from dedicated endpoint
+      let overdueCount = 0
+      try {
+        const overdueResponse = await apiClient.get('/api/v1/tickets/overdue')
+        let overdueData = overdueResponse?.data || overdueResponse
+        
+        // Normalize overdue data to array
+        if (overdueData && typeof overdueData === 'object' && !Array.isArray(overdueData)) {
+          const keys = Object.keys(overdueData)
+          if (keys.length > 0 && keys.every((key) => !isNaN(Number(key)))) {
+            overdueData = Object.values(overdueData)
+          } else {
+            overdueData = overdueData.tickets || overdueData.data || overdueData.items || []
+          }
+        }
+        
+        overdueCount = Array.isArray(overdueData) ? overdueData.length : 0
+      } catch (err) {
+        console.warn('Failed to fetch overdue tickets from endpoint, calculating manually:', err)
+        // Fallback to manual calculation
+        const now = new Date()
+        overdueCount = ticketsArray.filter(t => {
+          if (!t.dueDate) return false
+          const dueDate = new Date(t.dueDate)
+          const isOverdue = dueDate < now
+          const isNotCompleted = t.status !== 'resolved' && t.status !== 'closed' && t.status !== 'cancelled'
+          return isOverdue && isNotCompleted
+        }).length
+      }
+      
       // Calculate KPIs
       const totalTickets = ticketsArray.length
-      const overdueTickets = ticketsArray.filter(t => t.status === 'overdue').length
+      const overdueTickets = overdueCount
       const onTimePercentage = totalTickets > 0 
         ? Math.round(((totalTickets - overdueTickets) / totalTickets) * 100)
         : 0

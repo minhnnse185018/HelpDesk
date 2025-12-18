@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { formatDate, getPriorityBadge, getStatusBadge } from "../../utils/ticketHelpers.jsx";
+import { ActionButton } from "../../components/templates";
 
 function OverdueTickets({ searchTerm = "" }) {
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -11,20 +14,53 @@ function OverdueTickets({ searchTerm = "" }) {
     setLoading(true);
     setError("");
     try {
-      const res = await apiClient.get("/api/v1/tickets");
+      // Use the dedicated overdue endpoint
+      const res = await apiClient.get("/api/v1/tickets/overdue");
       let data = res?.data || res;
 
-      if (data && !Array.isArray(data)) {
-        data = Object.values(data).filter(Boolean);
+      // Handle nested data structure
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        // Check if data has nested data property
+        if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+          // Handle structure like { data: { "0": {...}, "1": {...} } }
+          const keys = Object.keys(data.data);
+          if (keys.length > 0 && keys.every((key) => !isNaN(Number(key)))) {
+            data = Object.values(data.data);
+          } else {
+            data = data.data;
+          }
+        } else {
+          // Handle structure like { "0": {...}, "1": {...} }
+          const keys = Object.keys(data);
+          if (keys.length > 0 && keys.every((key) => !isNaN(Number(key)))) {
+            data = Object.values(data);
+          } else {
+            data = data.tickets || data.items || [];
+          }
+        }
       }
 
       let ticketsArray = Array.isArray(data) ? data : [];
-      ticketsArray = ticketsArray.filter((ticket) => ticket.status === "overdue");
+
+      // Fetch room details for tickets with incomplete room data
+      ticketsArray = await Promise.all(
+        ticketsArray.map(async (ticket) => {
+          if (ticket.roomId && (!ticket.room?.code || !ticket.room?.floor)) {
+            try {
+              const roomRes = await apiClient.get(`/api/v1/rooms/${ticket.roomId}`);
+              ticket.room = roomRes.data || roomRes;
+            } catch (err) {
+              console.error(`Failed to fetch room ${ticket.roomId}:`, err);
+            }
+          }
+          return ticket;
+        })
+      );
 
       setTickets(ticketsArray);
     } catch (err) {
-      console.error("Failed to load tickets:", err);
-      setError("Failed to load tickets. Please try again later.");
+      console.error("Failed to load overdue tickets:", err);
+      setError("Failed to load overdue tickets. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -196,6 +232,16 @@ function OverdueTickets({ searchTerm = "" }) {
                     color: "#374151",
                   }}
                 >
+                  Department
+                </th>
+                <th
+                  style={{
+                    padding: "1rem",
+                    textAlign: "left",
+                    fontWeight: 600,
+                    color: "#374151",
+                  }}
+                >
                   Assignee
                 </th>
                 <th
@@ -218,12 +264,22 @@ function OverdueTickets({ searchTerm = "" }) {
                 >
                   Created At
                 </th>
+                <th
+                  style={{
+                    padding: "1rem",
+                    textAlign: "left",
+                    fontWeight: 600,
+                    color: "#374151",
+                  }}
+                >
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {filteredTickets.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ padding: "3rem", textAlign: "center", color: "#9ca3af" }}>
+                  <td colSpan="10" style={{ padding: "3rem", textAlign: "center", color: "#9ca3af" }}>
                     <div style={{ fontSize: "0.875rem", fontWeight: 500 }}>
                       {searchTerm ? "No overdue tickets match your search" : "No overdue tickets found"}
                     </div>
@@ -245,7 +301,27 @@ function OverdueTickets({ searchTerm = "" }) {
                       fontWeight: 500,
                     }}
                   >
-                    {ticket.title}
+                    <div
+                      style={{
+                        color: "#111827",
+                        fontWeight: 500,
+                        marginBottom: "0.25rem",
+                      }}
+                    >
+                      {ticket.title}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#6b7280",
+                        marginTop: "0.25rem",
+                      }}
+                    >
+                      Created by:{" "}
+                      {ticket.creator?.username ||
+                        ticket.creator?.email ||
+                        "N/A"}
+                    </div>
                   </td>
                   <td style={{ padding: "1rem" }}>
                     {getStatusBadge(ticket.status)}
@@ -255,6 +331,9 @@ function OverdueTickets({ searchTerm = "" }) {
                   </td>
                   <td style={{ padding: "1rem", color: "#6b7280" }}>
                     {ticket.room?.name || "N/A"}
+                  </td>
+                  <td style={{ padding: "1rem", color: "#6b7280" }}>
+                    {ticket.department?.name || "N/A"}
                   </td>
                   <td style={{ padding: "1rem", color: "#6b7280" }}>
                     {ticket.assignee?.username ||
@@ -279,6 +358,22 @@ function OverdueTickets({ searchTerm = "" }) {
                     }}
                   >
                     {formatDate(ticket.createdAt)}
+                  </td>
+                  <td style={{ padding: "1rem" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "0.5rem",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <ActionButton
+                        variant="secondary"
+                        onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
+                      >
+                        View
+                      </ActionButton>
+                    </div>
                   </td>
                 </tr>
                 ))

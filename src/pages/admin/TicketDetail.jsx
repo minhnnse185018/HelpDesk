@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
+import { ActionButton } from "../../components/templates";
+
+const ESCALATION_TEMPLATE =
+  "This issue is beyond the IT department’s handling capability and should be escalated to a professional maintenance/vendor team.";
 
 function TicketDetail() {
   const { id } = useParams();
@@ -9,6 +13,11 @@ function TicketDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [imagePopup, setImagePopup] = useState(null);
+  const [escalateLoading, setEscalateLoading] = useState(false);
+  const [escalateError, setEscalateError] = useState("");
+  const [escalateNotice, setEscalateNotice] = useState("");
+  const [showEscalateModal, setShowEscalateModal] = useState(false);
+  const [escalationReason, setEscalationReason] = useState(ESCALATION_TEMPLATE);
 
   useEffect(() => {
     loadTicketDetail();
@@ -19,31 +28,31 @@ function TicketDetail() {
       setLoading(true);
       const response = await apiClient.get(`/api/v1/tickets/${id}`);
       const ticketData = response.data;
-      
-      console.log('🎫 Ticket data:', ticketData);
-      
+
+      console.log("🎫 Ticket data:", ticketData);
+
       // Fetch room details if only ID is provided
       if (ticketData.roomId && !ticketData.room?.name) {
         try {
           const roomRes = await apiClient.get(`/api/v1/rooms/${ticketData.roomId}`);
           ticketData.room = roomRes.data || roomRes;
-          console.log('🏠 Room data fetched:', ticketData.room);
+          console.log("🏠 Room data fetched:", ticketData.room);
         } catch (err) {
-          console.error('Failed to fetch room details:', err);
+          console.error("Failed to fetch room details:", err);
         }
       }
-      
+
       // Fetch department details if only ID is provided
       if (ticketData.departmentId && !ticketData.department?.name) {
         try {
           const deptRes = await apiClient.get(`/api/v1/departments/${ticketData.departmentId}`);
           ticketData.department = deptRes.data || deptRes;
-          console.log('🏢 Department data fetched:', ticketData.department);
+          console.log("🏢 Department data fetched:", ticketData.department);
         } catch (err) {
-          console.error('Failed to fetch department details:', err);
+          console.error("Failed to fetch department details:", err);
         }
       }
-      
+
       // Fetch category details for each ticketCategory
       if (ticketData.ticketCategories && ticketData.ticketCategories.length > 0) {
         try {
@@ -52,20 +61,20 @@ function TicketDetail() {
               try {
                 const catRes = await apiClient.get(`/api/v1/categories/${tc.categoryId}`);
                 tc.category = catRes.data || catRes;
-                console.log(' Category data fetched:', tc.category);
+                console.log("📁 Category data fetched:", tc.category);
               } catch (err) {
                 console.error(`Failed to fetch category ${tc.categoryId}:`, err);
               }
             }
             return tc;
           });
-          
+
           await Promise.all(categoryPromises);
         } catch (err) {
-          console.error('Failed to fetch categories:', err);
+          console.error("Failed to fetch categories:", err);
         }
       }
-      
+
       setTicket(ticketData);
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || "Failed to load ticket details");
@@ -77,7 +86,7 @@ function TicketDetail() {
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleString("vi-VN");
+    return new Date(dateString).toLocaleString("en-US");
   };
 
   const getStatusColor = (status) => {
@@ -85,6 +94,7 @@ function TicketDetail() {
       open: { bg: "#dbeafe", text: "#1e40af", border: "#93c5fd" },
       assigned: { bg: "#fef3c7", text: "#92400e", border: "#fcd34d" },
       in_progress: { bg: "#e0e7ff", text: "#3730a3", border: "#a5b4fc" },
+      escalated: { bg: "#fef2f2", text: "#b91c1c", border: "#fecdd3" },
       resolved: { bg: "#d1fae5", text: "#065f46", border: "#6ee7b7" },
       closed: { bg: "#e5e7eb", text: "#374151", border: "#d1d5db" },
       denied: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
@@ -123,13 +133,7 @@ function TicketDetail() {
 
   if (error) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          backgroundColor: "#f5f5f7",
-          padding: "2rem",
-        }}
-      >
+      <div style={{ minHeight: "100vh", backgroundColor: "#f5f5f7", padding: "2rem" }}>
         <div
           style={{
             maxWidth: "1200px",
@@ -148,13 +152,7 @@ function TicketDetail() {
 
   if (!ticket) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          backgroundColor: "#f5f5f7",
-          padding: "2rem",
-        }}
-      >
+      <div style={{ minHeight: "100vh", backgroundColor: "#f5f5f7", padding: "2rem" }}>
         <div style={{ maxWidth: "1200px", margin: "0 auto", textAlign: "center" }}>
           Ticket not found
         </div>
@@ -164,6 +162,51 @@ function TicketDetail() {
 
   const statusColor = getStatusColor(ticket.status);
   const priorityColor = ticket.priority ? getPriorityColor(ticket.priority) : null;
+  const normalizedStatus = (ticket.status || "").toLowerCase();
+  const canEscalate = !["deleted", "resolved", "escalated"].includes(normalizedStatus);
+
+  const handleEscalate = async () => {
+    if (!id) return;
+
+    const trimmedReason = escalationReason.trim();
+
+    setEscalateError("");
+    setEscalateNotice("");
+
+    if (!trimmedReason) {
+      setEscalateError("Please enter an escalation reason.");
+      return;
+    }
+
+    try {
+      setEscalateLoading(true);
+
+      const response = await apiClient.post(`/api/v1/tickets/${id}/escalate`, {
+        escalationReason: trimmedReason,
+      });
+
+      console.log("Escalate response:", response);
+      setEscalateNotice("Ticket has been escalated successfully.");
+      setShowEscalateModal(false);
+
+      // Reload ticket detail to get updated status
+      await loadTicketDetail();
+    } catch (err) {
+      console.error("Escalate error:", err);
+      setEscalateError(
+        err?.response?.data?.message || err?.message || "Unable to escalate the ticket."
+      );
+    } finally {
+      setEscalateLoading(false);
+    }
+  };
+
+  const openEscalateModal = () => {
+    setEscalateError("");
+    setEscalateNotice("");
+    setEscalationReason((prev) => prev || ESCALATION_TEMPLATE);
+    setShowEscalateModal(true);
+  };
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f5f5f7", padding: "2rem" }}>
@@ -203,56 +246,104 @@ function TicketDetail() {
               marginBottom: "1.5rem",
             }}
           >
-            <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem" }}>
-              <span
-                style={{
-                  padding: "0.375rem 0.875rem",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  borderRadius: "9999px",
-                  backgroundColor: statusColor.bg,
-                  color: statusColor.text,
-                  border: `1px solid ${statusColor.border}`,
-                }}
-              >
-                {ticket.status.toUpperCase()}
-              </span>
-              {ticket.priority && (
-                <span
-                  style={{
-                    padding: "0.375rem 0.875rem",
-                    fontSize: "0.75rem",
-                    fontWeight: 600,
-                    borderRadius: "9999px",
-                    backgroundColor: priorityColor.bg,
-                    color: priorityColor.text,
-                  }}
-                >
-                  {ticket.priority.toUpperCase()}
-                </span>
-              )}
-            </div>
-            <h1
+            <div
               style={{
-                fontSize: "1.875rem",
-                fontWeight: 700,
-                color: "#111827",
-                margin: "0 0 0.5rem 0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: "1rem",
               }}
             >
-              {ticket.title}
-            </h1>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h1
+                  style={{
+                    fontSize: "1.875rem",
+                    fontWeight: 700,
+                    color: "#111827",
+                    margin: "0 0 0.5rem 0",
+                  }}
+                >
+                  {ticket.title}
+                </h1>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "0.75rem",
+                    marginBottom: "1rem",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
+                  <span
+                    style={{
+                      padding: "0.375rem 0.875rem",
+                      fontSize: "0.65rem",
+                      fontWeight: 500,
+                      borderRadius: "9999px",
+                      backgroundColor: statusColor.bg,
+                      color: statusColor.text,
+                      border: `1px solid ${statusColor.border}`,
+                    }}
+                  >
+                    {(ticket.status || "").toUpperCase()}
+                  </span>
+                  {ticket.priority && (
+                    <span
+                      style={{
+                        padding: "0.375rem 0.875rem",
+                        fontSize: "0.65rem",
+                        fontWeight: 500,
+                        borderRadius: "9999px",
+                        backgroundColor: priorityColor.bg,
+                        color: priorityColor.text,
+                      }}
+                    >
+                      {ticket.priority.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+              </div>
 
+              {(canEscalate || escalateNotice || escalateError) && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    gap: "0.5rem",
+                    minWidth: "140px",
+                  }}
+                >
+                  {canEscalate && (
+                    <ActionButton
+                      variant="danger"
+                      onClick={openEscalateModal}
+                      disabled={escalateLoading}
+                      style={{ whiteSpace: "nowrap", minWidth: "140px" }}
+                    >
+                      {escalateLoading ? "Escalating..." : "Escalate"}
+                    </ActionButton>
+                  )}
+                  {(escalateNotice || escalateError) && (
+                    <span
+                      style={{
+                        color: escalateError ? "#b91c1c" : "#047857",
+                        fontSize: "0.8rem",
+                        fontWeight: 600,
+                        textAlign: "right",
+                        maxWidth: "220px",
+                      }}
+                    >
+                      {escalateError || escalateNotice}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Two Column Layout */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "2fr 1fr",
-              gap: "2rem",
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "2rem" }}>
             {/* Left Column */}
             <div>
               {/* Description */}
@@ -339,7 +430,8 @@ function TicketDetail() {
                                   loading="lazy"
                                   onError={(e) => {
                                     e.target.style.display = "none";
-                                    e.target.parentElement.innerHTML = '<div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#fee2e2;color:#991b1b;font-size:0.875rem;">❌ Failed to load</div>';
+                                    e.target.parentElement.innerHTML =
+                                      '<div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#fee2e2;color:#991b1b;font-size:0.875rem;">❌ Failed to load</div>';
                                   }}
                                   style={{
                                     position: "absolute",
@@ -367,7 +459,7 @@ function TicketDetail() {
                                   gap: "0.25rem",
                                 }}
                               >
-                                 View
+                                View
                               </div>
                             </>
                           ) : (
@@ -420,14 +512,10 @@ function TicketDetail() {
                             >
                               {attachment.fileName}
                             </p>
-                            <p
-                              style={{
-                                fontSize: "0.7rem",
-                                color: "#9ca3af",
-                                margin: 0,
-                              }}
-                            >
-                              {attachment.fileSize ? `${(parseInt(attachment.fileSize) / 1024).toFixed(1)} KB` : "Unknown size"}
+                            <p style={{ fontSize: "0.7rem", color: "#9ca3af", margin: 0 }}>
+                              {attachment.fileSize
+                                ? `${(parseInt(attachment.fileSize) / 1024).toFixed(1)} KB`
+                                : "Unknown size"}
                             </p>
                           </div>
                         </div>
@@ -440,20 +528,15 @@ function TicketDetail() {
               {/* Sub-Tickets */}
               {ticket.subTickets && ticket.subTickets.length > 0 && (
                 <div style={{ marginBottom: "2rem" }}>
-                  <h3
-                    style={{
-                      fontSize: "1rem",
-                      fontWeight: 600,
-                      color: "#111827",
-                      marginBottom: "0.75rem",
-                    }}
-                  >
+                  <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "#111827", marginBottom: "0.75rem" }}>
                     Sub-Tickets ({ticket.subTickets.length})
                   </h3>
+
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                     {ticket.subTickets.map((subTicket, index) => {
                       const subStatusColor = getStatusColor(subTicket.status);
                       const subPriorityColor = getPriorityColor(subTicket.priority);
+
                       return (
                         <div
                           key={subTicket.id}
@@ -465,19 +548,17 @@ function TicketDetail() {
                           }}
                         >
                           {/* Sub-ticket header */}
-                          <div style={{ 
-                            display: "flex", 
-                            justifyContent: "space-between", 
-                            alignItems: "center",
-                            marginBottom: "1rem",
-                            paddingBottom: "0.75rem",
-                            borderBottom: "1px solid #e5e7eb"
-                          }}>
-                            <span style={{ 
-                              fontSize: "0.875rem", 
-                              fontWeight: 600, 
-                              color: "#374151" 
-                            }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              marginBottom: "1rem",
+                              paddingBottom: "0.75rem",
+                              borderBottom: "1px solid #e5e7eb",
+                            }}
+                          >
+                            <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#374151" }}>
                               Sub-Ticket #{index + 1}
                             </span>
                             <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -509,21 +590,19 @@ function TicketDetail() {
                           </div>
 
                           {/* Sub-ticket details grid */}
-                          <div style={{ 
-                            display: "grid", 
-                            gridTemplateColumns: "repeat(2, 1fr)", 
-                            gap: "1rem" 
-                          }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1rem" }}>
                             {/* Assigned To */}
                             <div>
-                              <p style={{
-                                fontSize: "0.7rem",
-                                fontWeight: 600,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.05em",
-                                margin: "0 0 0.25rem 0",
-                              }}>
+                              <p
+                                style={{
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  color: "#6b7280",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  margin: "0 0 0.25rem 0",
+                                }}
+                              >
                                 Assigned To
                               </p>
                               <p style={{ fontSize: "0.8rem", color: "#111827", margin: 0, fontWeight: 500 }}>
@@ -538,50 +617,58 @@ function TicketDetail() {
 
                             {/* Category */}
                             <div>
-                              <p style={{
-                                fontSize: "0.7rem",
-                                fontWeight: 600,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.05em",
-                                margin: "0 0 0.25rem 0",
-                              }}>
-                                Category
-                              </p>
-                              <p style={{ fontSize: "0.8rem", color: "#111827", margin: 0, fontWeight: 500 }}>
-                                {subTicket.category?.name || `Category ID: ${subTicket.categoryId?.slice(0, 8)}...` || "N/A"}
-                              </p>
-                            </div>
-
-                            {/* Room (from parent ticket) */}
-                            {ticket.room && (
-                              <div>
-                                <p style={{
+                              <p
+                                style={{
                                   fontSize: "0.7rem",
                                   fontWeight: 600,
                                   color: "#6b7280",
                                   textTransform: "uppercase",
                                   letterSpacing: "0.05em",
                                   margin: "0 0 0.25rem 0",
-                                }}>
+                                }}
+                              >
+                                Category
+                              </p>
+                              <p style={{ fontSize: "0.8rem", color: "#111827", margin: 0, fontWeight: 500 }}>
+                                {subTicket.category?.name ||
+                                  (subTicket.categoryId ? `Category ID: ${subTicket.categoryId.slice(0, 8)}...` : "N/A")}
+                              </p>
+                            </div>
+
+                            {/* Room (from parent ticket) */}
+                            {ticket.room && (
+                              <div>
+                                <p
+                                  style={{
+                                    fontSize: "0.7rem",
+                                    fontWeight: 600,
+                                    color: "#6b7280",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.05em",
+                                    margin: "0 0 0.25rem 0",
+                                  }}
+                                >
                                   Room
                                 </p>
                                 <p style={{ fontSize: "0.8rem", color: "#111827", margin: 0, fontWeight: 500 }}>
-                                  {ticket.room.name} {ticket.room.code && `(${ticket.room.code})`} {ticket.room.floor && `- Floor ${ticket.room.floor}`}
+                                  {ticket.room.name} {ticket.room.code && `(${ticket.room.code})`}{" "}
+                                  {ticket.room.floor && `- Floor ${ticket.room.floor}`}
                                 </p>
                               </div>
                             )}
 
                             {/* Created At */}
                             <div>
-                              <p style={{
-                                fontSize: "0.7rem",
-                                fontWeight: 600,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.05em",
-                                margin: "0 0 0.25rem 0",
-                              }}>
+                              <p
+                                style={{
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  color: "#6b7280",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  margin: "0 0 0.25rem 0",
+                                }}
+                              >
                                 Created At
                               </p>
                               <p style={{ fontSize: "0.8rem", color: "#111827", margin: 0 }}>
@@ -591,14 +678,16 @@ function TicketDetail() {
 
                             {/* Assigned At */}
                             <div>
-                              <p style={{
-                                fontSize: "0.7rem",
-                                fontWeight: 600,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.05em",
-                                margin: "0 0 0.25rem 0",
-                              }}>
+                              <p
+                                style={{
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  color: "#6b7280",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  margin: "0 0 0.25rem 0",
+                                }}
+                              >
                                 Assigned At
                               </p>
                               <p style={{ fontSize: "0.8rem", color: "#111827", margin: 0 }}>
@@ -609,22 +698,26 @@ function TicketDetail() {
                             {/* Due Date */}
                             {subTicket.dueDate && (
                               <div>
-                                <p style={{
-                                  fontSize: "0.7rem",
-                                  fontWeight: 600,
-                                  color: "#6b7280",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.05em",
-                                  margin: "0 0 0.25rem 0",
-                                }}>
+                                <p
+                                  style={{
+                                    fontSize: "0.7rem",
+                                    fontWeight: 600,
+                                    color: "#6b7280",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.05em",
+                                    margin: "0 0 0.25rem 0",
+                                  }}
+                                >
                                   Due Date
                                 </p>
-                                <p style={{ 
-                                  fontSize: "0.8rem", 
-                                  color: new Date(subTicket.dueDate) < new Date() ? "#dc2626" : "#111827", 
-                                  margin: 0,
-                                  fontWeight: new Date(subTicket.dueDate) < new Date() ? 600 : 400
-                                }}>
+                                <p
+                                  style={{
+                                    fontSize: "0.8rem",
+                                    color: new Date(subTicket.dueDate) < new Date() ? "#dc2626" : "#111827",
+                                    margin: 0,
+                                    fontWeight: new Date(subTicket.dueDate) < new Date() ? 600 : 400,
+                                  }}
+                                >
                                   {formatDate(subTicket.dueDate)}
                                   {new Date(subTicket.dueDate) < new Date() && " (Overdue)"}
                                 </p>
@@ -634,14 +727,16 @@ function TicketDetail() {
                             {/* Accepted At */}
                             {subTicket.acceptedAt && (
                               <div>
-                                <p style={{
-                                  fontSize: "0.7rem",
-                                  fontWeight: 600,
-                                  color: "#6b7280",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.05em",
-                                  margin: "0 0 0.25rem 0",
-                                }}>
+                                <p
+                                  style={{
+                                    fontSize: "0.7rem",
+                                    fontWeight: 600,
+                                    color: "#6b7280",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.05em",
+                                    margin: "0 0 0.25rem 0",
+                                  }}
+                                >
                                   Accepted At
                                 </p>
                                 <p style={{ fontSize: "0.8rem", color: "#111827", margin: 0 }}>
@@ -653,14 +748,16 @@ function TicketDetail() {
                             {/* Escalated At */}
                             {subTicket.escalatedAt && (
                               <div>
-                                <p style={{
-                                  fontSize: "0.7rem",
-                                  fontWeight: 600,
-                                  color: "#dc2626",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.05em",
-                                  margin: "0 0 0.25rem 0",
-                                }}>
+                                <p
+                                  style={{
+                                    fontSize: "0.7rem",
+                                    fontWeight: 600,
+                                    color: "#dc2626",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.05em",
+                                    margin: "0 0 0.25rem 0",
+                                  }}
+                                >
                                   ⚠️ Escalated At
                                 </p>
                                 <p style={{ fontSize: "0.8rem", color: "#dc2626", margin: 0, fontWeight: 500 }}>
@@ -672,14 +769,16 @@ function TicketDetail() {
                             {/* Resolved At */}
                             {subTicket.resolvedAt && (
                               <div>
-                                <p style={{
-                                  fontSize: "0.7rem",
-                                  fontWeight: 600,
-                                  color: "#059669",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.05em",
-                                  margin: "0 0 0.25rem 0",
-                                }}>
+                                <p
+                                  style={{
+                                    fontSize: "0.7rem",
+                                    fontWeight: 600,
+                                    color: "#059669",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.05em",
+                                    margin: "0 0 0.25rem 0",
+                                  }}
+                                >
                                   ✓ Resolved At
                                 </p>
                                 <p style={{ fontSize: "0.8rem", color: "#059669", margin: 0, fontWeight: 500 }}>
@@ -691,21 +790,25 @@ function TicketDetail() {
 
                           {/* Resolution Note */}
                           {subTicket.resolutionNote && (
-                            <div style={{
-                              marginTop: "1rem",
-                              padding: "0.75rem",
-                              backgroundColor: "#dcfce7",
-                              borderRadius: "0.5rem",
-                              border: "1px solid #86efac"
-                            }}>
-                              <p style={{
-                                fontSize: "0.7rem",
-                                fontWeight: 600,
-                                color: "#166534",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.05em",
-                                margin: "0 0 0.25rem 0",
-                              }}>
+                            <div
+                              style={{
+                                marginTop: "1rem",
+                                padding: "0.75rem",
+                                backgroundColor: "#dcfce7",
+                                borderRadius: "0.5rem",
+                                border: "1px solid #86efac",
+                              }}
+                            >
+                              <p
+                                style={{
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  color: "#166534",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  margin: "0 0 0.25rem 0",
+                                }}
+                              >
                                 Resolution Note
                               </p>
                               <p style={{ fontSize: "0.8rem", color: "#166534", margin: 0, whiteSpace: "pre-wrap" }}>
@@ -716,22 +819,26 @@ function TicketDetail() {
 
                           {/* Denied Reason */}
                           {subTicket.deniedReason && (
-                            <div style={{
-                              marginTop: "1rem",
-                              padding: "0.75rem",
-                              backgroundColor: "#fee2e2",
-                              borderRadius: "0.5rem",
-                              border: "1px solid #fca5a5"
-                            }}>
-                              <p style={{
-                                fontSize: "0.7rem",
-                                fontWeight: 600,
-                                color: "#991b1b",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.05em",
-                                margin: "0 0 0.25rem 0",
-                              }}>
-                                Denied Reason
+                            <div
+                              style={{
+                                marginTop: "1rem",
+                                padding: "0.75rem",
+                                backgroundColor: "#fee2e2",
+                                borderRadius: "0.5rem",
+                                border: "1px solid #fca5a5",
+                              }}
+                            >
+                              <p
+                                style={{
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  color: "#991b1b",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  margin: "0 0 0.25rem 0",
+                                }}
+                              >
+                                Denial Reason
                               </p>
                               <p style={{ fontSize: "0.8rem", color: "#991b1b", margin: 0, whiteSpace: "pre-wrap" }}>
                                 {subTicket.deniedReason}
@@ -742,21 +849,25 @@ function TicketDetail() {
                           {/* Sub-ticket Attachments */}
                           {subTicket.attachments && subTicket.attachments.length > 0 && (
                             <div style={{ marginTop: "1rem" }}>
-                              <p style={{
-                                fontSize: "0.7rem",
-                                fontWeight: 600,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.05em",
-                                margin: "0 0 0.5rem 0",
-                              }}>
+                              <p
+                                style={{
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                  color: "#6b7280",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                  margin: "0 0 0.5rem 0",
+                                }}
+                              >
                                 📎 Attachments ({subTicket.attachments.length})
                               </p>
-                              <div style={{
-                                display: "grid",
-                                gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
-                                gap: "0.75rem",
-                              }}>
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+                                  gap: "0.75rem",
+                                }}
+                              >
                                 {subTicket.attachments.map((attachment) => {
                                   const isImage = attachment.mimeType?.startsWith("image/");
                                   return (
@@ -796,7 +907,8 @@ function TicketDetail() {
                                               loading="lazy"
                                               onError={(e) => {
                                                 e.target.style.display = "none";
-                                                e.target.parentElement.innerHTML = '<div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#fee2e2;color:#991b1b;font-size:0.75rem;">❌ Failed</div>';
+                                                e.target.parentElement.innerHTML =
+                                                  '<div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#fee2e2;color:#991b1b;font-size:0.75rem;">❌ Failed</div>';
                                               }}
                                               style={{
                                                 position: "absolute",
@@ -902,16 +1014,7 @@ function TicketDetail() {
                 }}
               >
                 <div>
-                  <p
-                    style={{
-                      fontSize: "0.75rem",
-                      fontWeight: 600,
-                      color: "#6b7280",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      margin: "0 0 0.25rem 0",
-                    }}
-                  >
+                  <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.25rem 0" }}>
                     Created By
                   </p>
                   <p style={{ fontSize: "0.875rem", color: "#111827", margin: 0 }}>
@@ -921,16 +1024,7 @@ function TicketDetail() {
 
                 {ticket.assignee && (
                   <div>
-                    <p
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        margin: "0 0 0.25rem 0",
-                      }}
-                    >
+                    <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.25rem 0" }}>
                       Assigned To
                     </p>
                     <p style={{ fontSize: "0.875rem", color: "#111827", margin: 0 }}>
@@ -941,16 +1035,7 @@ function TicketDetail() {
 
                 {ticket.room && (
                   <div>
-                    <p
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        margin: "0 0 0.25rem 0",
-                      }}
-                    >
+                    <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.25rem 0" }}>
                       Room
                     </p>
                     <p style={{ fontSize: "0.875rem", color: "#111827", margin: 0 }}>
@@ -961,16 +1046,7 @@ function TicketDetail() {
 
                 {ticket.department && (
                   <div>
-                    <p
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        margin: "0 0 0.25rem 0",
-                      }}
-                    >
+                    <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.25rem 0" }}>
                       Department
                     </p>
                     <p style={{ fontSize: "0.875rem", color: "#111827", margin: 0 }}>
@@ -981,16 +1057,7 @@ function TicketDetail() {
 
                 {ticket.ticketCategories && ticket.ticketCategories.length > 0 && (
                   <div>
-                    <p
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        margin: "0 0 0.25rem 0",
-                      }}
-                    >
+                    <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.25rem 0" }}>
                       Categories
                     </p>
                     <p style={{ fontSize: "0.875rem", color: "#111827", margin: 0 }}>
@@ -1000,16 +1067,7 @@ function TicketDetail() {
                 )}
 
                 <div>
-                  <p
-                    style={{
-                      fontSize: "0.75rem",
-                      fontWeight: 600,
-                      color: "#6b7280",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      margin: "0 0 0.25rem 0",
-                    }}
-                  >
+                  <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.25rem 0" }}>
                     Created At
                   </p>
                   <p style={{ fontSize: "0.875rem", color: "#111827", margin: 0 }}>
@@ -1019,16 +1077,7 @@ function TicketDetail() {
 
                 {ticket.dueDate && (
                   <div>
-                    <p
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        margin: "0 0 0.25rem 0",
-                      }}
-                    >
+                    <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.25rem 0" }}>
                       Due Date
                     </p>
                     <p style={{ fontSize: "0.875rem", color: "#111827", margin: 0 }}>
@@ -1039,16 +1088,7 @@ function TicketDetail() {
 
                 {ticket.resolvedAt && (
                   <div>
-                    <p
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        margin: "0 0 0.25rem 0",
-                      }}
-                    >
+                    <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.25rem 0" }}>
                       Resolved At
                     </p>
                     <p style={{ fontSize: "0.875rem", color: "#111827", margin: 0 }}>
@@ -1059,26 +1099,10 @@ function TicketDetail() {
 
                 {ticket.resolutionNote && (
                   <div>
-                    <p
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        margin: "0 0 0.25rem 0",
-                      }}
-                    >
+                    <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 0.25rem 0" }}>
                       Resolution Note
                     </p>
-                    <p
-                      style={{
-                        fontSize: "0.875rem",
-                        color: "#111827",
-                        margin: 0,
-                        whiteSpace: "pre-wrap",
-                      }}
-                    >
+                    <p style={{ fontSize: "0.875rem", color: "#111827", margin: 0, whiteSpace: "pre-wrap" }}>
                       {ticket.resolutionNote}
                     </p>
                   </div>
@@ -1087,6 +1111,102 @@ function TicketDetail() {
             </div>
           </div>
         </div>
+
+        {/* Escalate Modal */}
+        {showEscalateModal && (
+          <div
+            onClick={() => !escalateLoading && setShowEscalateModal(false)}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.55)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 9998,
+              padding: "1rem",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: "white",
+                borderRadius: "0.75rem",
+                padding: "1.5rem",
+                width: "100%",
+                maxWidth: "520px",
+                boxShadow: "0 20px 50px rgba(0,0,0,0.25)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "1rem",
+              }}
+            >
+              <div>
+                <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.1rem", fontWeight: 700, color: "#111827" }}>
+                  Enter escalation reason
+                </h3>
+                <p style={{ margin: 0, color: "#4b5563", fontSize: "0.9rem", lineHeight: 1.5 }}>
+                  Please provide a clear reason for escalating this ticket to ensure it is handled quickly.
+                </p>
+              </div>
+
+              <textarea
+                value={escalationReason}
+                onChange={(e) => setEscalationReason(e.target.value)}
+                rows={4}
+                placeholder="Enter escalation reason..."
+                style={{
+                  width: "100%",
+                  minHeight: "120px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "0.5rem",
+                  padding: "0.75rem",
+                  fontSize: "0.9rem",
+                  fontFamily: "inherit",
+                  color: "#111827",
+                  outline: "none",
+                  resize: "vertical",
+                  backgroundColor: "#f9fafb",
+                }}
+              />
+
+              {escalateError && (
+                <p style={{ margin: 0, color: "#b91c1c", fontSize: "0.85rem", fontWeight: 600 }}>
+                  {escalateError}
+                </p>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+                <button
+                  onClick={() => !escalateLoading && setShowEscalateModal(false)}
+                  style={{
+                    padding: "0.65rem 1.1rem",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #e5e7eb",
+                    backgroundColor: "white",
+                    color: "#374151",
+                    cursor: escalateLoading ? "not-allowed" : "pointer",
+                    fontWeight: 600,
+                  }}
+                  disabled={escalateLoading}
+                >
+                  Cancel
+                </button>
+                <ActionButton
+                  variant="danger"
+                  onClick={handleEscalate}
+                  disabled={escalateLoading}
+                  style={{ minWidth: "140px" }}
+                >
+                  {escalateLoading ? "Escalating..." : "Confirm Escalation"}
+                </ActionButton>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Image Popup */}
         {imagePopup && (
@@ -1164,7 +1284,7 @@ function TicketDetail() {
                   boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
                 }}
               />
-              
+
               {/* Image Info Footer */}
               <div
                 style={{
@@ -1177,26 +1297,13 @@ function TicketDetail() {
                   minWidth: "300px",
                 }}
               >
-                <p
-                  style={{
-                    color: "white",
-                    fontSize: "1rem",
-                    fontWeight: 600,
-                    marginBottom: "0.5rem",
-                  }}
-                >
+                <p style={{ color: "white", fontSize: "1rem", fontWeight: 600, marginBottom: "0.5rem" }}>
                   {imagePopup.fileName}
                 </p>
-                <p
-                  style={{
-                    color: "rgba(255, 255, 255, 0.7)",
-                    fontSize: "0.875rem",
-                    marginBottom: "1rem",
-                  }}
-                >
+                <p style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "0.875rem", marginBottom: "1rem" }}>
                   {imagePopup.fileSize ? `${(parseInt(imagePopup.fileSize) / 1024).toFixed(1)} KB` : ""}
                 </p>
-                
+
                 {/* Download Button */}
                 <a
                   href={imagePopup.filePath}

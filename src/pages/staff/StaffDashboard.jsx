@@ -1,133 +1,157 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { apiClient } from "../../api/client";
-import { ActionButton } from "../../components/templates";
-
-function formatDate(dateString) {
-  if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "N/A";
-  return date.toLocaleString("vi-VN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function getPriorityBadge(priority) {
-  const configs = {
-    low: { className: "status-new", label: "Low" },
-    medium: { className: "status-in-progress", label: "Medium" },
-    high: { className: "status-overdue", label: "High" },
-    critical: { className: "status-overdue", label: "Critical" },
-  };
-  const config = configs[priority] || {
-    className: "status-new",
-    label: priority,
-  };
-  return (
-    <span className={`status-badge ${config.className}`}>{config.label}</span>
-  );
-}
-
-function getStatusBadge(status) {
-  const configs = {
-    assigned: { className: "status-in-progress", label: "Assigned" },
-    in_progress: { className: "status-in-progress", label: "In Progress" },
-    resolved: { className: "status-resolved", label: "Resolved" },
-    denied: { className: "status-overdue", label: "Denied" },
-  };
-  const config = configs[status] || { className: "status-new", label: status };
-  return (
-    <span className={`status-badge ${config.className}`}>{config.label}</span>
-  );
-}
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { apiClient } from '../../api/client'
+import { ActionButton } from '../../components/templates'
 
 function StaffDashboard() {
-  const navigate = useNavigate();
-  const [workload, setWorkload] = useState(null);
-  const [subTickets, setSubTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const getCurrentStaffId = () => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return null;
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      return payload.sub || payload.userId || payload.id;
-    } catch {
-      return null;
-    }
-  };
+  const navigate = useNavigate()
+  const [loading, setLoading] = useState(true)
+  const [tickets, setTickets] = useState([])
+  const [kpis, setKpis] = useState([
+    { label: 'Total Tickets', value: 0 },
+    { label: 'On-time SLA', value: '0%' },
+    { label: 'Overdue Tickets', value: 0 },
+  ])
+  const [slaStats, setSlaStats] = useState({ onTime: 0, overdue: 0 })
+  const [recentTickets, setRecentTickets] = useState([])
 
   useEffect(() => {
-    const loadDashboard = async () => {
-      try {
-        setLoading(true);
-        setError("");
+    loadDashboardData()
+  }, [])
 
-        const staffId = getCurrentStaffId();
-        if (!staffId) {
-          throw new Error("Unable to get staff ID from token");
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true)
+      const response = await apiClient.get('/api/v1/tickets/assigned-to-me')
+      
+      let data = response?.data?.data || response?.data || response
+      
+      // Normalize data to array
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const keys = Object.keys(data)
+        if (keys.length > 0 && keys.every((key) => !isNaN(Number(key)))) {
+          data = Object.values(data)
+        } else {
+          data = data.tickets || data.items || []
         }
-
-        const [workloadRes, subTicketsRes] = await Promise.all([
-          apiClient.get(`/api/v1/tickets/staff/${staffId}/workload`),
-          apiClient.get("/api/v1/sub-tickets/assigned-to-me"),
-        ]);
-
-        const workloadData = workloadRes?.data || workloadRes;
-        setWorkload(workloadData);
-
-        const subTicketsData = subTicketsRes?.data || subTicketsRes;
-        const activeSubTickets = Array.isArray(subTicketsData)
-          ? subTicketsData
-              .filter(
-                (st) => st.status === "assigned" || st.status === "in_progress"
-              )
-              .slice(0, 5)
-          : [];
-        setSubTickets(activeSubTickets);
-      } catch (err) {
-        console.error("Failed to load dashboard:", err);
-        setError(err?.message || "Failed to load dashboard data");
-      } finally {
-        setLoading(false);
       }
-    };
-
-    loadDashboard();
-  }, []);
+      
+      const ticketsArray = Array.isArray(data) ? data : []
+      setTickets(ticketsArray)
+      
+      // Calculate KPIs
+      const totalTickets = ticketsArray.length
+      const now = new Date()
+      const overdueTickets = ticketsArray.filter(t => {
+        if (!t.dueDate) return false
+        return new Date(t.dueDate) < now && t.status !== 'resolved' && t.status !== 'closed'
+      }).length
+      const onTimePercentage = totalTickets > 0 
+        ? Math.round(((totalTickets - overdueTickets) / totalTickets) * 100)
+        : 0
+      
+      setKpis([
+        { label: 'Total Tickets', value: totalTickets },
+        { label: 'On-time SLA', value: `${onTimePercentage}%` },
+        { label: 'Overdue Tickets', value: overdueTickets },
+      ])
+      
+      // Calculate SLA stats
+      setSlaStats({
+        onTime: totalTickets - overdueTickets,
+        overdue: overdueTickets,
+      })
+      
+      // Get recent tickets (last 5)
+      const recentTicketsBase = ticketsArray
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 5)
+      
+      // Fetch room details if needed
+      const recent = await Promise.all(
+        recentTicketsBase.map(async (ticket) => {
+          let roomData = ticket.room || null
+          
+          // Fetch room details if roomId exists and room data is incomplete
+          if (ticket.roomId && (!roomData?.code || !roomData?.floor)) {
+            try {
+              const roomRes = await apiClient.get(`/api/v1/rooms/${ticket.roomId}`)
+              // Handle nested response structure
+              roomData = roomRes?.data?.data || roomRes?.data || roomRes
+            } catch (err) {
+              console.error(`Failed to fetch room ${ticket.roomId}:`, err)
+            }
+          }
+          
+          return {
+            id: ticket.id,
+            title: ticket.title,
+            category: ticket.ticketCategories?.[0]?.category?.name || 'N/A',
+            room: roomData,
+            status: getStatusLabel(ticket.status),
+            statusKey: ticket.status,
+            slaDue: ticket.dueDate ? formatDate(ticket.dueDate) : 'N/A',
+          }
+        })
+      )
+      
+      setRecentTickets(recent)
+      
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const getStatusLabel = (status) => {
+    const labels = {
+      open: 'Open',
+      assigned: 'Assigned',
+      accepted: 'Accepted',
+      in_progress: 'In Progress',
+      resolved: 'Resolved',
+      closed: 'Closed',
+      cancelled: 'Cancelled',
+      escalated: 'Escalated',
+    }
+    return labels[status] || status
+  }
+  
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A'
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return 'N/A'
+    return date.toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
 
   if (loading) {
     return (
       <div className="page">
-        <div className="card" style={{ padding: "2rem", textAlign: "center" }}>
-          Loading dashboard...
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '400px',
+          color: '#6b7280'
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+              Loading Dashboard...
+            </div>
+            <div style={{ fontSize: '0.875rem' }}>
+              Fetching ticket statistics
+            </div>
+          </div>
         </div>
       </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="page">
-        <div
-          className="card"
-          style={{
-            padding: "1.5rem",
-            borderLeft: "4px solid #dc2626",
-            backgroundColor: "#fef2f2",
-            color: "#991b1b",
-          }}
-        >
-          {error}
-        </div>
-      </div>
-    );
+    )
   }
 
   return (
@@ -135,83 +159,133 @@ function StaffDashboard() {
       <div className="page-header">
         <div>
           <h2 className="page-title">Staff Dashboard</h2>
-          <p className="page-subtitle">Overview of your workload and tasks</p>
+          <p className="page-subtitle">
+            Overview of tickets assigned to you, SLA performance and recent activity.
+          </p>
         </div>
       </div>
 
       <section className="section">
         <div className="cards-grid">
-          <div className="card kpi-card">
-            <p className="kpi-label">Active Tickets</p>
-            <p className="kpi-value">{workload?.totalActive || 0}</p>
-          </div>
-          <div className="card kpi-card">
-            <p className="kpi-label">Critical Priority</p>
-            <p className="kpi-value">{workload?.criticalCount || 0}</p>
-          </div>
-          <div className="card kpi-card">
-            <p className="kpi-label">High Priority</p>
-            <p className="kpi-value">{workload?.highCount || 0}</p>
-          </div>
-          <div className="card kpi-card">
-            <p className="kpi-label">Overdue</p>
-            <p className="kpi-value">{workload?.overdueCount || 0}</p>
+          {kpis.map((item) => (
+            <div key={item.label} className="card kpi-card">
+              <p className="kpi-label">{item.label}</p>
+              <p className="kpi-value">{item.value}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="card chart-card">
+          <h3 className="section-title">
+            SLA Status
+          </h3>
+          <div className="chart-placeholder donut-chart">
+            <div className="donut" />
+            <div className="donut-legend">
+              <div className="legend-item">
+                <span className="legend-dot legend-dot-green" />
+                <span>On-time: {slaStats.onTime}</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot legend-dot-red" />
+                <span>Overdue: {slaStats.overdue}</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       <section className="section">
-        <div className="section-header">
-          <h3 className="section-title">Active Sub-Tickets</h3>
-        </div>
-
-        {subTickets.length === 0 ? (
-          <div
-            className="card"
-            style={{ padding: "2rem", textAlign: "center" }}
-          >
-            <p style={{ color: "#6b7280" }}>
-              No active sub-tickets at the moment.
-            </p>
+        <div className="card table-card">
+          <div className="section-header">
+            <h3 className="section-title">
+              Recent Tickets
+            </h3>
           </div>
-        ) : (
-          <div className="card table-card">
-            <table className="table">
-              <thead>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Ticket Title</th>
+                <th>Category</th>
+                <th>Room</th>
+                <th>Status</th>
+                <th>SLA Due</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentTickets.length === 0 ? (
                 <tr>
-                  <th>Parent Ticket</th>
-                  <th>Category</th>
-                  <th>Priority</th>
-                  <th>Status</th>
-                  <th>Due Date</th>
-                  <th>Actions</th>
+                  <td colSpan="6" style={{ 
+                    textAlign: 'center', 
+                    padding: '2rem', 
+                    color: '#9ca3af',
+                    fontSize: '0.875rem'
+                  }}>
+                    No recent tickets
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {subTickets.map((st) => (
-                  <tr key={st.id}>
-                    <td>{st.parentTicket?.title || "N/A"}</td>
-                    <td>{st.category?.name || "N/A"}</td>
-                    <td>{getPriorityBadge(st.priority)}</td>
-                    <td>{getStatusBadge(st.status)}</td>
-                    <td>{formatDate(st.dueDate)}</td>
+              ) : (
+                recentTickets.map((ticket) => (
+                  <tr key={ticket.id}>
+                    <td>
+                      <div style={{ 
+                        fontWeight: 500, 
+                        color: '#111827',
+                        maxWidth: '200px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {ticket.title || ticket.id}
+                      </div>
+                    </td>
+                    <td>{ticket.category}</td>
+                    <td>
+                      {ticket.room ? (
+                        <div>
+                          <div style={{ fontWeight: 500, color: '#111827' }}>
+                            {ticket.room.name || 'N/A'}
+                          </div>
+                          {(ticket.room.code || ticket.room.floor) && (
+                            <div style={{ fontSize: '0.75rem', marginTop: '0.125rem', color: '#6b7280' }}>
+                              {ticket.room.code && `(${ticket.room.code})`}
+                              {ticket.room.code && ticket.room.floor && ' - '}
+                              {ticket.room.floor && `Floor ${ticket.room.floor}`}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        'N/A'
+                      )}
+                    </td>
+                    <td>
+                      <span
+                        className={`status-badge status-${ticket.statusKey}`}
+                      >
+                        {ticket.status}
+                      </span>
+                    </td>
+                    <td>{ticket.slaDue}</td>
                     <td>
                       <ActionButton
                         variant="secondary"
-                        onClick={() => navigate(`/staff/sub-tickets/${st.id}`)}
+                        onClick={() => navigate(`/staff/tickets/${ticket.id}`)}
                       >
                         Details
                       </ActionButton>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
-  );
+  )
 }
 
-export default StaffDashboard;
+export default StaffDashboard
