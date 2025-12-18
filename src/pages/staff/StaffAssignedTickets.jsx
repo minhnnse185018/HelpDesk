@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
-import { ActionButton } from '../../components/templates'
+import { ActionButton, AlertModal } from '../../components/templates'
 
 function formatDate(dateString) {
   if (!dateString) return 'N/A'
@@ -75,6 +75,7 @@ function StaffAssignedTickets() {
   const [error, setError] = useState('')
   const [denyModal, setDenyModal] = useState(null)
   const [resolveModal, setResolveModal] = useState(null)
+  const [reassignModal, setReassignModal] = useState(null)
   const [activeTab, setActiveTab] = useState('all')
   const [alertModal, setAlertModal] = useState(null)
   const [searchTerm, setSearchTerm] = useState('') // all, assigned, in_progress, resolved, cancelled, closed
@@ -147,7 +148,11 @@ function StaffAssignedTickets() {
       await loadTickets()
     } catch (err) {
       console.error('Failed to accept ticket:', err)
-      setAlertModal({ message: 'Failed to accept ticket: ' + (err?.message || 'Unknown error') })
+      setAlertModal({ 
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to accept ticket: ' + (err?.message || 'Unknown error') 
+      })
     }
   }
 
@@ -159,7 +164,11 @@ function StaffAssignedTickets() {
       await loadTickets()
     } catch (err) {
       console.error('Failed to deny ticket:', err)
-      setAlertModal({ message: 'Failed to deny ticket: ' + (err?.message || 'Unknown error') })
+      setAlertModal({ 
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to deny ticket: ' + (err?.message || 'Unknown error') 
+      })
     }
   }
 
@@ -171,8 +180,48 @@ function StaffAssignedTickets() {
       await loadTickets()
     } catch (err) {
       console.error('Failed to resolve ticket:', err)
-      setAlertModal({ message: 'Failed to resolve ticket: ' + (err?.message || 'Unknown error') })
+      setAlertModal({ 
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to resolve ticket: ' + (err?.message || 'Unknown error') 
+      })
     }
+  }
+
+  const handleReassignRequest = async (ticketId, reason, departmentId, staffId) => {
+    try {
+      const payload = {
+        ticketId,
+        reason,
+      }
+      // Add departmentId if available
+      if (departmentId) {
+        payload.departmentId = departmentId
+      }
+      // Add staffId if available (suggested staff)
+      if (staffId) {
+        payload.staffId = staffId
+      }
+      
+      await apiClient.post('/api/v1/reassign-requests', payload)
+      setReassignModal(null)
+      setAlertModal({ 
+        type: 'success',
+        title: 'Success',
+        message: 'Reassign request submitted successfully' 
+      })
+    } catch (err) {
+      console.error('Failed to submit reassign request:', err)
+      setAlertModal({ 
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to submit reassign request: ' + (err?.message || 'Unknown error') 
+      })
+    }
+  }
+
+  const canReassign = (status) => {
+    return ['assigned', 'in_progress'].includes(status)
   }
 
   return (
@@ -338,7 +387,7 @@ function StaffAssignedTickets() {
                     <td
                       style={{
                         whiteSpace: 'nowrap',
-                        minWidth: '230px', // tùy bạn tăng/giảm
+                        minWidth: '300px', // Increased to accommodate Reassign button
                       }}
                     >
                       {/* đảm bảo tất cả button nằm trên một dòng */}
@@ -380,6 +429,21 @@ function StaffAssignedTickets() {
                           </ActionButton>
                         )}
 
+                        {canReassign(ticket.status) && (
+                          <ActionButton
+                            variant="warning"
+                            onClick={() =>
+                              setReassignModal({ 
+                                id: ticket.id, 
+                                title: ticket.title,
+                                departmentId: ticket.departmentId || ticket.department?.id
+                              })
+                            }
+                          >
+                            Reassign
+                          </ActionButton>
+                        )}
+
                         <ActionButton
                           variant="secondary"
                           onClick={() => navigate(`/staff/tickets/${ticket.id}`)}
@@ -399,7 +463,10 @@ function StaffAssignedTickets() {
       {/* Alert Modal */}
       {alertModal && (
         <AlertModal
+          isOpen={!!alertModal}
           message={alertModal.message}
+          title={alertModal.title || 'Notice'}
+          type={alertModal.type || 'info'}
           onClose={() => setAlertModal(null)}
         />
       )}
@@ -421,6 +488,16 @@ function StaffAssignedTickets() {
           onSubmit={(resolutionNote) => handleResolve(resolveModal.id, resolutionNote)}
         />
       )}
+
+      {/* Reassign Modal */}
+      {reassignModal && (
+        <ReassignTicketModal
+          ticketTitle={reassignModal.title}
+          departmentId={reassignModal.departmentId}
+          onClose={() => setReassignModal(null)}
+          onSubmit={(reason, staffId) => handleReassignRequest(reassignModal.id, reason, reassignModal.departmentId, staffId)}
+        />
+      )}
     </div>
   )
 }
@@ -433,7 +510,6 @@ function DenyTicketModal({ ticketTitle, onClose, onSubmit }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!reason.trim()) {
-      alert('Please provide a reason for denying this ticket.')
       return
     }
     setSubmitting(true)
@@ -529,7 +605,6 @@ function ResolveTicketModal({ ticketTitle, onClose, onSubmit }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!resolutionNote.trim()) {
-      alert('Please provide resolution notes.')
       return
     }
     setSubmitting(true)
@@ -651,8 +726,56 @@ function TabButton({ label, active, onClick, color = '#2563eb', bgColor = '#dbea
   )
 }
 
-// Alert Modal Component
-function AlertModal({ message, onClose }) {
+// Reassign Ticket Modal
+function ReassignTicketModal({ ticketTitle, departmentId, onClose, onSubmit }) {
+  const [reason, setReason] = useState('')
+  const [staffId, setStaffId] = useState('')
+  const [staffList, setStaffList] = useState([])
+  const [loadingStaff, setLoadingStaff] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    const loadStaff = async () => {
+      if (!departmentId) return
+      
+      try {
+        setLoadingStaff(true)
+        const response = await apiClient.get('/api/v1/users?role=staff')
+        let data = response?.data || response
+        
+        // Convert to array
+        if (data && !Array.isArray(data)) {
+          data = Object.values(data).filter(Boolean)
+        }
+        
+        // Filter staff by department
+        const filteredStaff = (Array.isArray(data) ? data : []).filter((user) => {
+          const isStaff = String(user.role || '').toLowerCase() === 'staff'
+          const userDeptId = user.departmentId || user.department?.id
+          return isStaff && userDeptId && userDeptId === departmentId
+        })
+        
+        setStaffList(filteredStaff)
+      } catch (err) {
+        console.error('Failed to load staff:', err)
+      } finally {
+        setLoadingStaff(false)
+      }
+    }
+    
+    loadStaff()
+  }, [departmentId])
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!reason.trim()) {
+      return
+    }
+    setSubmitting(true)
+    await onSubmit(reason, staffId || null)
+    setSubmitting(false)
+  }
+
   return (
     <div
       style={{
@@ -660,6 +783,7 @@ function AlertModal({ message, onClose }) {
         inset: 0,
         backgroundColor: 'rgba(0, 0, 0, 0.4)',
         backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -671,32 +795,108 @@ function AlertModal({ message, onClose }) {
         className="card"
         style={{
           width: '100%',
-          maxWidth: '400px',
+          maxWidth: '500px',
           padding: '1.5rem',
           margin: '1rem',
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(40px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(40px) saturate(180%)',
           border: '1px solid rgba(255, 255, 255, 0.3)',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
           borderRadius: '20px',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: 600, textAlign: 'center' }}>
-          Notice
-        </div>
-        <div style={{ marginBottom: '1.5rem', color: '#374151', textAlign: 'center' }}>
-          {message}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <ActionButton
-            variant="primary"
+        <h3 style={{ marginBottom: '1rem', fontSize: '1.25rem', fontWeight: 600 }}>
+          Request Reassignment
+        </h3>
+        <p style={{ marginBottom: '1rem', color: '#6b7280' }}>
+          <strong>Ticket:</strong> {ticketTitle}
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '1rem' }}>
+            <label
+              htmlFor="reassignReason"
+              style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}
+            >
+              Reason for reassignment <span style={{ color: '#dc2626' }}>*</span>
+            </label>
+            <textarea
+              id="reassignReason"
+              rows={4}
+              className="input"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Please explain why you need to reassign this ticket..."
+              required
+            />
+          </div>
+
+          {departmentId && (
+            <div style={{ marginBottom: '1rem' }}>
+              <label
+                htmlFor="suggestedStaff"
+                style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}
+              >
+                Suggest Staff Member (Optional)
+              </label>
+              {loadingStaff ? (
+                <div style={{ padding: '0.75rem', color: '#6b7280', fontSize: '0.875rem' }}>
+                  Loading staff...
+                </div>
+              ) : staffList.length === 0 ? (
+                <div style={{ padding: '0.75rem', color: '#6b7280', fontSize: '0.875rem' }}>
+                  No staff members found in this department
+                </div>
+              ) : (
+                <select
+                  id="suggestedStaff"
+                  className="input"
+                  value={staffId}
+                  onChange={(e) => setStaffId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    fontSize: '0.875rem',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+                    color: '#374151',
+                  }}
+                >
+                  <option value="">-- Select a staff member (optional) --</option>
+                  {staffList.map((staff) => (
+                    <option key={staff.id} value={staff.id}>
+                      {staff.fullName || staff.username} {staff.email ? `(${staff.email})` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                Suggest a staff member from your department for reassignment
+              </p>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            <ActionButton
+            type="button"
+              variant="secondary"
             onClick={onClose}
-            style={{ minWidth: '100px' }}
-          >
-            OK
-          </ActionButton>
+              disabled={submitting}
+            >
+              Cancel
+            </ActionButton>
+            <ActionButton
+              type="submit"
+              variant="warning"
+              disabled={submitting}
+            >
+              {submitting ? 'Submitting...' : 'Submit Request'}
+            </ActionButton>
         </div>
+        </form>
       </div>
     </div>
   )

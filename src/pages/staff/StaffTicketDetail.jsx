@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../../api/client'
-import { ActionButton } from '../../components/templates'
+import { ActionButton, AlertModal } from '../../components/templates'
 
 function formatDate(dateString) {
   if (!dateString) return 'N/A'
@@ -77,8 +77,10 @@ function StaffTicketDetail() {
   const [error, setError] = useState('')
   const [denyModal, setDenyModal] = useState(false)
   const [resolveModal, setResolveModal] = useState(false)
+  const [reassignModal, setReassignModal] = useState(false)
   const [imageModal, setImageModal] = useState(null)
   const [alertModal, setAlertModal] = useState(null)
+  const [creatorDetails, setCreatorDetails] = useState(null)
 
   const loadTicket = async () => {
     if (!id) return
@@ -87,7 +89,63 @@ function StaffTicketDetail() {
       setError('')
       const response = await apiClient.get(`/api/v1/tickets/${id}`)
       const data = response?.data || response
+
+      // Fetch category details for each ticketCategory if needed
+      if (data.ticketCategories && Array.isArray(data.ticketCategories) && data.ticketCategories.length > 0) {
+        try {
+          const categoryPromises = data.ticketCategories.map(async (tc) => {
+            // If categoryId exists but category object is missing or incomplete
+            if (tc.categoryId && (!tc.category || !tc.category.name)) {
+              try {
+                const catRes = await apiClient.get(`/api/v1/categories/${tc.categoryId}`)
+                const categoryData = catRes?.data || catRes
+                return { ...tc, category: categoryData }
+              } catch (err) {
+                console.error(`Failed to fetch category ${tc.categoryId}:`, err)
+                return tc
+              }
+            }
+            return tc
+          })
+          
+          data.ticketCategories = await Promise.all(categoryPromises)
+        } catch (err) {
+          console.error('Failed to fetch categories:', err)
+        }
+      }
+
       setTicket(data)
+
+      // Fetch creator details if needed
+      const creatorId = typeof data.createdBy === 'string' ? data.createdBy : (data.createdBy?.id || data.creator?.id)
+      const existingCreator = data.creator || (typeof data.createdBy === 'object' ? data.createdBy : null)
+      
+      if (creatorId) {
+        // If creator object exists but fullName is missing/null, fetch from API
+        if (existingCreator && (!existingCreator.fullName || existingCreator.fullName === null)) {
+          try {
+            const creatorRes = await apiClient.get(`/api/v1/users/${creatorId}`)
+            const creatorData = creatorRes?.data || creatorRes
+            setCreatorDetails(creatorData)
+          } catch (err) {
+            console.error('Failed to load creator details:', err)
+            // Use existing creator data if fetch fails
+            setCreatorDetails(existingCreator)
+          }
+        } else if (existingCreator) {
+          setCreatorDetails(existingCreator)
+        } else {
+          // If only ID is available, fetch from API
+          try {
+            const creatorRes = await apiClient.get(`/api/v1/users/${creatorId}`)
+            const creatorData = creatorRes?.data || creatorRes
+            setCreatorDetails(creatorData)
+          } catch (err) {
+            console.error('Failed to load creator details:', err)
+            setCreatorDetails({ id: creatorId })
+          }
+        }
+      }
     } catch (err) {
       console.error('Failed to load ticket:', err)
       setError(err?.message || 'Failed to load ticket')
@@ -119,7 +177,11 @@ function StaffTicketDetail() {
       await loadTicket()
     } catch (err) {
       console.error('Failed to accept ticket:', err)
-      setAlertModal({ message: 'Failed to accept ticket: ' + (err?.message || 'Unknown error') })
+      setAlertModal({ 
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to accept ticket: ' + (err?.message || 'Unknown error') 
+      })
     }
   }
 
@@ -130,7 +192,11 @@ function StaffTicketDetail() {
       await loadTicket()
     } catch (err) {
       console.error('Failed to deny ticket:', err)
-      setAlertModal({ message: 'Failed to deny ticket: ' + (err?.message || 'Unknown error') })
+      setAlertModal({ 
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to deny ticket: ' + (err?.message || 'Unknown error') 
+      })
     }
   }
 
@@ -141,8 +207,44 @@ function StaffTicketDetail() {
       await loadTicket()
     } catch (err) {
       console.error('Failed to resolve ticket:', err)
-      setAlertModal({ message: 'Failed to resolve ticket: ' + (err?.message || 'Unknown error') })
+      setAlertModal({ 
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to resolve ticket: ' + (err?.message || 'Unknown error') 
+      })
     }
+  }
+
+  const handleReassignRequest = async (reason) => {
+    try {
+      const payload = {
+        ticketId: id,
+        reason,
+      }
+      // Add departmentId if available
+      if (ticket?.departmentId || ticket?.department?.id) {
+        payload.departmentId = ticket.departmentId || ticket.department.id
+      }
+      
+      await apiClient.post('/api/v1/reassign-requests', payload)
+      setReassignModal(false)
+      setAlertModal({ 
+        type: 'success',
+        title: 'Success',
+        message: 'Reassign request submitted successfully' 
+      })
+    } catch (err) {
+      console.error('Failed to submit reassign request:', err)
+      setAlertModal({ 
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to submit reassign request: ' + (err?.message || 'Unknown error') 
+      })
+    }
+  }
+
+  const canReassign = (status) => {
+    return ['assigned', 'accepted', 'in_progress'].includes(status)
   }
 
   if (loading) {
@@ -220,12 +322,20 @@ function StaffTicketDetail() {
                 </ActionButton>
               </>
             )}
-            {ticket.status === 'in_progress' && (
+            {(ticket.status === 'accepted' || ticket.status === 'in_progress') && (
               <ActionButton
                 variant="success"
                 onClick={() => setResolveModal(true)}
               >
                 Resolve
+              </ActionButton>
+            )}
+            {canReassign(ticket.status) && (
+              <ActionButton
+                variant="info"
+                onClick={() => setReassignModal(true)}
+              >
+                Reassign
               </ActionButton>
             )}
           </div>
@@ -234,9 +344,41 @@ function StaffTicketDetail() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
           <InfoItem label="Room" value={ticket.room?.name || 'N/A'} />
           <InfoItem label="Department" value={ticket.department?.name || 'N/A'} />
-          <InfoItem label="Category" value={ticket.ticketCategories?.map(tc => tc.category?.name).filter(Boolean).join(', ') || 'N/A'} />
+          <InfoItem 
+            label="Category" 
+            value={
+              ticket.ticketCategories && ticket.ticketCategories.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {ticket.ticketCategories.map((tc, idx) => (
+                    <span
+                      key={idx}
+                      style={{
+                        padding: '0.25rem 0.75rem',
+                        backgroundColor: '#e0f2fe',
+                        color: '#0c4a6e',
+                        borderRadius: '999px',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {tc.category?.name || 'N/A'}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                'N/A'
+              )
+            } 
+          />
           <InfoItem label="Assigned To" value={ticket.assignee?.fullName || ticket.assignee?.username || 'N/A'} />
-          <InfoItem label="Created By" value={ticket.createdBy?.fullName || ticket.createdBy?.username || 'N/A'} />
+          <InfoItem 
+            label="Created By" 
+            value={
+              (creatorDetails?.fullName || ticket.creator?.fullName || ticket.createdBy?.fullName) || 
+              (creatorDetails?.username || ticket.creator?.username || ticket.createdBy?.username) || 
+              'N/A'
+            } 
+          />
           <InfoItem label="Created At" value={formatDate(ticket.createdAt)} />
           <InfoItem label="Due Date" value={formatDate(ticket.dueDate)} />
         </div>
@@ -262,27 +404,7 @@ function StaffTicketDetail() {
           </div>
         )}
 
-        {ticket.ticketCategories && ticket.ticketCategories.length > 0 && (
-          <div style={{ marginTop: '1.5rem' }}>
-            <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>Categories</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {ticket.ticketCategories.map((tc, idx) => (
-                <span
-                  key={idx}
-                  style={{
-                    padding: '0.25rem 0.75rem',
-                    backgroundColor: '#e0f2fe',
-                    color: '#0c4a6e',
-                    borderRadius: '999px',
-                    fontSize: '0.875rem',
-                  }}
-                >
-                  {tc.category?.name || 'Unknown'}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+        
 
         {ticket.attachments && ticket.attachments.length > 0 && (
           <div style={{ marginTop: '1.5rem' }}>
@@ -525,10 +647,23 @@ function StaffTicketDetail() {
       )}
 
       {/* Alert Modal */}
+      {/* Alert Modal */}
       {alertModal && (
         <AlertModal
+          isOpen={!!alertModal}
           message={alertModal.message}
+          title={alertModal.title || 'Notice'}
+          type={alertModal.type || 'info'}
           onClose={() => setAlertModal(null)}
+        />
+      )}
+
+      {/* Reassign Modal */}
+      {reassignModal && (
+        <ReassignModal
+          ticketTitle={ticket?.title || 'N/A'}
+          onClose={() => setReassignModal(false)}
+          onSubmit={handleReassignRequest}
         />
       )}
 
@@ -722,8 +857,21 @@ function ResolveTicketModal({ ticketTitle, onClose, onSubmit }) {
   )
 }
 
-// Alert Modal Component
-function AlertModal({ message, onClose }) {
+// Reassign Ticket Modal
+function ReassignModal({ ticketTitle, onClose, onSubmit }) {
+  const [reason, setReason] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!reason.trim()) {
+      return
+    }
+    setSubmitting(true)
+    await onSubmit(reason)
+    setSubmitting(false)
+  }
+
   return (
     <div
       style={{
@@ -742,7 +890,7 @@ function AlertModal({ message, onClose }) {
         className="card"
         style={{
           width: '100%',
-          maxWidth: '400px',
+          maxWidth: '500px',
           padding: '1.5rem',
           margin: '1rem',
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -753,21 +901,50 @@ function AlertModal({ message, onClose }) {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: 600, textAlign: 'center' }}>
-          Notice
-        </div>
-        <div style={{ marginBottom: '1.5rem', color: '#374151', textAlign: 'center' }}>
-          {message}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <ActionButton
-            variant="primary"
-            onClick={onClose}
-            style={{ minWidth: '100px' }}
-          >
-            OK
-          </ActionButton>
-        </div>
+        <h3 style={{ marginBottom: '1rem', fontSize: '1.25rem', fontWeight: 600 }}>
+          Request Reassignment
+        </h3>
+        <p style={{ marginBottom: '1rem', color: '#6b7280' }}>
+          <strong>Ticket:</strong> {ticketTitle}
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '1rem' }}>
+            <label
+              htmlFor="reassignReason"
+              style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}
+            >
+              Reason for reassignment <span style={{ color: '#dc2626' }}>*</span>
+            </label>
+            <textarea
+              id="reassignReason"
+              rows={4}
+              className="input"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Please explain why you need to reassign this ticket..."
+              required
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            <ActionButton
+              type="button"
+              variant="secondary"
+              onClick={onClose}
+              disabled={submitting}
+            >
+              Cancel
+            </ActionButton>
+            <ActionButton
+              type="submit"
+              variant="info"
+              disabled={submitting}
+            >
+              {submitting ? 'Submitting...' : 'Submit Request'}
+            </ActionButton>
+          </div>
+        </form>
       </div>
     </div>
   )

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { apiClient } from '../../api/client'
+import { AlertModal } from '../../components/templates'
 
 function formatDate(dateString) {
   if (!dateString) return 'N/A'
@@ -51,6 +52,7 @@ function AdminReassignRequestDetail() {
   const [newAssignee, setNewAssignee] = useState('')
   const [staffList, setStaffList] = useState([])
   const [submitting, setSubmitting] = useState(false)
+  const [alertModal, setAlertModal] = useState(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -142,10 +144,18 @@ function AdminReassignRequestDetail() {
         reviewNote: reviewNote.trim(),
       }))
 
-      alert('Review submitted successfully')
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'Review submitted successfully'
+      })
     } catch (err) {
       console.error('Failed to submit review:', err)
-      alert('Failed to submit review: ' + (err?.message || 'Unknown error'))
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to submit review: ' + (err?.message || 'Unknown error')
+      })
     } finally {
       setSubmitting(false)
     }
@@ -465,6 +475,17 @@ function AdminReassignRequestDetail() {
             </div>
           </form>
         </div>
+      )}
+
+      {/* Alert Modal */}
+      {alertModal && (
+        <AlertModal
+          isOpen={!!alertModal}
+          onClose={() => setAlertModal(null)}
+          message={alertModal.message}
+          title={alertModal.title}
+          type={alertModal.type}
+        />
       )}
     </div>
   )

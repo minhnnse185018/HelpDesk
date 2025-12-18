@@ -51,7 +51,7 @@ function ProfileModal({ open, onClose, onUpdated }) {
         })
       })
       .catch((err) => {
-        setError(err?.message || 'Không tải được thông tin tài khoản')
+        setError(err?.message || 'Cannot load account information')
       })
       .finally(() => setLoading(false))
   }, [open])
@@ -75,21 +75,21 @@ function ProfileModal({ open, onClose, onUpdated }) {
       !profile.phoneNumber ||
       /^[0-9()+\-\s]{8,20}$/.test(profile.phoneNumber.trim())
     if (!phoneValid) {
-      setError('Số điện thoại không hợp lệ')
+      setError('Invalid phone number')
       return
     }
     if (profile.fullName && profile.fullName.trim().length < 2) {
-      setError('Full name must be at least 2 characters')
+      setError('Full name must be at least 2 characters long')
       return
     }
     if (profile.dateOfBirth) {
       const dob = new Date(profile.dateOfBirth)
       if (Number.isNaN(dob.getTime())) {
-        setError('Invalid date of birth')
+        setError('Invalid date of birth format')
         return
       }
       if (dob.getFullYear() > 2007) {
-        setError('Date of birth must be before or in 2007')
+        setError('Date of birth must be before or in 2007 year')
         return
       }
     }
@@ -182,7 +182,7 @@ function ProfileModal({ open, onClose, onUpdated }) {
     <div style={backdropStyle} onClick={onClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Thông tin tài khoản</h3>
+          <h3>Account information</h3>
           <button type="button" className="icon-button" onClick={onClose}>
             ✕
           </button>
@@ -190,11 +190,11 @@ function ProfileModal({ open, onClose, onUpdated }) {
 
         <div className="modal-body">
           {loading ? (
-            <p>Đang tải...</p>
+            <p>Loading...</p>
           ) : (
             <>
               <section className="section">
-                <h4>Thông tin cơ bản</h4>
+                <h4>Basic information</h4>
                 <div className="form-grid">
                   <div className="form-field">
                     <label className="form-label">Email</label>
@@ -205,7 +205,7 @@ function ProfileModal({ open, onClose, onUpdated }) {
                     <input className="input" value={profile.username} readOnly />
                   </div>
                   <div className="form-field">
-                    <label className="form-label">Họ tên</label>
+                    <label className="form-label">Full Name</label>
                     <input
                       className="input"
                       name="fullName"
@@ -214,7 +214,7 @@ function ProfileModal({ open, onClose, onUpdated }) {
                     />
                   </div>
                   <div className="form-field">
-                    <label className="form-label">Phone Number</label>
+                    <label className="form-label">Phone Number (0123456789)</label>
                     <input
                       className="input"
                       name="phoneNumber"
