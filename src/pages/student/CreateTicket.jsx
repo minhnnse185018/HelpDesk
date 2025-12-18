@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
+import { ActionButton } from '../../components/templates'
 
 function CreateTicket() {
   const navigate = useNavigate()
@@ -613,58 +614,22 @@ function CreateTicket() {
               </p>
               
               <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button
+                <ActionButton
                   type="button"
+                  variant="secondary"
                   onClick={() => navigate('/student/dashboard')}
                   disabled={submitting}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    borderRadius: '8px',
-                    border: '1px solid #d1d5db',
-                    background: 'white',
-                    color: '#374151',
-                    cursor: submitting ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!submitting) e.currentTarget.style.backgroundColor = '#f9fafb'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white'
-                  }}
                 >
                   Cancel
-                </button>
+                </ActionButton>
 
-                <button
+                <ActionButton
                   type="submit"
+                  variant="success"
                   disabled={submitting || loading}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    borderRadius: '8px',
-                    background: (submitting || loading) ? '#9ca3af' : '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    cursor: (submitting || loading) ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!submitting && !loading) {
-                      e.currentTarget.style.backgroundColor = '#2563eb'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!submitting && !loading) {
-                      e.currentTarget.style.backgroundColor = '#3b82f6'
-                    }
-                  }}
                 >
                   {submitting ? '⏳ Submitting...' : '✓ Submit Ticket'}
-                </button>
+                </ActionButton>
               </div>
             </div>
 

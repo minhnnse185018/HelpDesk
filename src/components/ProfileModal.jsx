@@ -79,17 +79,17 @@ function ProfileModal({ open, onClose, onUpdated }) {
       return
     }
     if (profile.fullName && profile.fullName.trim().length < 2) {
-      setError('Họ tên cần ít nhất 2 ký tự')
+      setError('Full name must be at least 2 characters')
       return
     }
     if (profile.dateOfBirth) {
       const dob = new Date(profile.dateOfBirth)
       if (Number.isNaN(dob.getTime())) {
-        setError('Ngày sinh không hợp lệ')
+        setError('Invalid date of birth')
         return
       }
       if (dob.getFullYear() > 2007) {
-        setError('Ngày sinh phải trước hoặc trong năm 2007')
+        setError('Date of birth must be before or in 2007')
         return
       }
     }
@@ -103,10 +103,10 @@ function ProfileModal({ open, onClose, onUpdated }) {
         gender: profile.gender,
         avatar: profile.avatar,
       })
-      setStatus('Cập nhật thông tin thành công')
+      setStatus('Profile updated successfully')
       if (typeof onUpdated === 'function') onUpdated()
     } catch (err) {
-      setError(err?.message || 'Cập nhật thông tin thất bại')
+      setError(err?.message || 'Failed to update profile')
     } finally {
       setSavingProfile(false)
     }
@@ -117,32 +117,32 @@ function ProfileModal({ open, onClose, onUpdated }) {
     setError('')
     setStatus('')
     if (!passwordForm.currentPassword.trim()) {
-      setError('Vui lòng nhập mật khẩu hiện tại')
+      setError('Please enter current password')
       return
     }
     if (!passwordForm.newPassword.trim()) {
-      setError('Vui lòng nhập mật khẩu mới')
+      setError('Please enter new password')
       return
     }
     if (passwordForm.newPassword.length < 8) {
-      setError('Mật khẩu mới cần ít nhất 8 ký tự')
+      setError('New password must be at least 8 characters')
       return
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp')
+      setError('Confirm password does not match')
       return
     }
     setSavingPassword(true)
     try {
       await changePassword(passwordForm)
-      setStatus('Đổi mật khẩu thành công')
+      setStatus('Password changed successfully')
       setPasswordForm({
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
       })
     } catch (err) {
-      setError(err?.message || 'Đổi mật khẩu thất bại')
+      setError(err?.message || 'Failed to change password')
     } finally {
       setSavingPassword(false)
     }
@@ -214,7 +214,7 @@ function ProfileModal({ open, onClose, onUpdated }) {
                     />
                   </div>
                   <div className="form-field">
-                    <label className="form-label">Số điện thoại</label>
+                    <label className="form-label">Phone Number</label>
                     <input
                       className="input"
                       name="phoneNumber"
@@ -223,7 +223,7 @@ function ProfileModal({ open, onClose, onUpdated }) {
                     />
                   </div>
                   <div className="form-field">
-                    <label className="form-label">Địa chỉ</label>
+                    <label className="form-label">Address</label>
                     <input
                       className="input"
                       name="address"
@@ -232,7 +232,7 @@ function ProfileModal({ open, onClose, onUpdated }) {
                     />
                   </div>
                   <div className="form-field">
-                    <label className="form-label">Ngày sinh</label>
+                    <label className="form-label">Date of Birth</label>
                     <input
                       className="input"
                       type="date"
@@ -242,21 +242,21 @@ function ProfileModal({ open, onClose, onUpdated }) {
                     />
                   </div>
                   <div className="form-field">
-                    <label className="form-label">Giới tính</label>
+                    <label className="form-label">Gender</label>
                     <select
                       className="input"
                       name="gender"
                       value={profile.gender || ''}
                       onChange={handleFieldChange}
                     >
-                      <option value="">Chọn</option>
-                      <option value="male">Nam</option>
-                      <option value="female">Nữ</option>
-                      <option value="other">Khác</option>
+                      <option value="">Select</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
                     </select>
                   </div>
                   <div className="form-field">
-                    <label className="form-label">Vai trò</label>
+                    <label className="form-label">Role</label>
                     <input className="input" value={profile.role || ''} readOnly />
                   </div>
                 </div>
@@ -266,15 +266,15 @@ function ProfileModal({ open, onClose, onUpdated }) {
                   onClick={handleSaveProfile}
                   disabled={savingProfile}
                 >
-                  {savingProfile ? 'Đang lưu...' : 'Lưu thông tin'}
+                  {savingProfile ? 'Saving...' : 'Save Profile'}
                 </button>
               </section>
 
               <section className="section" style={{ marginTop: '16px' }}>
-                <h4>Đổi mật khẩu</h4>
+                <h4>Change Password</h4>
                 <div className="form-grid">
                   <div className="form-field">
-                    <label className="form-label">Mật khẩu hiện tại</label>
+                    <label className="form-label">Current Password</label>
                     <input
                       className="input"
                       type="password"
@@ -284,7 +284,7 @@ function ProfileModal({ open, onClose, onUpdated }) {
                     />
                   </div>
                   <div className="form-field">
-                    <label className="form-label">Mật khẩu mới</label>
+                    <label className="form-label">New Password</label>
                     <input
                       className="input"
                       type="password"
@@ -294,7 +294,7 @@ function ProfileModal({ open, onClose, onUpdated }) {
                     />
                   </div>
                   <div className="form-field">
-                    <label className="form-label">Xác nhận mật khẩu</label>
+                    <label className="form-label">Confirm Password</label>
                     <input
                       className="input"
                       type="password"
@@ -310,7 +310,7 @@ function ProfileModal({ open, onClose, onUpdated }) {
                   onClick={handleChangePassword}
                   disabled={savingPassword}
                 >
-                  {savingPassword ? 'Đang đổi...' : 'Đổi mật khẩu'}
+                  {savingPassword ? 'Changing...' : 'Change Password'}
                 </button>
               </section>
 

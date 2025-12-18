@@ -35,7 +35,7 @@ function AdminLayout() {
           className="sidebar-header"
           onClick={() => navigate("/admin/dashboard")}
         >
-          <div className="app-logo">FH</div>
+          <img src="/helpdesk.png" alt="HelpDesk" className="app-logo" style={{ width: '36px', height: '36px', borderRadius: '999px', objectFit: 'contain' }} />
           <div className="app-title-group">
             <span className="app-title-short">Facility Helpdesk</span>
           </div>

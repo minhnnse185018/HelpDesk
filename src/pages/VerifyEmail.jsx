@@ -43,11 +43,11 @@ function VerifyEmail() {
         otp: form.otp.trim(),
       })
       setStatusMessage(
-        'Xac minh thanh cong. Dang chuyen toi trang dang nhap...'
+        'Verification successful. Redirecting to the login page...'
       )
       setTimeout(() => navigate('/login', { replace: true }), 800)
     } catch (error) {
-      setServerError(error.message || 'Xac minh that bai')
+      setServerError(error.message || 'Verification failed')
     } finally {
       setLoading(false)
     }
@@ -67,9 +67,9 @@ function VerifyEmail() {
     setResendLoading(true)
     try {
       await resendOtp({ email: form.email.trim() })
-      setStatusMessage('Da gui lai ma OTP. Vui long kiem tra email.')
+      setStatusMessage('A new OTP has been sent. Please check your email.')
     } catch (error) {
-      setServerError(error.message || 'Khong gui duoc OTP')
+      setServerError(error.message || 'Failed to resend OTP')
     } finally {
       setResendLoading(false)
     }
@@ -80,11 +80,21 @@ function VerifyEmail() {
       <div className="login-card">
         <div className="login-form-wrapper" style={{ gridColumn: '1 / -1' }}>
           <div className="login-header">
-            <div className="app-logo">FH</div>
+            <img
+              src="/helpdesk.png"
+              alt="HelpDesk"
+              className="app-logo"
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '999px',
+                objectFit: 'contain',
+              }}
+            />
             <div>
-              <h1 className="login-title">Xac minh email</h1>
+              <h1 className="login-title">Email Verification</h1>
               <p className="login-subtitle">
-                Nhap ma OTP da gui ve email de kich hoat tai khoan
+                Enter the OTP code sent to your email to activate your account.
               </p>
             </div>
           </div>
@@ -104,12 +114,14 @@ function VerifyEmail() {
                 aria-invalid={Boolean(errors.email)}
                 placeholder="example@domain.com"
               />
-              {errors.email && <span className="form-error">{errors.email}</span>}
+              {errors.email && (
+                <span className="form-error">{errors.email}</span>
+              )}
             </div>
 
             <div className="form-field">
               <label htmlFor="verify-otp" className="form-label">
-                Ma OTP
+                OTP Code
               </label>
               <input
                 id="verify-otp"
@@ -119,7 +131,7 @@ function VerifyEmail() {
                 value={form.otp}
                 onChange={handleChange}
                 aria-invalid={Boolean(errors.otp)}
-                placeholder="Nhap ma 6 chu so"
+                placeholder="Enter the 6-digit code"
               />
               {errors.otp && <span className="form-error">{errors.otp}</span>}
             </div>
@@ -134,7 +146,7 @@ function VerifyEmail() {
               className="btn btn-primary full-width"
               disabled={loading || resendLoading}
             >
-              {loading ? 'Dang xac minh...' : 'Xac minh tai khoan'}
+              {loading ? 'Verifying...' : 'Verify Account'}
             </button>
 
             <button
@@ -143,7 +155,7 @@ function VerifyEmail() {
               onClick={handleResendOtp}
               disabled={loading || resendLoading}
             >
-              {resendLoading ? 'Dang gui lai...' : 'Gui lai ma OTP'}
+              {resendLoading ? 'Resending...' : 'Resend OTP'}
             </button>
 
             <div className="login-footer-links">
@@ -152,7 +164,7 @@ function VerifyEmail() {
                 className="link-button small"
                 onClick={() => navigate('/login')}
               >
-                Quay lai trang dang nhap
+                Back to login
               </button>
             </div>
           </form>

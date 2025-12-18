@@ -33,7 +33,7 @@ function Login() {
     if (error?.response?.data?.message) {
       return error.response.data.message;
     }
-    
+
     if (error?.response?.data?.error) {
       return error.response.data.error;
     }
@@ -43,7 +43,7 @@ function Login() {
       return error.message;
     }
 
-    return "Email hoặc mật khẩu không chính xác";
+    return "Email or password is incorrect";
   };
 
   const handleStudentLogin = async (event) => {
@@ -107,8 +107,8 @@ function Login() {
         destination = "/staff/dashboard";
       }
       navigate(destination, { replace: true });
-      
-      // Start auto-refresh sau khi login thành công
+
+      // Start auto-refresh after successful login
       window.dispatchEvent(new Event("auth-login-success"));
     } catch (error) {
       setServerError(extractErrorMessage(error));
@@ -125,7 +125,8 @@ function Login() {
     try {
       const idToken = credentialResponse.credential;
 
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
+      const baseUrl =
+        import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
       const res = await axios.post(`${baseUrl}/api/v1/auth/google`, {
         idToken,
       });
@@ -134,7 +135,7 @@ function Login() {
 
       const payload = res.data;
 
-      // 🔥 LẤY TOKEN ĐÚNG DỮ LIỆU BACKEND TRẢ VỀ
+      // Get tokens from backend response
       const accessToken = payload.data?.accessToken;
       const refreshToken = payload.data?.refreshToken;
 
@@ -142,11 +143,11 @@ function Login() {
       console.log("🔥 refreshToken:", refreshToken);
 
       if (!accessToken) {
-        setServerError("Backend không trả accessToken");
+        setServerError("Backend did not return an accessToken");
         return;
       }
 
-      // 🔥 GIẢI MÃ JWT ĐỂ LẤY ROLE
+      // Decode JWT to get role
       const decoded = jwtDecode(accessToken);
       console.log("🔥 decoded:", decoded);
 
@@ -157,14 +158,14 @@ function Login() {
 
       const username = decoded.email?.split("@")[0];
 
-      // LƯU TOKEN
+      // Store tokens
       localStorage.setItem("accessToken", accessToken);
       if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
 
       localStorage.setItem("role", normalizedRole);
       if (username) localStorage.setItem("username", username);
 
-      // DELAY 100ms để Google iframe giải phóng
+      // Delay 100ms to allow Google iframe to release
       setTimeout(() => {
         let destination = "/student/dashboard";
         if (normalizedRole === "ADMIN") {
@@ -173,41 +174,51 @@ function Login() {
           destination = "/staff/dashboard";
         }
         navigate(destination, { replace: true });
-        
-        // Start auto-refresh sau khi login thành công
+
+        // Start auto-refresh after successful login
         window.dispatchEvent(new Event("auth-login-success"));
       }, 100);
     } catch (err) {
       console.error(err);
-      setServerError("Đăng nhập Google thất bại");
+      setServerError("Google login failed");
     }
   };
 
   return (
     <div className="login-page">
       <div className="login-card">
-        {/* Hình minh hoạ */}
+        {/* Illustration */}
         <div className="login-illustration" aria-hidden="true">
           <div className="building-shape" />
           <div className="wifi-shape" />
           <div className="tools-shape" />
           <p className="login-illustration-text">
-            Cơ sở vật chất hiện đại
+            Modern Facilities
             <br />
-            Hạ tầng, WiFi, thiết bị và nhiều hơn nữa
+            Infrastructure, WiFi, Equipment and More
           </p>
         </div>
 
-        {/* Form đăng nhập */}
+        {/* Login form */}
         <div className="login-form-wrapper">
           <div className="login-header">
-            <div className="app-logo">FH</div>
+            <img
+              src="/helpdesk.png"
+              alt="HelpDesk"
+              className="app-logo"
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "999px",
+                objectFit: "contain",
+              }}
+            />
             <div>
               <h1 className="login-title">
-                Hệ thống Phản Ánh CSVC & Yêu Cầu Hỗ Trợ
+                Infrastructure Feedback & Support Request System
               </h1>
               <p className="login-subtitle">
-                Gửi yêu cầu về cơ sở vật chất, WiFi và thiết bị
+                Submit a request regarding facilities, WiFi, and equipment.
               </p>
             </div>
           </div>
@@ -231,9 +242,10 @@ function Login() {
                 <span className="form-error">{errors.email}</span>
               )}
             </div>
+
             <div className="form-field" style={{ position: "relative" }}>
               <label htmlFor="password" className="form-label">
-                Mật khẩu
+                Password
               </label>
               <input
                 id="password"
@@ -272,17 +284,20 @@ function Login() {
                 <span className="form-error">{errors.password}</span>
               )}
             </div>
+
             {serverError && <div className="form-error">{serverError}</div>}
             {statusMessage && !serverError && (
               <div className="form-success">{statusMessage}</div>
             )}
+
             <button
               type="submit"
               className="btn btn-primary full-width"
               disabled={loading}
             >
-              {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+              {loading ? "Signing in..." : "Sign In"}
             </button>
+
             <div className="login-footer-links">
               <button
                 type="button"
@@ -290,7 +305,7 @@ function Login() {
                 onClick={handleForgotPassword}
                 disabled={loading}
               >
-                Quên mật khẩu?
+                Forgot password?
               </button>
 
               <button
@@ -298,7 +313,7 @@ function Login() {
                 className="link-button small"
                 onClick={() => navigate("/register")}
               >
-                Đăng ký tài khoản
+                Create account
               </button>
 
               <button
@@ -306,7 +321,7 @@ function Login() {
                 className="link-button small"
                 onClick={goToVerifyPage}
               >
-                Nhập mã OTP
+                Enter OTP code
               </button>
             </div>
 
@@ -321,7 +336,7 @@ function Login() {
             >
               <GoogleLogin
                 onSuccess={handleGoogleLogin}
-                onError={() => setServerError("Đăng nhập Google thất bại")}
+                onError={() => setServerError("Google login failed")}
                 size="large"
                 width="280"
                 useOneTap={false}

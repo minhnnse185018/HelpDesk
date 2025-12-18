@@ -287,85 +287,40 @@ function StaffSubTicketDetail() {
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
             {subTicket.status === 'assigned' && (
               <>
-                <button
-                  type="button"
-                  className="btn btn-success"
+                <ActionButton
+                  variant="success"
                   onClick={handleAccept}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    marginTop:"50px",
-                    fontSize: '0.875rem',
-                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                    color: '#059669',
-                    border: '1px solid rgba(16, 185, 129, 0.2)',
-                    borderRadius: '14px',
-                    backdropFilter: 'blur(40px) saturate(200%)',
-                    boxShadow: '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-                  }}
+                  style={{ marginTop: "50px" }}
                 >
                   Accept
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger"
+                </ActionButton>
+                <ActionButton
+                  variant="danger"
                   onClick={() => setDenyModal(true)}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                    color: '#dc2626',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    borderRadius: '14px',
-                    backdropFilter: 'blur(40px) saturate(200%)',
-                    boxShadow: '0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-                  }}
                 >
                   Deny
-                </button>
+                </ActionButton>
               </>
             )}
 
             {subTicket.status === 'in_progress' && (
-              <button
-                type="button"
-                className="btn btn-success"
+              <ActionButton
+                variant="success"
                 onClick={() => setResolveModal(true)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  marginTop:"20px",
-                  fontSize: '0.875rem',
-                  backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                  color: '#059669',
-                  border: '1px solid rgba(16, 185, 129, 0.2)',
-                  borderRadius: '14px',
-                  backdropFilter: 'blur(40px) saturate(200%)',
-                  boxShadow: '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-                }}
+                style={{ marginTop: "20px" }}
               >
                 Resolve
-              </button>
+              </ActionButton>
             )}
 
             {canReassign(subTicket.status) && (
-              <button
-                type="button"
-                className="btn btn-warning"
+              <ActionButton
+                variant="warning"
                 onClick={() => setReassignModal(true)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.875rem',
-                  marginTop:"20px",
-
-                  backgroundColor: 'rgba(245, 158, 11, 0.08)',
-                  color: '#d97706',
-                  border: '1px solid rgba(245, 158, 11, 0.2)',
-                  borderRadius: '14px',
-                  backdropFilter: 'blur(40px) saturate(200%)',
-                  boxShadow: '0 8px 32px rgba(245, 158, 11, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-                }}
+                style={{ marginTop: "20px" }}
               >
                 Reassign
-              </button>
+              </ActionButton>
             )}
           </div>
         </div>
@@ -640,17 +595,17 @@ function DenyModal({ onClose, onSubmit }) {
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-            <button
+            <ActionButton
               type="button"
-              className="btn btn-secondary"
+              variant="secondary"
               onClick={onClose}
               disabled={submitting}
             >
               Cancel
-            </button>
-            <button type="submit" className="btn btn-danger" disabled={submitting}>
+            </ActionButton>
+            <ActionButton type="submit" variant="danger" disabled={submitting}>
               {submitting ? 'Denying...' : 'Deny'}
-            </button>
+            </ActionButton>
           </div>
         </form>
       </div>
@@ -720,17 +675,17 @@ function ResolveModal({ onClose, onSubmit }) {
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-            <button
+            <ActionButton
               type="button"
-              className="btn btn-secondary"
+              variant="secondary"
               onClick={onClose}
               disabled={submitting}
             >
               Cancel
-            </button>
-            <button type="submit" className="btn btn-success" disabled={submitting}>
+            </ActionButton>
+            <ActionButton type="submit" variant="success" disabled={submitting}>
               {submitting ? 'Resolving...' : 'Resolve'}
-            </button>
+            </ActionButton>
           </div>
         </form>
       </div>
@@ -806,17 +761,17 @@ function ReassignModal({ onClose, onSubmit, subTicket }) {
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-            <button
+            <ActionButton
               type="button"
-              className="btn btn-secondary"
+              variant="secondary"
               onClick={onClose}
               disabled={submitting}
             >
               Cancel
-            </button>
-            <button type="submit" className="btn btn-warning" disabled={submitting}>
+            </ActionButton>
+            <ActionButton type="submit" variant="warning" disabled={submitting}>
               {submitting ? 'Submitting...' : 'Submit Request'}
-            </button>
+            </ActionButton>
           </div>
         </form>
       </div>
@@ -862,14 +817,13 @@ function AlertModal({ message, onClose }) {
           {message}
         </div>
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <button
-            type="button"
-            className="btn btn-primary"
+          <ActionButton
+            variant="primary"
             onClick={onClose}
             style={{ minWidth: '100px' }}
           >
             OK
-          </button>
+          </ActionButton>
         </div>
       </div>
     </div>

@@ -176,7 +176,7 @@ function SubTickets({ searchTerm = "" }) {
       console.error("Failed to delete sub-ticket:", err);
       setNotification({
         type: "error",
-        message: err?.response?.data?.message || "Xóa sub-ticket thất bại",
+        message: err?.response?.data?.message || "Failed to delete sub-ticket",
       });
     }
   };
@@ -671,7 +671,7 @@ function SubTickets({ searchTerm = "" }) {
                 marginBottom: "1rem",
               }}
             >
-              Xác nhận xóa
+              Confirm Delete
             </h3>
             <p
               style={{
@@ -710,7 +710,7 @@ function SubTickets({ searchTerm = "" }) {
                   e.currentTarget.style.backgroundColor = "#f3f4f6";
                 }}
               >
-                Hủy
+                Cancel
               </button>
               <button
                 type="button"
@@ -733,7 +733,7 @@ function SubTickets({ searchTerm = "" }) {
                   e.currentTarget.style.backgroundColor = "#ef4444";
                 }}
               >
-                Xóa
+                Delete
               </button>
             </div>
           </div>

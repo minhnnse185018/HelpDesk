@@ -51,10 +51,10 @@ function ForgotPassword() {
     setSendingOtp(true);
     try {
       await forgotPassword({ email: form.email.trim() });
-      setStatusMessage("Đã gửi mã OTP tới email. Vui lòng kiểm tra hộp thư.");
+      setStatusMessage("OTP code has been sent to your email. Please check your inbox.");
     } catch (error) {
       setServerError(
-        error.message || "Không gửi được mã OTP, vui lòng thử lại."
+        error.message || "Failed to send OTP code. Please try again."
       );
     } finally {
       setSendingOtp(false);
@@ -83,12 +83,12 @@ function ForgotPassword() {
         newPassword: form.newPassword,
       });
       setStatusMessage(
-        "Đặt lại mật khẩu thành công. Đang chuyển về trang đăng nhập..."
+        "Password reset successful. Redirecting to login page..."
       );
       setTimeout(() => navigate("/login", { replace: true }), 1000);
     } catch (error) {
       setServerError(
-        error.message || "Đặt lại mật khẩu thất bại, vui lòng thử lại."
+        error.message || "Password reset failed. Please try again."
       );
     } finally {
       setResetting(false);
@@ -100,16 +100,16 @@ function ForgotPassword() {
       <div className="login-card">
         <div className="login-form-wrapper" style={{ gridColumn: "1 / -1" }}>
           <div className="login-header">
-            <div className="app-logo">FH</div>
+            <img src="/helpdesk.png" alt="HelpDesk" className="app-logo" style={{ width: '48px', height: '48px', borderRadius: '999px', objectFit: 'contain' }} />
             <div>
-              <h1 className="login-title">Quên mật khẩu</h1>
+              <h1 className="login-title">Forgot password</h1>
               <p className="login-subtitle">
-                Nhập email để nhận mã OTP và đặt lại mật khẩu mới
+              Enter your email to receive the OTP code and reset your password.
               </p>
             </div>
           </div>
 
-          {/* Form gửi OTP */}
+          {/* Send OTP Form */}
           <form className="login-form" onSubmit={handleSendOtp}>
             <div className="form-field">
               <label htmlFor="forgot-email" className="form-label">
@@ -135,11 +135,11 @@ function ForgotPassword() {
               className="btn btn-primary full-width"
               disabled={sendingOtp || resetting}
             >
-              {sendingOtp ? "Đang gửi mã OTP..." : "Gửi mã OTP"}
+              {sendingOtp ? "Sending OTP code..." : "Send OTP Code"}
             </button>
           </form>
 
-          {/* Form đặt lại mật khẩu */}
+          {/* Reset Password Form */}
           <form className="login-form" onSubmit={handleResetPassword}>
             <div className="form-field">
               <label
@@ -147,7 +147,7 @@ function ForgotPassword() {
                 className="form-label"
                 style={{ marginTop: "16px" }}
               >
-                Mã OTP
+                OTP Code
               </label>
               <input
                 id="otp"
@@ -156,7 +156,7 @@ function ForgotPassword() {
                 className="input"
                 value={form.otp}
                 onChange={handleChange}
-                placeholder="Nhập mã gồm 6 chữ số"
+                placeholder="Enter 6-digit code"
                 aria-invalid={Boolean(errors.otp)}
               />
               {errors.otp && <span className="form-error">{errors.otp}</span>}
@@ -164,7 +164,7 @@ function ForgotPassword() {
 
             <div className="form-field" style={{ position: "relative" }}>
               <label htmlFor="newPassword" className="form-label">
-                Mật khẩu mới
+                New Password
               </label>
               <input
                 id="newPassword"
@@ -176,7 +176,7 @@ function ForgotPassword() {
                 onKeyDown={handlePasswordKeyNew}
                 onKeyUp={handlePasswordKeyNew}
                 onBlur={resetCapsNew}
-                placeholder="Nhập mật khẩu mới"
+                placeholder="Enter new password"
                 aria-invalid={Boolean(errors.newPassword)}
               />
               {capsLockNew && !errors.newPassword && (
@@ -206,7 +206,7 @@ function ForgotPassword() {
 
             <div className="form-field" style={{ position: "relative" }}>
               <label htmlFor="confirmPassword" className="form-label">
-                Xác nhận mật khẩu
+                Confirm Password
               </label>
               <input
                 id="confirmPassword"
@@ -218,7 +218,7 @@ function ForgotPassword() {
                 onKeyDown={handlePasswordKeyConfirm}
                 onKeyUp={handlePasswordKeyConfirm}
                 onBlur={resetCapsConfirm}
-                placeholder="Nhập lại mật khẩu mới"
+                placeholder="Re-enter new password"
                 aria-invalid={Boolean(errors.confirmPassword)}
               />
               {capsLockConfirm && !errors.confirmPassword && (
@@ -256,7 +256,7 @@ function ForgotPassword() {
               className="btn btn-secondary full-width"
               disabled={resetting || sendingOtp}
             >
-              {resetting ? "Đang đặt lại..." : "Đặt lại mật khẩu"}
+              {resetting ? "Resetting..." : "Reset Password"}
             </button>
           </form>
 
@@ -267,7 +267,7 @@ function ForgotPassword() {
               onClick={() => navigate("/login")}
               disabled={sendingOtp || resetting}
             >
-              Quay lại đăng nhập
+              Back to Login
             </button>
           </div>
         </div>

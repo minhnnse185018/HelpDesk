@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiClient } from '../../api/client'
+import { ActionButton, DeleteConfirmModal } from '../../components/templates'
 
 function MyTickets() {
   const [tickets, setTickets] = useState([])
@@ -178,11 +179,11 @@ function MyTickets() {
       if (selectedTicket?.id === ticketId) {
         setSelectedTicket(null)
       }
-      setDeleteConfirm(null)
       setError('')
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || 'Failed to delete ticket')
       console.error('Failed to delete ticket:', err)
+      throw err
     }
   }
 
@@ -1043,132 +1044,44 @@ function MyTickets() {
               </div>
 
               {/* Delete Button */}
-              <button
+              <ActionButton
+                variant="danger"
                 onClick={() => setDeleteConfirm(selectedTicket)}
                 style={{
                   width: '100%',
-                  padding: '0.75rem 1rem',
-                  backgroundColor: 'white',
-                  color: 'black',
-                  border: '1px solid black',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
                   marginTop: '1.5rem',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f3f4f6'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white'
                 }}
               >
                 Delete Ticket
-              </button>
+              </ActionButton>
             </div>
           )}
         </div>
 
         {/* Delete Confirmation Modal */}
-        {deleteConfirm && (
-          <div
-            onClick={() => setDeleteConfirm(null)}
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              padding: '1rem'
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                backgroundColor: 'white',
-                borderRadius: '12px',
-                padding: '2rem',
-                maxWidth: '450px',
-                width: '100%',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)'
-              }}
-            >
-              <h3 style={{
-                fontSize: '1.25rem',
-                fontWeight: '700',
-                color: '#111827',
-                marginBottom: '0.75rem'
-              }}>
-                Delete Ticket?
-              </h3>
-              <p style={{
-                fontSize: '0.875rem',
-                color: '#6b7280',
-                marginBottom: '1.5rem',
-                lineHeight: '1.6'
-              }}>
-                Are you sure you want to delete the ticket <strong>"{deleteConfirm.title}"</strong>? This action cannot be undone.
-              </p>
-              <div style={{
-                display: 'flex',
-                gap: '0.75rem',
-                justifyContent: 'flex-end'
-              }}>
-                <button
-                  onClick={() => setDeleteConfirm(null)}
-                  style={{
-                    padding: '0.625rem 1.25rem',
-                    backgroundColor: '#f3f4f6',
-                    color: '#374151',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#e5e7eb'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f3f4f6'
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleDeleteTicket(deleteConfirm.id)}
-                  style={{
-                    padding: '0.625rem 1.25rem',
-                    backgroundColor: '#111827',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#374151'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#111827'
-                  }}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <DeleteConfirmModal
+          isOpen={!!deleteConfirm}
+          onClose={() => setDeleteConfirm(null)}
+          onConfirm={async () => {
+            if (deleteConfirm) {
+              try {
+                await handleDeleteTicket(deleteConfirm.id)
+                setDeleteConfirm(null)
+              } catch (err) {
+                // Error already handled in handleDeleteTicket
+              }
+            }
+          }}
+          deleting={false}
+          title="Delete Ticket?"
+          message={`Are you sure you want to delete the ticket "${deleteConfirm?.title}"?`}
+          warningMessage="This action cannot be undone."
+          itemInfo={deleteConfirm ? {
+            Title: deleteConfirm.title,
+            ID: deleteConfirm.id,
+          } : null}
+          itemLabel="Ticket"
+        />
 
         {/* Image Popup Modal */}
         {imagePopup && (
