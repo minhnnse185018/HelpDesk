@@ -1,8 +1,11 @@
 import { useOutletContext } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
+import { ActionButton } from '../../components/templates'
 
 function StudentDashboard() {
+  const navigate = useNavigate()
   const outletContext = useOutletContext() || {}
   const profile = outletContext.profile || {}
 
@@ -116,9 +119,9 @@ function StudentDashboard() {
             Hello {displayName} - {displayRole}
           </p>
         </div>
-        <button type="button" className="btn btn-primary">
+        <ActionButton variant="success" onClick={() => navigate('/student/create-ticket')}>
           Create New Ticket
-        </button>
+        </ActionButton>
       </div>
 
       <section className="section">

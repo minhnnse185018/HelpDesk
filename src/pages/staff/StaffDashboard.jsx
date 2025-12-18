@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
+import { ActionButton } from "../../components/templates";
 
 function formatDate(dateString) {
   if (!dateString) return "N/A";
@@ -195,13 +196,12 @@ function StaffDashboard() {
                     <td>{getStatusBadge(st.status)}</td>
                     <td>{formatDate(st.dueDate)}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-secondary"
+                      <ActionButton
+                        variant="secondary"
                         onClick={() => navigate(`/staff/sub-tickets/${st.id}`)}
                       >
                         Details
-                      </button>
+                      </ActionButton>
                     </td>
                   </tr>
                 ))}

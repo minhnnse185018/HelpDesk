@@ -53,7 +53,7 @@ export const changePassword = (payload) =>
 
 export const validateLoginPayload = ({ email, password }) => {
   const errors = {}
-  if (!isValidEmail(email)) errors.email = 'Email không hợp lệ'
+  if (!isValidEmail(email)) errors.email = 'Invalid email'
   if (!isValidPassword(password)) errors.password = 'Mật khẩu không hợp lệ'
   return errors
 }
@@ -67,15 +67,15 @@ export const validateRegisterPayload = ({
 }) => {
   const errors = {}
 
-  if (!isValidEmail(email)) errors.email = 'Email không hợp lệ'
+  if (!isValidEmail(email)) errors.email = 'Invalid email'
   if (!isValidPassword(password))
-    errors.password = 'Mật khẩu phải có ít nhất 8 ký tự'
-  if (!isNonEmpty(username)) errors.username = 'Họ tên không được bỏ trống'
+    errors.password = 'Password must be at least 8 characters'
+  if (!isNonEmpty(username)) errors.username = 'Full name cannot be empty'
   if (!isValidPhone(phoneNumber))
-    errors.phoneNumber = 'Số điện thoại không hợp lệ'
+    errors.phoneNumber = 'Invalid phone number'
 
   if (typeof confirmPassword !== 'undefined' && password !== confirmPassword) {
-    errors.confirmPassword = 'Mật khẩu xác nhận không khớp'
+    errors.confirmPassword = 'Confirm password does not match'
   }
 
   return errors
@@ -83,20 +83,20 @@ export const validateRegisterPayload = ({
 
 export const validateVerifyEmailPayload = ({ email, otp }) => {
   const errors = {}
-  if (!isValidEmail(email)) errors.email = 'Email không hợp lệ'
+  if (!isValidEmail(email)) errors.email = 'Invalid email'
   if (!isNonEmpty(otp)) errors.otp = 'OTP không được bỏ trống'
   return errors
 }
 
 export const validateResendOtpPayload = ({ email }) => {
   const errors = {}
-  if (!isValidEmail(email)) errors.email = 'Email không hợp lệ'
+  if (!isValidEmail(email)) errors.email = 'Invalid email'
   return errors
 }
 
 export const validateForgotPasswordPayload = ({ email }) => {
   const errors = {}
-  if (!isValidEmail(email)) errors.email = 'Email không hợp lệ'
+  if (!isValidEmail(email)) errors.email = 'Invalid email'
   return errors
 }
 
@@ -108,14 +108,14 @@ export const validateResetPasswordPayload = ({
 }) => {
   const errors = {}
 
-  if (!isValidEmail(email)) errors.email = 'Email không hợp lệ'
+  if (!isValidEmail(email)) errors.email = 'Invalid email'
   if (!isNonEmpty(otp)) errors.otp = 'OTP không được bỏ trống'
 
   if (!isValidPassword(newPassword))
-    errors.newPassword = 'Mật khẩu mới phải có ít nhất 8 ký tự'
+    errors.newPassword = 'New password must be at least 8 characters'
 
   if (newPassword !== confirmPassword)
-    errors.confirmPassword = 'Mật khẩu xác nhận không khớp'
+    errors.confirmPassword = 'Confirm password does not match'
 
   return errors
 }

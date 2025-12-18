@@ -51,10 +51,10 @@ function StaffLayout() {
       {/* HEADER */}
       <header className="top-bar">
         <div className="top-bar-left" onClick={() => navigate("/staff/dashboard")}>
-          <div className="app-logo">FH</div>
+          <img src="/helpdesk.png" alt="HelpDesk" className="app-logo" style={{ width: '36px', height: '36px', borderRadius: '999px', objectFit: 'contain' }} />
           <div className="app-title-group">
             <span className="app-title">Facility Feedback & Helpdesk</span>
-            <span className="app-subtitle">Staff Portal - Quản lý và xử lý tickets</span>
+            <span className="app-subtitle">Staff Portal - Ticket management and processing</span>
           </div>
         </div>
 

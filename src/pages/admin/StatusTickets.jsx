@@ -90,11 +90,11 @@ function StatusTickets({ status, searchTerm = "" }) {
 
     try {
       await apiClient.delete(`/api/v1/tickets/${ticketId}`);
-      setNotification({ type: "success", message: "Xóa ticket thành công!" });
+      setNotification({ type: "success", message: "Ticket deleted successfully!" });
       loadTickets();
     } catch (err) {
       console.error("Failed to delete:", err);
-      setNotification({ type: "error", message: "Xóa ticket thất bại" });
+      setNotification({ type: "error", message: "Failed to delete ticket" });
     }
   };
 
@@ -556,7 +556,7 @@ function StatusTickets({ status, searchTerm = "" }) {
                 marginBottom: "1rem",
               }}
             >
-              Xác nhận xóa
+              Confirm Delete
             </h3>
             <p
               style={{
@@ -565,7 +565,7 @@ function StatusTickets({ status, searchTerm = "" }) {
                 lineHeight: "1.5",
               }}
             >
-              Bạn có chắc chắn muốn xóa ticket này không? Hành động này không thể hoàn tác.
+              Are you sure you want to delete this ticket? This action cannot be undone.
             </p>
             <div
               style={{
@@ -595,7 +595,7 @@ function StatusTickets({ status, searchTerm = "" }) {
                   e.currentTarget.style.backgroundColor = "#f3f4f6";
                 }}
               >
-                Hủy
+                Cancel
               </button>
               <button
                 type="button"
@@ -618,7 +618,7 @@ function StatusTickets({ status, searchTerm = "" }) {
                   e.currentTarget.style.backgroundColor = "#ef4444";
                 }}
               >
-                Xóa
+                Delete
               </button>
             </div>
           </div>

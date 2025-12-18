@@ -51,10 +51,10 @@ function StudentLayout() {
       {/* HEADER */}
       <header className="top-bar">
         <div className="top-bar-left" onClick={() => navigate("/student/dashboard")}>
-          <div className="app-logo">FH</div>
+          <img src="/helpdesk.png" alt="HelpDesk" className="app-logo" style={{ width: '36px', height: '36px', borderRadius: '999px', objectFit: 'contain' }} />
           <div className="app-title-group">
             <span className="app-title">Facility Feedback & Helpdesk</span>
-            <span className="app-subtitle">Hệ thống phản ánh CSVC, WiFi, thiết bị</span>
+            <span className="app-subtitle">The system reflects infrastructure, WiFi, and equipment.</span>
           </div>
         </div>
 

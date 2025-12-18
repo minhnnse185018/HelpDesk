@@ -47,13 +47,10 @@
   width: 36px;
   height: 36px;
   border-radius: 999px;
-  background-color: var(--color-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-weight: 700;
-  font-size: 0.9rem;
+  object-fit: contain;
 }
 
 .app-title-group {

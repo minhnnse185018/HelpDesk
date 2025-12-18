@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../../api/client'
+import { ActionButton } from '../../components/templates'
 
 function formatDate(dateString) {
   if (!dateString) return 'N/A'
@@ -161,14 +162,13 @@ function StaffTicketDetail() {
         <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid #dc2626', backgroundColor: '#fef2f2' }}>
           <div style={{ color: '#991b1b', fontWeight: 600 }}>❌ Error</div>
           <div style={{ color: '#dc2626', marginTop: '0.5rem' }}>{error || 'Ticket not found'}</div>
-          <button
-            type="button"
-            className="btn btn-secondary"
+          <ActionButton
+            variant="secondary"
             onClick={() => navigate('/staff/tickets')}
             style={{ marginTop: '1rem' }}
           >
             Back to Tickets
-          </button>
+          </ActionButton>
         </div>
       </div>
     )
@@ -206,60 +206,27 @@ function StaffTicketDetail() {
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {ticket.status === 'assigned' && (
               <>
-                <button
-                  type="button"
-                  className="btn btn-success"
+                <ActionButton
+                  variant="success"
                   onClick={handleAccept}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                    color: '#059669',
-                    border: '1px solid rgba(16, 185, 129, 0.2)',
-                    borderRadius: '14px',
-                    backdropFilter: 'blur(40px) saturate(200%)',
-                    boxShadow: '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-                  }}
                 >
                   Accept
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger"
+                </ActionButton>
+                <ActionButton
+                  variant="danger"
                   onClick={() => setDenyModal(true)}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                    color: '#dc2626',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    borderRadius: '14px',
-                    backdropFilter: 'blur(40px) saturate(200%)',
-                    boxShadow: '0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-                  }}
                 >
                   Deny
-                </button>
+                </ActionButton>
               </>
             )}
             {ticket.status === 'in_progress' && (
-              <button
-                type="button"
-                className="btn btn-success"
+              <ActionButton
+                variant="success"
                 onClick={() => setResolveModal(true)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.875rem',
-                  backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                  color: '#059669',
-                  border: '1px solid rgba(16, 185, 129, 0.2)',
-                  borderRadius: '14px',
-                  backdropFilter: 'blur(40px) saturate(200%)',
-                  boxShadow: '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-                }}
               >
                 Resolve
-              </button>
+              </ActionButton>
             )}
           </div>
         </div>
@@ -662,12 +629,12 @@ function DenyTicketModal({ ticketTitle, onClose, onSubmit }) {
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>
+            <ActionButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
               Cancel
-            </button>
-            <button type="submit" className="btn btn-danger" disabled={submitting}>
+            </ActionButton>
+            <ActionButton type="submit" variant="danger" disabled={submitting}>
               {submitting ? 'Denying...' : 'Deny Ticket'}
-            </button>
+            </ActionButton>
           </div>
         </form>
       </div>
@@ -742,12 +709,12 @@ function ResolveTicketModal({ ticketTitle, onClose, onSubmit }) {
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>
+            <ActionButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
               Cancel
-            </button>
-            <button type="submit" className="btn btn-success" disabled={submitting}>
+            </ActionButton>
+            <ActionButton type="submit" variant="success" disabled={submitting}>
               {submitting ? 'Resolving...' : 'Resolve Ticket'}
-            </button>
+            </ActionButton>
           </div>
         </form>
       </div>
@@ -793,14 +760,13 @@ function AlertModal({ message, onClose }) {
           {message}
         </div>
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <button
-            type="button"
-            className="btn btn-primary"
+          <ActionButton
+            variant="primary"
             onClick={onClose}
             style={{ minWidth: '100px' }}
           >
             OK
-          </button>
+          </ActionButton>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
+import { ActionButton } from '../../components/templates'
 
 function formatDate(dateString) {
   if (!dateString) return 'N/A'
@@ -206,9 +207,8 @@ function StaffReassignRequests() {
                     <td>{getStatusBadge(request.status)}</td>
                     <td>{formatDate(request.createdAt)}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-secondary"
+                      <ActionButton
+                        variant="secondary"
                         onClick={() => {
                           if (request.subTicketId) {
                             navigate(`/staff/sub-tickets/${request.subTicketId}`)
@@ -216,32 +216,9 @@ function StaffReassignRequests() {
                             navigate(`/staff/tickets/${request.ticketId}`)
                           }
                         }}
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.7)',
-                          backdropFilter: 'blur(10px) saturate(180%)',
-                          WebkitBackdropFilter: 'blur(10px) saturate(180%)',
-                          border: '1px solid rgba(59, 130, 246, 0.3)',
-                          boxShadow: '0 2px 8px rgba(59, 130, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
-                          color: '#1e40af',
-                          padding: '0.35rem 0.75rem',
-                          fontSize: '0.8rem',
-                          fontWeight: 500,
-                          borderRadius: '8px',
-                          transition: 'all 0.2s',
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-1px)'
-                          e.currentTarget.style.boxShadow =
-                            '0 4px 12px rgba(59, 130, 246, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)'
-                          e.currentTarget.style.boxShadow =
-                            '0 2px 8px rgba(59, 130, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
-                        }}
                       >
                         View Details
-                      </button>
+                      </ActionButton>
                     </td>
                   </tr>
                 ))}

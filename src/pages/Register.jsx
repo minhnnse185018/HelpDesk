@@ -49,7 +49,7 @@ function Register() {
 
     const validationErrors = validateRegisterPayload(form)
     if (!isValidPassword(form.confirmPassword, 8)) {
-      validationErrors.confirmPassword = 'Xác nhận mật khẩu phải có ít nhất 8 ký tự'
+      validationErrors.confirmPassword = 'Confirm password must be at least 8 characters'
     }
 
     if (Object.keys(validationErrors).length) {
@@ -66,9 +66,9 @@ function Register() {
         username: form.username.trim(),
         phoneNumber: form.phoneNumber.trim(),
       })
-      setStatusMessage('Đăng ký thành công. Vui lòng kiểm tra email/OTP để xác minh.')
+      setStatusMessage('Registration successful. Please check your email/OTP to verify.')
     } catch (error) {
-      setServerError(error.message || 'Đăng ký thất bại')
+      setServerError(error.message || 'Registration failed')
     } finally {
       setLoading(false)
     }
@@ -79,11 +79,11 @@ function Register() {
       <div className="login-card">
         <div className="login-form-wrapper" style={{ gridColumn: '1 / -1' }}>
           <div className="login-header">
-            <div className="app-logo">FH</div>
+            <img src="/helpdesk.png" alt="HelpDesk" className="app-logo" style={{ width: '48px', height: '48px', borderRadius: '999px', objectFit: 'contain' }} />
             <div>
-              <h1 className="login-title">Tạo tài khoản</h1>
+              <h1 className="login-title">Create an account</h1>
               <p className="login-subtitle">
-                Đăng ký để gửi và theo dõi yêu cầu hỗ trợ CSVC
+              Register to submit and track infrastructure support requests.
               </p>
             </div>
           </div>
@@ -105,7 +105,7 @@ function Register() {
             </div>
 
             <div className="form-field">
-              <label htmlFor="reg-username" className="form-label">Họ và tên</label>
+              <label htmlFor="reg-username" className="form-label">Full Name</label>
               <input
                 id="reg-username"
                 name="username"
@@ -119,7 +119,7 @@ function Register() {
             </div>
 
             <div className="form-field">
-              <label htmlFor="reg-phone" className="form-label">Số điện thoại</label>
+              <label htmlFor="reg-phone" className="form-label">Phone Number</label>
               <input
                 id="reg-phone"
                 name="phoneNumber"
@@ -134,7 +134,7 @@ function Register() {
             </div>
 
             <div className="form-field" style={{ position: 'relative' }}>
-              <label htmlFor="reg-password" className="form-label">Mật khẩu</label>
+              <label htmlFor="reg-password" className="form-label">Password</label>
               <input
                 id="reg-password"
                 name="password"
@@ -146,7 +146,7 @@ function Register() {
                 onKeyUp={handlePasswordKeyEventPassword}
                 onBlur={resetCapsPassword}
                 aria-invalid={Boolean(errors.password)}
-                placeholder="Ít nhất 8 ký tự"
+                placeholder="At least 8 characters"
               />
               {capsLockOnPassword && !errors.password && (
                 <span
@@ -172,7 +172,7 @@ function Register() {
             </div>
 
             <div className="form-field" style={{ position: 'relative' }}>
-              <label htmlFor="reg-confirm" className="form-label">Xác nhận mật khẩu</label>
+              <label htmlFor="reg-confirm" className="form-label">Confirm Password</label>
               <input
                 id="reg-confirm"
                 name="confirmPassword"
@@ -218,7 +218,7 @@ function Register() {
               className="btn btn-primary full-width"
               disabled={loading}
             >
-              {loading ? 'Đang đăng ký...' : 'Đăng ký'}
+              {loading ? 'Registering...' : 'Register'}
             </button>
 
             <div className="login-footer-links">
@@ -227,7 +227,7 @@ function Register() {
                 className="link-button small"
                 onClick={() => navigate('/login')}
               >
-                Quay lại đăng nhập
+                Back to Login
               </button>
 
               <button
@@ -235,7 +235,7 @@ function Register() {
                 className="link-button small"
                 onClick={goToVerifyPage}
               >
-                Nhập mã OTP
+                Enter OTP Code
               </button>
             </div>
 

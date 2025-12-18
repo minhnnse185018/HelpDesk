@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
+import { ActionButton } from "../../components/templates";
 
 function formatDate(dateString) {
   if (!dateString) return "N/A";
@@ -223,142 +224,53 @@ function StaffSubTickets() {
                           alignItems: "center",
                         }}
                       >
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-secondary"
+                        <ActionButton
+                          variant="secondary"
                           onClick={() =>
                             navigate(`/staff/sub-tickets/${subTicket.id}`)
                           }
-                          style={{
-                            padding: '0.5rem 1rem',
-                            fontSize: '0.8rem',
-                            fontWeight: 500,
-                            backgroundColor: 'rgba(59, 130, 246, 0.08)',
-                            color: '#2563eb',
-                            border: '1px solid rgba(59, 130, 246, 0.2)',
-                            borderRadius: '14px',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                            backdropFilter: 'blur(40px) saturate(200%)',
-                            boxShadow: '0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(59, 130, 246, 0.1)',
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-2px)'
-                            e.currentTarget.style.boxShadow = '0 12px 40px rgba(59, 130, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4)'
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)'
-                            e.currentTarget.style.boxShadow = '0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(59, 130, 246, 0.1)'
-                          }}
                         >
                           Details
-                        </button>
+                        </ActionButton>
 
                         {subTicket.status === "assigned" && (
                           <>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-success"
+                            <ActionButton
+                              variant="success"
                               onClick={() => handleAccept(subTicket.id)}
-                              style={{
-                                padding: '0.5rem 1rem',
-                                fontSize: '0.8rem',
-                                fontWeight: 500,
-                                backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                                color: '#059669',
-                                border: '1px solid rgba(16, 185, 129, 0.2)',
-                                borderRadius: '14px',
-                                cursor: 'pointer',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                backdropFilter: 'blur(40px) saturate(200%)',
-                                boxShadow: '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(16, 185, 129, 0.1)',
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)'
-                                e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4)'
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)'
-                                e.currentTarget.style.boxShadow = '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(16, 185, 129, 0.1)'
-                              }}
                             >
                               Accept
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-danger"
+                            </ActionButton>
+                            <ActionButton
+                              variant="danger"
                               onClick={() =>
                                 setDenyModal({
                                   id: subTicket.id,
                                   category: subTicket.category?.name,
                                 })
                               }
-                              style={{
-                                padding: '0.5rem 1rem',
-                                fontSize: '0.8rem',
-                                fontWeight: 500,
-                                backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                                color: '#dc2626',
-                                border: '1px solid rgba(239, 68, 68, 0.2)',
-                                borderRadius: '14px',
-                                cursor: 'pointer',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                backdropFilter: 'blur(40px) saturate(200%)',
-                                boxShadow: '0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(239, 68, 68, 0.1)',
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)'
-                                e.currentTarget.style.boxShadow = '0 12px 40px rgba(239, 68, 68, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4)'
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)'
-                                e.currentTarget.style.boxShadow = '0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(239, 68, 68, 0.1)'
-                              }}
                             >
                               Deny
-                            </button>
+                            </ActionButton>
                           </>
                         )}
 
                         {subTicket.status === "in_progress" && (
                           <>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-success"
+                            <ActionButton
+                              variant="success"
                               onClick={() =>
                                 setResolveModal({
                                   id: subTicket.id,
                                   category: subTicket.category?.name,
                                 })
                               }
-                              style={{
-                                padding: '0.5rem 1rem',
-                                fontSize: '0.8rem',
-                                fontWeight: 500,
-                                backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                                color: '#059669',
-                                border: '1px solid rgba(16, 185, 129, 0.2)',
-                                borderRadius: '14px',
-                                cursor: 'pointer',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                backdropFilter: 'blur(40px) saturate(200%)',
-                                boxShadow: '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(16, 185, 129, 0.1)',
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)'
-                                e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.4)'
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)'
-                                e.currentTarget.style.boxShadow = '0 8px 32px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(16, 185, 129, 0.1)'
-                              }}
                             >
                               Resolve
-                            </button>
+                            </ActionButton>
                             {canReassign(subTicket.status) && (
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-warning"
+                              <ActionButton
+                                variant="warning"
                                 onClick={() =>
                                   setReassignModal({
                                     id: subTicket.id,
@@ -389,7 +301,8 @@ function StaffSubTickets() {
                                 }}
                               >
                                 Reassign
-                              </button>
+                              </ActionButton> 
+                              
                             )}
                           </>
                         )}
@@ -530,21 +443,21 @@ function DenySubTicketModal({ category, onClose, onSubmit }) {
               justifyContent: "flex-end",
             }}
           >
-            <button
+            <ActionButton
               type="button"
-              className="btn btn-secondary"
+              variant="secondary"
               onClick={onClose}
               disabled={submitting}
             >
               Cancel
-            </button>
-            <button
+            </ActionButton>
+            <ActionButton
               type="submit"
-              className="btn btn-danger"
+              variant="danger"
               disabled={submitting}
             >
               {submitting ? "Denying..." : "Deny Sub-Ticket"}
-            </button>
+            </ActionButton>
           </div>
         </form>
       </div>
@@ -636,21 +549,21 @@ function ResolveSubTicketModal({ category, onClose, onSubmit }) {
               justifyContent: "flex-end",
             }}
           >
-            <button
+            <ActionButton
               type="button"
-              className="btn btn-secondary"
+              variant="secondary"
               onClick={onClose}
               disabled={submitting}
             >
               Cancel
-            </button>
-            <button
+            </ActionButton>
+            <ActionButton
               type="submit"
-              className="btn btn-success"
+              variant="success"
               disabled={submitting}
             >
               {submitting ? "Resolving..." : "Resolve Sub-Ticket"}
-            </button>
+            </ActionButton>
           </div>
         </form>
       </div>
@@ -752,21 +665,21 @@ function ReassignRequestModal({ category, subTicket, onClose, onSubmit }) {
               justifyContent: "flex-end",
             }}
           >
-            <button
+            <ActionButton
               type="button"
-              className="btn btn-secondary"
+              variant="secondary"
               onClick={onClose}
               disabled={submitting}
             >
               Cancel
-            </button>
-            <button
+            </ActionButton>
+            <ActionButton
               type="submit"
-              className="btn btn-warning"
+              variant="warning"
               disabled={submitting}
             >
               {submitting ? "Submitting..." : "Submit Request"}
-            </button>
+            </ActionButton>
           </div>
         </form>
       </div>
