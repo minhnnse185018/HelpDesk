@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 import { ActionButton } from '../../components/templates'
+import Snowfall from 'react-snowfall'
 
 function StudentDashboard() {
   const navigate = useNavigate()
@@ -113,6 +114,7 @@ function StudentDashboard() {
 
   return (
     <div className="page">
+      <Snowfall color='#82C3D9' />
       <div className="page-header">
         <div>
           <h2 className="page-title">Student Dashboard</h2>
@@ -198,6 +200,7 @@ function StudentDashboard() {
           )}
         </div>
       </section>
+      <Snowfall color='#ffffff' />
     </div>
   )
 }

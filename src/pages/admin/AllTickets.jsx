@@ -6,6 +6,7 @@ import {
 } from "../../utils/ticketHelpers.jsx";
 import AssignTicketModal from "../../components/modals/AssignTicketModal";
 import NotificationModal from "../../components/modals/NotificationModal";
+import { useNotificationSocket } from "../../context/NotificationSocketContext";
 
 const getStatusColor = (status) => {
   const colors = {
@@ -14,7 +15,8 @@ const getStatusColor = (status) => {
     in_progress: { bg: "#fef3c7", text: "#92400e" },
     resolved: { bg: "#d1fae5", text: "#065f46" },
     denied: { bg: "#fee2e2", text: "#991b1b" },
-    closed: { bg: "#f3f4f6", text: "#374151" },
+    closed: { bg: "#e5e7eb", text: "#374151" },
+    escalated: { bg: "#fef2f2", text: "#b91c1c" },
   };
   return colors[status] || { bg: "#f3f4f6", text: "#374151" };
 };
@@ -31,6 +33,7 @@ const getPriorityColor = (priority) => {
 
 function AllTickets({ searchTerm = "" }) {
   const navigate = useNavigate();
+  const { socket } = useNotificationSocket();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -62,6 +65,34 @@ function AllTickets({ searchTerm = "" }) {
       }
 
       let ticketsArray = Array.isArray(data) ? data : [];
+
+      // Fetch tickets with subTickets to enrich the data
+      try {
+        const subTicketsRes = await apiClient.get("/api/v1/tickets/with-subtickets");
+        const subTicketsData = subTicketsRes?.data || subTicketsRes;
+        const ticketsWithSubTickets = Array.isArray(subTicketsData)
+          ? subTicketsData
+          : Object.values(subTicketsData || {}).filter(Boolean);
+
+        // Create a map of ticket IDs to their subTickets
+        const subTicketsMap = new Map();
+        ticketsWithSubTickets.forEach((ticket) => {
+          if (ticket.id && ticket.subTickets && Array.isArray(ticket.subTickets) && ticket.subTickets.length > 0) {
+            subTicketsMap.set(ticket.id, ticket.subTickets);
+          }
+        });
+
+        // Merge subTickets into tickets array
+        ticketsArray = ticketsArray.map((ticket) => {
+          if (subTicketsMap.has(ticket.id)) {
+            return { ...ticket, subTickets: subTicketsMap.get(ticket.id) };
+          }
+          return ticket;
+        });
+      } catch (err) {
+        console.error("Failed to fetch tickets with subTickets:", err);
+        // Continue without subTickets data
+      }
 
       // Fetch room details for tickets with incomplete room data
       ticketsArray = await Promise.all(
@@ -96,13 +127,110 @@ function AllTickets({ searchTerm = "" }) {
   useEffect(() => {
     loadTickets();
 
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 5 minutes (300000ms)
     const interval = setInterval(() => {
       loadTickets();
-    }, 30000);
+    }, 300000); // 5 minutes
 
-    return () => clearInterval(interval);
+    // Refresh when tab becomes visible (user switches back to tab)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadTickets();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
+
+  // Listen for new ticket created events (real-time update)
+  useEffect(() => {
+    // Listen for custom window event (from CreateTicket)
+    const handleTicketCreated = async (event) => {
+      const newTicket = event.detail;
+      if (!newTicket || !newTicket.id) return;
+
+      try {
+        // Fetch full ticket details including room, categories, etc.
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${newTicket.id}`);
+        const fullTicket = ticketRes?.data || ticketRes;
+
+        // Fetch room details if needed
+        if (fullTicket.roomId && (!fullTicket.room?.code || !fullTicket.room?.floor)) {
+          try {
+            const roomRes = await apiClient.get(`/api/v1/rooms/${fullTicket.roomId}`);
+            fullTicket.room = roomRes.data || roomRes;
+          } catch (err) {
+            console.error(`Failed to fetch room ${fullTicket.roomId}:`, err);
+          }
+        }
+
+        // Check if ticket already exists (avoid duplicates)
+        setTickets((prevTickets) => {
+          const exists = prevTickets.some(t => t.id === fullTicket.id);
+          if (exists) return prevTickets;
+          
+          // Add new ticket to the beginning of the list
+          return [fullTicket, ...prevTickets];
+        });
+      } catch (err) {
+        console.error('Failed to fetch new ticket details:', err);
+        // Fallback: just add the ticket as-is
+        setTickets((prevTickets) => {
+          const exists = prevTickets.some(t => t.id === newTicket.id);
+          if (exists) return prevTickets;
+          return [newTicket, ...prevTickets];
+        });
+      }
+    };
+
+    // Listen for socket event from server (if server emits ticket:created)
+    const handleSocketTicketCreated = async (ticketData) => {
+      if (!ticketData || !ticketData.id) return;
+
+      try {
+        // Fetch full ticket details
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`);
+        const fullTicket = ticketRes?.data || ticketRes;
+
+        // Fetch room details if needed
+        if (fullTicket.roomId && (!fullTicket.room?.code || !fullTicket.room?.floor)) {
+          try {
+            const roomRes = await apiClient.get(`/api/v1/rooms/${fullTicket.roomId}`);
+            fullTicket.room = roomRes.data || roomRes;
+          } catch (err) {
+            console.error(`Failed to fetch room ${fullTicket.roomId}:`, err);
+          }
+        }
+
+        setTickets((prevTickets) => {
+          const exists = prevTickets.some(t => t.id === fullTicket.id);
+          if (exists) return prevTickets;
+          return [fullTicket, ...prevTickets];
+        });
+      } catch (err) {
+        console.error('Failed to fetch new ticket from socket:', err);
+      }
+    };
+
+    // Register event listeners
+    window.addEventListener('ticket:created', handleTicketCreated);
+    
+    if (socket) {
+      socket.on('ticket:created', handleSocketTicketCreated);
+    }
+
+    return () => {
+      window.removeEventListener('ticket:created', handleTicketCreated);
+      if (socket) {
+        socket.off('ticket:created', handleSocketTicketCreated);
+      }
+    };
+  }, [socket]);
 
   const handleDeleteClick = (ticketId) => {
     setDeleteConfirmModal(ticketId);
@@ -128,6 +256,20 @@ function AllTickets({ searchTerm = "" }) {
         staffId,
         priority,
       });
+      
+      // Fetch updated ticket to emit with event
+      try {
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketId}`);
+        const updatedTicket = ticketRes?.data || ticketRes;
+        
+        // Emit event for real-time update
+        window.dispatchEvent(new CustomEvent('ticket:assigned', { 
+          detail: updatedTicket 
+        }));
+      } catch (fetchErr) {
+        console.error('Failed to fetch updated ticket:', fetchErr);
+      }
+      
       setNotification({
         type: "success",
         message: "Ticket assigned successfully!",
@@ -439,15 +581,51 @@ function AllTickets({ searchTerm = "" }) {
                     style={{ borderBottom: "1px solid #f3f4f6" }}
                   >
                     <td style={{ padding: "1rem" }}>
-                      <div
-                        className="ticket-title"
-                        style={{
-                          color: "#111827",
-                          fontWeight: 500,
-                          marginBottom: "0.25rem",
-                        }}
-                      >
-                        {ticket.title}
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem", flexWrap: "wrap" }}>
+                        <div
+                          className="ticket-title"
+                          style={{
+                            color: "#111827",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {ticket.title}
+                        </div>
+                        {/* Badge SUB-TICKET */}
+                        {ticket.subTickets && Array.isArray(ticket.subTickets) && ticket.subTickets.length > 0 && (
+                          <span
+                            style={{
+                              fontSize: "0.7rem",
+                              fontWeight: 600,
+                              padding: "0.125rem 0.5rem",
+                              borderRadius: "9999px",
+                              backgroundColor: "#dbeafe",
+                              color: "#1e40af",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            SUB-TICKET
+                          </span>
+                        )}
+                        {/* Badge PENDING SPLIT - chỉ hiển thị khi chưa có subTickets */}
+                        {ticket.status === "open" &&
+                          Array.isArray(ticket.ticketCategories) &&
+                          ticket.ticketCategories.length >= 2 &&
+                          (!ticket.subTickets || !Array.isArray(ticket.subTickets) || ticket.subTickets.length === 0) && (
+                            <span
+                              style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 600,
+                                padding: "0.125rem 0.5rem",
+                                borderRadius: "9999px",
+                                backgroundColor: "#fef3c7",
+                                color: "#92400e",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              PENDING SPLIT
+                            </span>
+                          )}
                       </div>
                       <div
                         style={{
@@ -634,45 +812,52 @@ function AllTickets({ searchTerm = "" }) {
                         >
                           View
                         </button>
-                        {ticket.status !== "in_progress" && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              navigate(`/admin/tickets/edit/${ticket.id}`)
-                            }
-                            style={{
-                              padding: "0.5rem 1rem",
-                              fontSize: "0.8rem",
-                              fontWeight: 500,
-                              backgroundColor: "rgba(59, 130, 246, 0.08)",
-                              color: "#2563eb",
-                              border: "1px solid rgba(59, 130, 246, 0.2)",
-                              borderRadius: "14px",
-                              cursor: "pointer",
-                              transition:
-                                "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                              backdropFilter: "blur(40px) saturate(200%)",
-                              boxShadow:
-                                "0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(59, 130, 246, 0.1)",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.backgroundColor =
-                                "rgba(59, 130, 246, 0.15)";
-                              e.currentTarget.style.transform =
-                                "translateY(-1px)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.backgroundColor =
-                                "rgba(59, 130, 246, 0.08)";
-                              e.currentTarget.style.transform = "translateY(0)";
-                            }}
-                          >
-                            Edit
-                          </button>
-                        )}
+                        {ticket.status !== "in_progress" &&
+                          ticket.status !== "closed" &&
+                          ticket.status !== "escalated" && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                navigate(`/admin/tickets/edit/${ticket.id}`)
+                              }
+                              style={{
+                                padding: "0.5rem 1rem",
+                                fontSize: "0.8rem",
+                                fontWeight: 500,
+                                backgroundColor: "rgba(59, 130, 246, 0.08)",
+                                color: "#2563eb",
+                                border: "1px solid rgba(59, 130, 246, 0.2)",
+                                borderRadius: "14px",
+                                cursor: "pointer",
+                                transition:
+                                  "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                                backdropFilter: "blur(40px) saturate(200%)",
+                                boxShadow:
+                                  "0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(59, 130, 246, 0.1)",
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.backgroundColor =
+                                  "rgba(59, 130, 246, 0.15)";
+                                e.currentTarget.style.transform =
+                                  "translateY(-1px)";
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.backgroundColor =
+                                  "rgba(59, 130, 246, 0.08)";
+                                e.currentTarget.style.transform = "translateY(0)";
+                              }}
+                            >
+                              Edit
+                            </button>
+                          )}
                         {(() => {
                           const canAssign = ticket.status === "open";
-                          if (!canAssign) return null;
+                          const isPendingSplit = ticket.status === "open" &&
+                            Array.isArray(ticket.ticketCategories) &&
+                            ticket.ticketCategories.length >= 2;
+                          
+                          // Ẩn nút Assign nếu ticket là pending split
+                          if (!canAssign || isPendingSplit) return null;
                           return (
                             <button
                               type="button"

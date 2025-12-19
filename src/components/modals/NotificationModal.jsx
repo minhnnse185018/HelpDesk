@@ -1,3 +1,5 @@
+import { fontSize } from '../../utils/fontStyles';
+
 function NotificationModal({ type, message, onClose }) {
   return (
     <div
@@ -28,7 +30,7 @@ function NotificationModal({ type, message, onClose }) {
             gap: "0.75rem",
           }}
         >
-          <span style={{ fontSize: "1.25rem" }}>
+          <span style={{ fontSize: fontSize.xl }}>
             {type === "success" ? "✅" : "❌"}
           </span>
           <div>
@@ -43,7 +45,7 @@ function NotificationModal({ type, message, onClose }) {
             </div>
             <div
               style={{
-                fontSize: "0.875rem",
+                fontSize: fontSize.base,
                 color: type === "success" ? "#15803d" : "#dc2626",
               }}
             >

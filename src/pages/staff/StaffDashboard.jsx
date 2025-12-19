@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 import { ActionButton } from '../../components/templates'
+import { useNotificationSocket } from '../../context/NotificationSocketContext'
+import Snowfall from 'react-snowfall'
 
 function StaffDashboard() {
   const navigate = useNavigate()
+  const { socket } = useNotificationSocket()
   const [loading, setLoading] = useState(true)
   const [tickets, setTickets] = useState([])
   const [kpis, setKpis] = useState([
@@ -18,6 +21,80 @@ function StaffDashboard() {
   useEffect(() => {
     loadDashboardData()
   }, [])
+
+  // Listen for new ticket created/assigned events (real-time update)
+  useEffect(() => {
+    // Get current user ID to check if ticket is assigned to this staff
+    const getCurrentUserId = () => {
+      try {
+        return localStorage.getItem('userId')
+      } catch {
+        return null
+      }
+    }
+
+    // Helper function to update dashboard when new ticket is assigned
+    const updateDashboardWithNewTicket = async (ticketData) => {
+      if (!ticketData || !ticketData.id) return
+
+      try {
+        // Fetch full ticket details
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`)
+        const fullTicket = ticketRes?.data || ticketRes
+
+        // Check if ticket is assigned to current staff
+        const currentUserId = getCurrentUserId()
+        const isAssignedToMe = fullTicket.assignee?.id === currentUserId || 
+                              fullTicket.assigneeId === currentUserId ||
+                              fullTicket.assignee?.userId === currentUserId
+
+        if (isAssignedToMe) {
+          // Reload dashboard data to get updated KPIs and recent tickets
+          await loadDashboardData()
+        }
+      } catch (err) {
+        console.error('Failed to update dashboard with new ticket:', err)
+      }
+    }
+
+    // Listen for custom window event (from CreateTicket or AssignTicket)
+    const handleTicketCreated = async (event) => {
+      await updateDashboardWithNewTicket(event.detail)
+    }
+
+    // Listen for ticket assigned event (when admin assigns ticket to staff)
+    const handleTicketAssigned = async (event) => {
+      const ticketData = event.detail || event
+      await updateDashboardWithNewTicket(ticketData)
+    }
+
+    // Listen for socket event from server
+    const handleSocketTicketCreated = async (ticketData) => {
+      await updateDashboardWithNewTicket(ticketData)
+    }
+
+    const handleSocketTicketAssigned = async (ticketData) => {
+      await updateDashboardWithNewTicket(ticketData)
+    }
+
+    // Register event listeners
+    window.addEventListener('ticket:created', handleTicketCreated)
+    window.addEventListener('ticket:assigned', handleTicketAssigned)
+    
+    if (socket) {
+      socket.on('ticket:created', handleSocketTicketCreated)
+      socket.on('ticket:assigned', handleSocketTicketAssigned)
+    }
+
+    return () => {
+      window.removeEventListener('ticket:created', handleTicketCreated)
+      window.removeEventListener('ticket:assigned', handleTicketAssigned)
+      if (socket) {
+        socket.off('ticket:created', handleSocketTicketCreated)
+        socket.off('ticket:assigned', handleSocketTicketAssigned)
+      }
+    }
+  }, [socket])
 
   const loadDashboardData = async () => {
     try {
@@ -156,6 +233,7 @@ function StaffDashboard() {
 
   return (
     <div className="page">
+      <Snowfall color='#82C3D9' />
       <div className="page-header">
         <div>
           <h2 className="page-title">Staff Dashboard</h2>
@@ -284,6 +362,7 @@ function StaffDashboard() {
           </table>
         </div>
       </section>
+      <Snowfall color='#ffffff' />
     </div>
   )
 }

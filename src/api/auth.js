@@ -33,8 +33,14 @@ export const forgotPassword = (payload) =>
 export const resetPassword = (payload) =>
   apiClient.post('/api/v1/auth/reset-password', payload)
 
-export const refreshToken = (payload) =>
-  apiClient.post('/api/v1/auth/refresh', payload)
+export const refreshToken = (payload) => {
+  // Ensure payload has refreshToken
+  const refreshTokenValue = payload?.refreshToken || localStorage.getItem('refreshToken');
+  if (!refreshTokenValue) {
+    throw new Error('Refresh token is required');
+  }
+  return apiClient.post('/api/v1/auth/refresh', { refreshToken: refreshTokenValue });
+}
 
 export const logout = (payload) =>
   apiClient.post('/api/v1/auth/logout', payload)

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiClient } from "../api/client";
+import { apiClient, isTokenExpiringSoon, getTimeUntilExpiration } from "../api/client";
 
 const AuthRefreshContext = createContext(null);
 
@@ -33,11 +33,19 @@ export function AuthRefreshProvider({ children }) {
       return;
     }
 
+    // Check if token is actually expiring soon
+    if (!isTokenExpiringSoon(2)) {
+      const timeLeft = getTimeUntilExpiration();
+      const minutesLeft = timeLeft ? Math.floor(timeLeft / 60000) : 0;
+      console.log(`⏰ Token still valid for ${minutesLeft} minutes, skipping refresh`);
+      return;
+    }
+
     try {
       isRefreshingRef.current = true;
-      console.log("🔄 Refreshing access token...");
-      console.log("📝 Current refreshToken:", refreshToken);
-      console.log("📝 Current accessToken:", accessToken);
+      const timeLeft = getTimeUntilExpiration();
+      const minutesLeft = timeLeft ? Math.floor(timeLeft / 60000) : 0;
+      console.log(`🔄 Refreshing access token (expires in ${minutesLeft} minutes)...`);
 
       const response = await apiClient.post("/api/v1/auth/refresh", {
         refreshToken,
@@ -45,8 +53,16 @@ export function AuthRefreshProvider({ children }) {
 
       console.log("📦 Refresh response:", response);
 
-      const newAccessToken = response?.data?.accessToken || response?.data?.data?.accessToken;
-      const newRefreshToken = response?.data?.refreshToken || response?.data?.data?.refreshToken;
+      // Handle different response formats
+      const newAccessToken = 
+        response?.data?.accessToken || 
+        response?.data?.data?.accessToken ||
+        response?.accessToken;
+        
+      const newRefreshToken = 
+        response?.data?.refreshToken || 
+        response?.data?.data?.refreshToken ||
+        response?.refreshToken;
 
       if (newAccessToken) {
         localStorage.setItem("accessToken", newAccessToken);
@@ -59,7 +75,7 @@ export function AuthRefreshProvider({ children }) {
         }
       } else {
         console.warn("⚠️ No new access token received");
-        console.warn("⚠️ Response data:", response?.data);
+        console.warn("⚠️ Response data:", response?.data || response);
       }
     } catch (error) {
       console.error("❌ Failed to refresh token:", error);
@@ -102,16 +118,16 @@ export function AuthRefreshProvider({ children }) {
       clearInterval(refreshIntervalRef.current);
     }
 
-    console.log("🚀 Starting auto-refresh every 10 minutes");
+    console.log("🚀 Starting smart auto-refresh system");
 
-    // Refresh ngay lập tức lần đầu
+    // Check và refresh ngay lập tức nếu cần
     refreshAccessToken();
 
-    // Set interval refresh mỗi 10 phút (10 * 60 * 1000 ms)
-    // Refresh sớm hơn để tránh token hết hạn
+    // Smart refresh: Check every minute and refresh if token expires in < 2 minutes
+    // Token hết hạn sau 20 phút, nên check mỗi 1 phút là đủ
     refreshIntervalRef.current = setInterval(() => {
       refreshAccessToken();
-    }, 10 * 60 * 1000);
+    }, 60 * 1000); // Check every 1 minute
   };
 
   const stopAutoRefresh = () => {

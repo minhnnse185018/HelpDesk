@@ -132,7 +132,13 @@ function CreateTicket() {
       formData.categoryIds.forEach(id => fd.append('categoryIds', id))
       files.forEach(file => fd.append('files', file))
 
-      await apiClient.post('/api/v1/tickets', fd)
+      const response = await apiClient.post('/api/v1/tickets', fd)
+      const newTicket = response?.data || response
+
+      // Emit custom event để các component khác có thể listen
+      window.dispatchEvent(new CustomEvent('ticket:created', { 
+        detail: newTicket 
+      }))
 
       navigate('/student/my-tickets')
     } catch (err) {

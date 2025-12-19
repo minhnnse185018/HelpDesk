@@ -2,6 +2,11 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { ActionButton } from "../../components/templates";
+import SplitCategoriesModal from "../../components/modals/SplitCategoriesModal";
+import NotificationModal from "../../components/modals/NotificationModal";
+import DuplicateCheckModal from "../../components/modals/DuplicateCheckModal";
+import { fontSize, fontWeight } from "../../utils/fontStyles";
+import { downloadFile, openFileInNewTab, getFilenameFromUrl } from "../../utils/fileDownload";
 
 const ESCALATION_TEMPLATE =
   "This issue is beyond the IT department’s handling capability and should be escalated to a professional maintenance/vendor team.";
@@ -18,6 +23,9 @@ function TicketDetail() {
   const [escalateNotice, setEscalateNotice] = useState("");
   const [showEscalateModal, setShowEscalateModal] = useState(false);
   const [escalationReason, setEscalationReason] = useState(ESCALATION_TEMPLATE);
+  const [splitModal, setSplitModal] = useState(null);
+  const [duplicateModal, setDuplicateModal] = useState(null);
+  const [notification, setNotification] = useState(null);
 
   useEffect(() => {
     loadTicketDetail();
@@ -208,6 +216,23 @@ function TicketDetail() {
     setShowEscalateModal(true);
   };
 
+  const handleSplit = async (ticketId, splits) => {
+    try {
+      await apiClient.post(`/api/v1/tickets/${ticketId}/split-categories`, { splits });
+      setNotification({ type: "success", message: "Ticket split successfully!" });
+      setSplitModal(null);
+      await loadTicketDetail();
+    } catch (err) {
+      console.error("Failed to split:", err);
+      setNotification({ type: "error", message: err?.response?.data?.message || "Failed to split ticket" });
+    }
+  };
+
+  // Check if ticket needs splitting
+  const needsSplitting = ticket?.status === "open" &&
+    Array.isArray(ticket.ticketCategories) &&
+    ticket.ticketCategories.length >= 2;
+
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f5f5f7", padding: "2rem" }}>
       <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
@@ -221,8 +246,8 @@ function TicketDetail() {
             borderRadius: "0.5rem",
             cursor: "pointer",
             marginBottom: "1.5rem",
-            fontSize: "0.875rem",
-            fontWeight: 500,
+            fontSize: fontSize.base,
+            fontWeight: fontWeight.medium,
             color: "#374151",
           }}
         >
@@ -257,8 +282,8 @@ function TicketDetail() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h1
                   style={{
-                    fontSize: "1.875rem",
-                    fontWeight: 700,
+                    fontSize: fontSize['3xl'],
+                    fontWeight: fontWeight.bold,
                     color: "#111827",
                     margin: "0 0 0.5rem 0",
                   }}
@@ -277,7 +302,7 @@ function TicketDetail() {
                   <span
                     style={{
                       padding: "0.375rem 0.875rem",
-                      fontSize: "0.65rem",
+                      fontSize: fontSize.xs,
                       fontWeight: 500,
                       borderRadius: "9999px",
                       backgroundColor: statusColor.bg,
@@ -291,7 +316,7 @@ function TicketDetail() {
                     <span
                       style={{
                         padding: "0.375rem 0.875rem",
-                        fontSize: "0.65rem",
+                        fontSize: fontSize.xs,
                         fontWeight: 500,
                         borderRadius: "9999px",
                         backgroundColor: priorityColor.bg,
@@ -304,7 +329,7 @@ function TicketDetail() {
                 </div>
               </div>
 
-              {(canEscalate || escalateNotice || escalateError) && (
+              {(canEscalate || needsSplitting || escalateNotice || escalateError) && (
                 <div
                   style={{
                     display: "flex",
@@ -314,6 +339,22 @@ function TicketDetail() {
                     minWidth: "140px",
                   }}
                 >
+                  <ActionButton
+                    variant="info"
+                    onClick={() => setDuplicateModal(ticket)}
+                    style={{ whiteSpace: "nowrap", minWidth: "140px" }}
+                  >
+                    Check Duplicates
+                  </ActionButton>
+                  {needsSplitting && (
+                    <ActionButton
+                      variant="success"
+                      onClick={() => setSplitModal(ticket)}
+                      style={{ whiteSpace: "nowrap", minWidth: "140px" }}
+                    >
+                      Split Categories
+                    </ActionButton>
+                  )}
                   {canEscalate && (
                     <ActionButton
                       variant="danger"
@@ -337,6 +378,25 @@ function TicketDetail() {
                       {escalateError || escalateNotice}
                     </span>
                   )}
+                </div>
+              )}
+              {(!canEscalate && !needsSplitting && !escalateNotice && !escalateError) && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    gap: "0.5rem",
+                    minWidth: "140px",
+                  }}
+                >
+                  <ActionButton
+                    variant="info"
+                    onClick={() => setDuplicateModal(ticket)}
+                    style={{ whiteSpace: "nowrap", minWidth: "140px" }}
+                  >
+                    Check Duplicates
+                  </ActionButton>
                 </div>
               )}
             </div>
@@ -475,20 +535,24 @@ function TicketDetail() {
                               }}
                             >
                               <span style={{ fontSize: "3rem" }}>📄</span>
-                              <a
-                                href={attachment.filePath}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  color: "#3b82f6",
-                                  fontSize: "0.875rem",
-                                  fontWeight: 500,
-                                  textDecoration: "none",
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  downloadFile(attachment.filePath, attachment.fileName);
                                 }}
-                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  color: "#3b82f6",
+                                  fontSize: fontSize.base,
+                                  fontWeight: fontWeight.medium,
+                                  textDecoration: "none",
+                                  cursor: "pointer",
+                                  padding: "0.25rem 0.5rem",
+                                }}
                               >
                                 Download
-                              </a>
+                              </button>
                             </div>
                           )}
                           <div
@@ -949,20 +1013,24 @@ function TicketDetail() {
                                           }}
                                         >
                                           <span style={{ fontSize: "2rem" }}>📄</span>
-                                          <a
-                                            href={attachment.filePath}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            style={{
-                                              color: "#3b82f6",
-                                              fontSize: "0.7rem",
-                                              fontWeight: 500,
-                                              textDecoration: "none",
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              downloadFile(attachment.filePath, attachment.fileName);
                                             }}
-                                            onClick={(e) => e.stopPropagation()}
+                                            style={{
+                                              background: "none",
+                                              border: "none",
+                                              color: "#3b82f6",
+                                              fontSize: fontSize.xs,
+                                              fontWeight: fontWeight.medium,
+                                              textDecoration: "none",
+                                              cursor: "pointer",
+                                              padding: "0.25rem 0.5rem",
+                                            }}
                                           >
                                             Download
-                                          </a>
+                                          </button>
                                         </div>
                                       )}
                                       <div
@@ -1111,6 +1179,36 @@ function TicketDetail() {
             </div>
           </div>
         </div>
+
+        {/* Split Categories Modal */}
+        {splitModal && (
+          <SplitCategoriesModal
+            ticket={splitModal}
+            onClose={() => setSplitModal(null)}
+            onSubmit={handleSplit}
+          />
+        )}
+
+        {/* Duplicate Check Modal */}
+        {duplicateModal && (
+          <DuplicateCheckModal
+            ticket={duplicateModal}
+            onClose={() => setDuplicateModal(null)}
+            onMarkDuplicate={async () => {
+              setNotification({ type: "success", message: "Ticket marked as duplicate successfully!" });
+              await loadTicketDetail();
+            }}
+          />
+        )}
+
+        {/* Notification Modal */}
+        {notification && (
+          <NotificationModal
+            type={notification.type}
+            message={notification.message}
+            onClose={() => setNotification(null)}
+          />
+        )}
 
         {/* Escalate Modal */}
         {showEscalateModal && (
@@ -1305,11 +1403,8 @@ function TicketDetail() {
                 </p>
 
                 {/* Download Button */}
-                <a
-                  href={imagePopup.filePath}
-                  download={imagePopup.fileName}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => downloadFile(imagePopup.filePath, imagePopup.fileName)}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -1317,12 +1412,12 @@ function TicketDetail() {
                     padding: "0.75rem 1.5rem",
                     backgroundColor: "#3b82f6",
                     color: "white",
-                    textDecoration: "none",
-                    borderRadius: "8px",
-                    fontSize: "0.875rem",
-                    fontWeight: 600,
-                    transition: "all 0.2s ease",
                     border: "none",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    fontSize: fontSize.base,
+                    fontWeight: fontWeight.semibold,
+                    transition: "all 0.2s ease",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = "#2563eb";
@@ -1334,7 +1429,7 @@ function TicketDetail() {
                   }}
                 >
                   ⬇️ Download Image
-                </a>
+                </button>
               </div>
             </div>
           </div>
