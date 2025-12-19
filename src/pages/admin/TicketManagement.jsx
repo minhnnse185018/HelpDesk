@@ -4,7 +4,6 @@ import StatusTickets from "./StatusTickets";
 import PendingSplitTickets from "./PendingSplitTickets";
 import WaitingAcceptanceTickets from "./WaitingAcceptanceTickets";
 import OverdueTickets from "./OverdueTickets";
-import SubTickets from "./SubTickets";
 import AdminReassignRequests from "./AdminReassignRequests";
 
 function TicketManagement() {
@@ -13,13 +12,13 @@ function TicketManagement() {
 
   const tabs = [
     { key: "all", label: "All Tickets" },
-    { key: "sub-tickets", label: "Sub-Tickets" },
     { key: "open", label: "Open" },
     { key: "assigned", label: "Assigned" },
     { key: "in_progress", label: "In Progress" },
     { key: "resolved", label: "Resolved" },
-    // { key: "closed", label: "Closed" },
-    { key: "pending-split", label: "Pending Split" },
+    { key: "escalated", label: "Escalated" },
+    { key: "closed", label: "Closed" },
+    // { key: "pending-split", label: "Pending Split" },
     // { key: "waiting-acceptance", label: "Waiting Acceptance" },
     { key: "overdue", label: "Overdue" },
     { key: "reassign-requests", label: "Reassign Requests" }
@@ -188,11 +187,11 @@ function TicketManagement() {
           <StatusTickets status="in_progress" searchTerm={searchTerm} />
         )}
         {activeTab === "resolved" && <StatusTickets status="resolved" searchTerm={searchTerm} />}
+        {activeTab === "escalated" && <StatusTickets status="escalated" searchTerm={searchTerm} />}
         {activeTab === "closed" && <StatusTickets status="closed" searchTerm={searchTerm} />}
-        {activeTab === "pending-split" && <PendingSplitTickets searchTerm={searchTerm} />}
+        {/* {activeTab === "pending-split" && <PendingSplitTickets searchTerm={searchTerm} />} */}
         {/* {activeTab === "waiting-acceptance" && <WaitingAcceptanceTickets searchTerm={searchTerm} />} */}
         {activeTab === "overdue" && <OverdueTickets searchTerm={searchTerm} />}
-        {activeTab === "sub-tickets" && <SubTickets searchTerm={searchTerm} />}
         {activeTab === "reassign-requests" && <AdminReassignRequests searchTerm={searchTerm} />}
       </div>
     </div>

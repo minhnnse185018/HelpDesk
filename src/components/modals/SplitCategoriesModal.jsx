@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiClient } from "../../api/client";
+import { fontSize, fontWeight } from "../../utils/fontStyles";
 
 function SplitCategoriesModal({ ticket, onClose, onSubmit }) {
   const [submitting, setSubmitting] = useState(false);

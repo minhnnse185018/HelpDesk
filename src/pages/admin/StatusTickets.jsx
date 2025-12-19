@@ -101,6 +101,20 @@ function StatusTickets({ status, searchTerm = "" }) {
   const handleAssign = async (ticketId, staffId, priority) => {
     try {
       await apiClient.post(`/api/v1/tickets/${ticketId}/assign-category`, { staffId, priority });
+      
+      // Fetch updated ticket to emit with event
+      try {
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketId}`);
+        const updatedTicket = ticketRes?.data || ticketRes;
+        
+        // Emit event for real-time update
+        window.dispatchEvent(new CustomEvent('ticket:assigned', { 
+          detail: updatedTicket 
+        }));
+      } catch (fetchErr) {
+        console.error('Failed to fetch updated ticket:', fetchErr);
+      }
+      
       setNotification({ type: "success", message: "Ticket assigned successfully!" });
       setAssignModal(null);
       loadTickets();
@@ -469,14 +483,16 @@ function StatusTickets({ status, searchTerm = "" }) {
                         >
                           View
                         </ActionButton>
-                        {ticket.status !== "in_progress" && (
-                          <ActionButton
-                            variant="primary"
-                            onClick={() => navigate(`/admin/tickets/edit/${ticket.id}`)}
-                          >
-                            Edit
-                          </ActionButton>
-                        )}
+                        {ticket.status !== "in_progress" &&
+                          ticket.status !== "closed" &&
+                          ticket.status !== "escalated" && (
+                            <ActionButton
+                              variant="primary"
+                              onClick={() => navigate(`/admin/tickets/edit/${ticket.id}`)}
+                            >
+                              Edit
+                            </ActionButton>
+                          )}
                         {(() => {
                           const canAssign = ticket.status === "open";
                           if (!canAssign) return null;

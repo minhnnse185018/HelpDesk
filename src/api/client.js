@@ -27,6 +27,69 @@ const getAccessToken = () => localStorage.getItem("accessToken");
 const getRefreshToken = () => localStorage.getItem("refreshToken");
 
 const saveAccessToken = (token) => localStorage.setItem("accessToken", token);
+const saveRefreshToken = (token) => localStorage.setItem("refreshToken", token);
+
+// ===============================
+// JWT UTILITIES
+// ===============================
+/**
+ * Decode JWT token without verification (client-side only)
+ * @param {string} token - JWT token
+ * @returns {object|null} Decoded payload or null if invalid
+ */
+function decodeJWT(token) {
+  if (!token || typeof token !== 'string') return null;
+  
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    
+    const payload = parts[1];
+    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    return decoded;
+  } catch (error) {
+    console.error('Failed to decode JWT:', error);
+    return null;
+  }
+}
+
+/**
+ * Check if access token is expired or will expire soon
+ * @param {number} bufferMinutes - Minutes before expiration to consider as "expiring soon" (default: 2)
+ * @returns {boolean} True if token is expired or expiring soon
+ */
+function isTokenExpiringSoon(bufferMinutes = 2) {
+  const token = getAccessToken();
+  if (!token) return true;
+  
+  const decoded = decodeJWT(token);
+  if (!decoded || !decoded.exp) return true;
+  
+  const expirationTime = decoded.exp * 1000; // Convert to milliseconds
+  const currentTime = Date.now();
+  const bufferTime = bufferMinutes * 60 * 1000; // Convert buffer to milliseconds
+  
+  // Token is expired or will expire within buffer time
+  return (expirationTime - currentTime) <= bufferTime;
+}
+
+/**
+ * Get time until token expires in milliseconds
+ * @returns {number|null} Milliseconds until expiration or null if invalid
+ */
+function getTimeUntilExpiration() {
+  const token = getAccessToken();
+  if (!token) return null;
+  
+  const decoded = decodeJWT(token);
+  if (!decoded || !decoded.exp) return null;
+  
+  const expirationTime = decoded.exp * 1000;
+  const currentTime = Date.now();
+  const timeUntilExpiration = expirationTime - currentTime;
+  
+  return timeUntilExpiration > 0 ? timeUntilExpiration : 0;
+}
 
 // ===============================
 // 🔥 REFRESH TOKEN FUNCTION
@@ -46,12 +109,42 @@ async function refreshAccessToken() {
     body: JSON.stringify({ refreshToken }),
   });
 
-  if (!res.ok) throw new Error("Failed to refresh token");
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const error = new Error(errorData?.message || "Failed to refresh token");
+    error.response = {
+      data: errorData,
+      status: res.status,
+      statusText: res.statusText
+    };
+    throw error;
+  }
 
   const data = await res.json();
-  const newAccessToken = data?.accessToken;
+  
+  // Handle different response formats
+  const newAccessToken = 
+    data?.data?.accessToken || 
+    data?.accessToken || 
+    data?.data?.data?.accessToken;
+    
+  const newRefreshToken = 
+    data?.data?.refreshToken || 
+    data?.refreshToken || 
+    data?.data?.data?.refreshToken;
 
-  if (newAccessToken) saveAccessToken(newAccessToken);
+  if (newAccessToken) {
+    saveAccessToken(newAccessToken);
+    console.log("✅ Access token refreshed successfully");
+  } else {
+    console.warn("⚠️ No access token in refresh response:", data);
+  }
+  
+  // Update refresh token if provided
+  if (newRefreshToken) {
+    saveRefreshToken(newRefreshToken);
+    console.log("✅ Refresh token updated");
+  }
 
   return newAccessToken;
 }
@@ -198,3 +291,6 @@ export const apiClient = {
 };
 
 export const API_BASE_URL = getBaseUrl();
+
+// Export JWT utilities for use in other modules
+export { decodeJWT, isTokenExpiringSoon, getTimeUntilExpiration };

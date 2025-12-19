@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiClient } from '../../api/client'
 import { ActionButton, DeleteConfirmModal } from '../../components/templates'
+import { useNotificationSocket } from '../../context/NotificationSocketContext'
+import { downloadFile } from '../../utils/fileDownload'
 
 function MyTickets() {
+  const { socket } = useNotificationSocket()
   const [tickets, setTickets] = useState([])
   const [selectedTicket, setSelectedTicket] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -75,6 +78,91 @@ function MyTickets() {
   useEffect(() => {
     loadTickets()
   }, [loadTickets])
+
+  // Listen for new ticket created events (real-time update)
+  useEffect(() => {
+    // Listen for custom window event (from CreateTicket)
+    const handleTicketCreated = async (event) => {
+      const newTicket = event.detail
+      if (!newTicket || !newTicket.id) return
+
+      try {
+        // Fetch full ticket details including room, categories, etc.
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${newTicket.id}`)
+        const fullTicket = ticketRes?.data || ticketRes
+
+        // Fetch room details if needed
+        if (fullTicket.roomId && (!fullTicket.room?.code || !fullTicket.room?.floor)) {
+          try {
+            const roomRes = await apiClient.get(`/api/v1/rooms/${fullTicket.roomId}`)
+            fullTicket.room = roomRes.data || roomRes
+          } catch (err) {
+            console.error(`Failed to fetch room ${fullTicket.roomId}:`, err)
+          }
+        }
+
+        // Check if ticket already exists (avoid duplicates)
+        setTickets((prevTickets) => {
+          const exists = prevTickets.some(t => t.id === fullTicket.id)
+          if (exists) return prevTickets
+          
+          // Add new ticket to the beginning of the list
+          return [fullTicket, ...prevTickets]
+        })
+      } catch (err) {
+        console.error('Failed to fetch new ticket details:', err)
+        // Fallback: just add the ticket as-is
+        setTickets((prevTickets) => {
+          const exists = prevTickets.some(t => t.id === newTicket.id)
+          if (exists) return prevTickets
+          return [newTicket, ...prevTickets]
+        })
+      }
+    }
+
+    // Listen for socket event from server (if server emits ticket:created)
+    const handleSocketTicketCreated = async (ticketData) => {
+      if (!ticketData || !ticketData.id) return
+
+      try {
+        // Fetch full ticket details
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`)
+        const fullTicket = ticketRes?.data || ticketRes
+
+        // Fetch room details if needed
+        if (fullTicket.roomId && (!fullTicket.room?.code || !fullTicket.room?.floor)) {
+          try {
+            const roomRes = await apiClient.get(`/api/v1/rooms/${fullTicket.roomId}`)
+            fullTicket.room = roomRes.data || roomRes
+          } catch (err) {
+            console.error(`Failed to fetch room ${fullTicket.roomId}:`, err)
+          }
+        }
+
+        setTickets((prevTickets) => {
+          const exists = prevTickets.some(t => t.id === fullTicket.id)
+          if (exists) return prevTickets
+          return [fullTicket, ...prevTickets]
+        })
+      } catch (err) {
+        console.error('Failed to fetch new ticket from socket:', err)
+      }
+    }
+
+    // Register event listeners
+    window.addEventListener('ticket:created', handleTicketCreated)
+    
+    if (socket) {
+      socket.on('ticket:created', handleSocketTicketCreated)
+    }
+
+    return () => {
+      window.removeEventListener('ticket:created', handleTicketCreated)
+      if (socket) {
+        socket.off('ticket:created', handleSocketTicketCreated)
+      }
+    }
+  }, [socket])
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A'
@@ -1180,16 +1268,16 @@ function MyTickets() {
                 </p>
                 
                 {/* Download Button */}
-                <a
-                  href={imagePopup.filePath}
-                  download={imagePopup.fileName}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => downloadFile(imagePopup.filePath, imagePopup.fileName)}
                   style={{
                     display: 'inline-block',
                     marginTop: '0.75rem',
                     padding: '0.5rem 1rem',
                     backgroundColor: '#3b82f6',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
                     color: 'white',
                     textDecoration: 'none',
                     borderRadius: '6px',
@@ -1205,7 +1293,7 @@ function MyTickets() {
                   }}
                 >
                   ⬇️ Download
-                </a>
+                </button>
               </div>
             </div>
           </div>

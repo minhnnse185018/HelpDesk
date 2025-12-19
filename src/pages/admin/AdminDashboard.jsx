@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
-
+import Snowfall from 'react-snowfall'
 function AdminDashboard() {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [tickets, setTickets] = useState([])
   const [kpis, setKpis] = useState([
@@ -20,11 +22,11 @@ function AdminDashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true)
-      
+
       // Fetch all tickets
       const response = await apiClient.get('/api/v1/tickets')
       let data = response?.data || response
-      
+
       // Normalize data to array
       if (data && typeof data === 'object' && !Array.isArray(data)) {
         const keys = Object.keys(data)
@@ -34,16 +36,16 @@ function AdminDashboard() {
           data = data.tickets || data.data || data.items || []
         }
       }
-      
+
       const ticketsArray = Array.isArray(data) ? data : []
       setTickets(ticketsArray)
-      
+
       // Fetch overdue tickets from dedicated endpoint
       let overdueCount = 0
       try {
         const overdueResponse = await apiClient.get('/api/v1/tickets/overdue')
         let overdueData = overdueResponse?.data || overdueResponse
-        
+
         // Normalize overdue data to array
         if (overdueData && typeof overdueData === 'object' && !Array.isArray(overdueData)) {
           const keys = Object.keys(overdueData)
@@ -53,7 +55,7 @@ function AdminDashboard() {
             overdueData = overdueData.tickets || overdueData.data || overdueData.items || []
           }
         }
-        
+
         overdueCount = Array.isArray(overdueData) ? overdueData.length : 0
       } catch (err) {
         console.warn('Failed to fetch overdue tickets from endpoint, calculating manually:', err)
@@ -67,20 +69,20 @@ function AdminDashboard() {
           return isOverdue && isNotCompleted
         }).length
       }
-      
+
       // Calculate KPIs
       const totalTickets = ticketsArray.length
       const overdueTickets = overdueCount
-      const onTimePercentage = totalTickets > 0 
+      const onTimePercentage = totalTickets > 0
         ? Math.round(((totalTickets - overdueTickets) / totalTickets) * 100)
         : 0
-      
+
       setKpis([
         { label: 'Total Tickets', value: totalTickets },
         { label: 'On-time SLA', value: `${onTimePercentage}%` },
         { label: 'Overdue Tickets', value: overdueTickets },
       ])
-      
+
       // Calculate category statistics
       const categoryMap = {}
       ticketsArray.forEach(ticket => {
@@ -93,43 +95,53 @@ function AdminDashboard() {
           })
         }
       })
-      
+
       const categoryStatsArray = Object.entries(categoryMap)
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 6) // Top 6 categories
-      
+
       setCategoryStats(categoryStatsArray)
-      
+
       // Calculate SLA stats
       setSlaStats({
         onTime: totalTickets - overdueTickets,
         overdue: overdueTickets,
       })
-      
+
       // Get recent tickets (last 5)
       const recentTicketsBase = ticketsArray
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
         .slice(0, 5)
-      
-      // Fetch room details if needed
+
+      // Fetch room details and ticket details if needed
       const recent = await Promise.all(
         recentTicketsBase.map(async (ticket) => {
           let roomData = ticket.room || null
-          
+          let dueDate = ticket.dueDate || null
+
           // Fetch room details if roomId exists and room data is incomplete
           if (ticket.roomId && (!roomData?.code || !roomData?.floor)) {
             try {
               const roomRes = await apiClient.get(`/api/v1/rooms/${ticket.roomId}`)
               // Handle nested response structure
               roomData = roomRes?.data?.data || roomRes?.data || roomRes
-              console.log('🏠 Room ID:', ticket.roomId)
-              console.log('🏠 Fetched room data:', roomData)
             } catch (err) {
               console.error(`Failed to fetch room ${ticket.roomId}:`, err)
             }
           }
-          
+
+          // Fetch ticket details if dueDate is missing
+          if (!dueDate && ticket.id) {
+            try {
+              const ticketRes = await apiClient.get(`/api/v1/tickets/${ticket.id}`)
+              const ticketDetail = ticketRes?.data || ticketRes
+              dueDate = ticketDetail.dueDate || null
+            } catch (err) {
+              console.error(`Failed to fetch ticket detail ${ticket.id}:`, err)
+            }
+          }
+
           return {
             id: ticket.id,
             title: ticket.title,
@@ -137,20 +149,20 @@ function AdminDashboard() {
             room: roomData,
             status: getStatusLabel(ticket.status),
             statusKey: ticket.status,
-            slaDue: ticket.dueDate ? formatDate(ticket.dueDate) : 'N/A',
+            slaDue: dueDate ? formatDate(dueDate) : 'N/A',
           }
         })
       )
-      
+
       setRecentTickets(recent)
-      
+
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
     } finally {
       setLoading(false)
     }
   }
-  
+
   const getStatusLabel = (status) => {
     const labels = {
       open: 'Open',
@@ -159,10 +171,26 @@ function AdminDashboard() {
       resolved: 'Resolved',
       closed: 'Closed',
       overdue: 'Overdue',
+      escalated: 'Escalated',
+      denied: 'Denied',
     }
     return labels[status] || status
   }
-  
+
+  const getStatusColor = (status) => {
+    const colors = {
+      open: { bg: '#e0e7ff', text: '#3730a3' },
+      assigned: { bg: '#dbeafe', text: '#1e40af' },
+      in_progress: { bg: '#fef3c7', text: '#92400e' },
+      resolved: { bg: '#d1fae5', text: '#065f46' },
+      denied: { bg: '#fee2e2', text: '#991b1b' },
+      closed: { bg: '#e5e7eb', text: '#374151' },
+      escalated: { bg: '#fef2f2', text: '#b91c1c' },
+      overdue: { bg: '#fee2e2', text: '#dc2626' },
+    }
+    return colors[status] || { bg: '#f3f4f6', text: '#374151' }
+  }
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A'
     const date = new Date(dateString)
@@ -175,7 +203,7 @@ function AdminDashboard() {
       minute: '2-digit',
     })
   }
-  
+
   const getMaxCount = () => {
     return Math.max(...categoryStats.map(c => c.count), 1)
   }
@@ -183,10 +211,10 @@ function AdminDashboard() {
   if (loading) {
     return (
       <div className="page">
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
           minHeight: '400px',
           color: '#6b7280'
         }}>
@@ -205,12 +233,11 @@ function AdminDashboard() {
 
   return (
     <div className="page">
+      <Snowfall color='#82C3D9' />
       <div className="page-header">
         <div>
           <h2 className="page-title">Admin Dashboard</h2>
-          <p className="page-subtitle">
-            Overview of tickets, SLA performance and recent activity.
-          </p>
+          <p className="page-subtitle">Overview of tickets, SLA performance and recent activity.</p>
         </div>
       </div>
 
@@ -232,9 +259,9 @@ function AdminDashboard() {
           </h3>
           <div className="chart-placeholder bar-chart">
             {categoryStats.length === 0 ? (
-              <div style={{ 
-                textAlign: 'center', 
-                padding: '2rem', 
+              <div style={{
+                textAlign: 'center',
+                padding: '2rem',
                 color: '#9ca3af',
                 fontSize: '0.875rem'
               }}>
@@ -245,9 +272,9 @@ function AdminDashboard() {
                 <div key={cat.name} className="bar-row">
                   <span className="bar-label">{cat.name}</span>
                   <div className="bar-track">
-                    <div 
-                      className="bar bar-primary" 
-                      style={{ width: `${(cat.count / getMaxCount()) * 100}%` }} 
+                    <div
+                      className="bar bar-primary"
+                      style={{ width: `${(cat.count / getMaxCount()) * 100}%` }}
                     />
                   </div>
                   <span className="bar-value">{cat.count}</span>
@@ -291,15 +318,15 @@ function AdminDashboard() {
                 <th>Category</th>
                 <th>Room</th>
                 <th>Status</th>
-                <th>SLA Due</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {recentTickets.length === 0 ? (
                 <tr>
-                  <td colSpan="5" style={{ 
-                    textAlign: 'center', 
-                    padding: '2rem', 
+                  <td colSpan="5" style={{
+                    textAlign: 'center',
+                    padding: '2rem',
                     color: '#9ca3af',
                     fontSize: '0.875rem'
                   }}>
@@ -307,54 +334,95 @@ function AdminDashboard() {
                   </td>
                 </tr>
               ) : (
-                recentTickets.map((ticket) => (
-                  <tr key={ticket.id}>
-                    <td>
-                      <div style={{ 
-                        fontWeight: 500, 
-                        color: '#111827',
-                        maxWidth: '200px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {ticket.title || ticket.id}
-                      </div>
-                    </td>
-                    <td>{ticket.category}</td>
-                    <td>
-                      {ticket.room ? (
-                        <div>
-                          <div style={{ fontWeight: 500, color: '#111827' }}>
-                            {ticket.room.name || 'N/A'}
-                          </div>
-                          {(ticket.room.code || ticket.room.floor) && (
-                            <div style={{ fontSize: '0.75rem', marginTop: '0.125rem', color: '#6b7280' }}>
-                              {ticket.room.code && `(${ticket.room.code})`}
-                              {ticket.room.code && ticket.room.floor && ' - '}
-                              {ticket.room.floor && `Floor ${ticket.room.floor}`}
-                            </div>
-                          )}
+                recentTickets.map((ticket) => {
+                  const statusColor = getStatusColor(ticket.statusKey)
+                  return (
+                    <tr key={ticket.id}>
+                      <td>
+                        <div style={{
+                          fontWeight: 500,
+                          color: '#111827',
+                          maxWidth: '200px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {ticket.title || ticket.id}
                         </div>
-                      ) : (
-                        'N/A'
-                      )}
-                    </td>
-                    <td>
-                      <span
-                        className={`status-badge status-${ticket.statusKey}`}
-                      >
-                        {ticket.status}
-                      </span>
-                    </td>
-                    <td>{ticket.slaDue}</td>
-                  </tr>
-                ))
+                      </td>
+                      <td>{ticket.category}</td>
+                      <td>
+                        {ticket.room ? (
+                          <div>
+                            <div style={{ fontWeight: 500, color: '#111827' }}>
+                              {ticket.room.name || 'N/A'}
+                            </div>
+                            {(ticket.room.code || ticket.room.floor) && (
+                              <div style={{ fontSize: '0.75rem', marginTop: '0.125rem', color: '#6b7280' }}>
+                                {ticket.room.code && `(${ticket.room.code})`}
+                                {ticket.room.code && ticket.room.floor && ' - '}
+                                {ticket.room.floor && `Floor ${ticket.room.floor}`}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          'N/A'
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '9999px',
+                            backgroundColor: statusColor.bg,
+                            color: statusColor.text,
+                            display: 'inline-block',
+                          }}
+                        >
+                          {ticket.status}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            fontSize: '0.8rem',
+                            fontWeight: 500,
+                            backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                            color: '#6366f1',
+                            border: '1px solid rgba(99, 102, 241, 0.2)',
+                            borderRadius: '14px',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            backdropFilter: 'blur(40px) saturate(200%)',
+                            boxShadow: '0 8px 32px rgba(99, 102, 241, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(99, 102, 241, 0.1)',
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.backgroundColor = 'rgba(99, 102, 241, 0.15)'
+                            e.currentTarget.style.transform = 'translateY(-1px)'
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.backgroundColor = 'rgba(99, 102, 241, 0.08)'
+                            e.currentTarget.style.transform = 'translateY(0)'
+                          }}
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
         </div>
       </section>
+      <Snowfall color='#ffffff' />
+
     </div>
   )
 }

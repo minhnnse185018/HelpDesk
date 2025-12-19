@@ -81,6 +81,9 @@ function StudentLayout() {
 
         <NavLink to="/student/create-ticket" className={({ isActive }) =>
           `top-nav-link ${isActive ? "top-nav-link-active" : ""}`}>Create Ticket</NavLink>
+
+        <NavLink to="/student/rate-tickets" className={({ isActive }) =>
+          `top-nav-link ${isActive ? "top-nav-link-active" : ""}`}>Rate Tickets</NavLink>
       </nav>
 
       <main className="app-content">

@@ -435,7 +435,7 @@ function StaffTicketDetail() {
                       if (isImage) {
                         setImageModal(attachment)
                       } else {
-                        window.open(attachment.filePath, '_blank')
+                        downloadFile(attachment.filePath, attachment.fileName)
                       }
                     }}
                   >

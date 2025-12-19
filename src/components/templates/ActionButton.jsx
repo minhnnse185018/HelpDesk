@@ -65,8 +65,8 @@ function ActionButton({
 
   const baseStyle = {
     padding: '0.5rem 1rem',
-    fontSize: '0.8rem',
-    fontWeight: 500,
+    fontSize: 'var(--font-size-base)',
+    fontWeight: 'var(--font-weight-medium)',
     backgroundColor: disabled ? 'rgba(156, 163, 175, 0.08)' : currentStyle.backgroundColor,
     color: disabled ? '#9ca3af' : currentStyle.color,
     border: disabled ? '1px solid rgba(156, 163, 175, 0.2)' : currentStyle.border,

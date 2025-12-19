@@ -10,13 +10,36 @@
   --radius-lg: 16px;
   --shadow-card: 0 16px 40px rgba(15, 23, 42, 0.08);
 
+  /* Typography System - Font Family */
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Inter', 'Roboto',
-    sans-serif;
+    'Segoe UI', sans-serif;
   line-height: 1.5;
   font-weight: 400;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Typography System - Font Sizes (rem-based scale) */
+  --font-size-xs: 0.7rem;      /* 11.2px - Small labels, badges */
+  --font-size-sm: 0.75rem;    /* 12px - Secondary text, captions */
+  --font-size-base: 0.875rem; /* 14px - Body text, default */
+  --font-size-md: 0.9rem;     /* 14.4px - Slightly emphasized text */
+  --font-size-lg: 1rem;      /* 16px - Section titles, emphasized */
+  --font-size-xl: 1.25rem;    /* 20px - Page subtitles, card titles */
+  --font-size-2xl: 1.35rem;  /* 21.6px - Page titles */
+  --font-size-3xl: 1.875rem; /* 30px - Large headings */
+  --font-size-4xl: 2rem;     /* 32px - Hero headings */
+
+  /* Typography System - Font Weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Typography System - Line Heights */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
 }
 
 *,

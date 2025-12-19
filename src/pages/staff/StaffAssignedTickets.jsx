@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 import { ActionButton, AlertModal } from '../../components/templates'
+import { useNotificationSocket } from '../../context/NotificationSocketContext'
 
 function formatDate(dateString) {
   if (!dateString) return 'N/A'
@@ -70,6 +71,7 @@ function getStatusBadge(status) {
 
 function StaffAssignedTickets() {
   const navigate = useNavigate()
+  const { socket } = useNotificationSocket()
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -141,6 +143,121 @@ function StaffAssignedTickets() {
   useEffect(() => {
     loadTickets()
   }, [])
+
+  // Listen for new ticket created/assigned events (real-time update)
+  useEffect(() => {
+    // Get current user ID to check if ticket is assigned to this staff
+    const getCurrentUserId = () => {
+      try {
+        return localStorage.getItem('userId')
+      } catch {
+        return null
+      }
+    }
+
+    // Listen for custom window event (from CreateTicket or AssignTicket)
+    const handleTicketCreated = async (event) => {
+      const newTicket = event.detail
+      if (!newTicket || !newTicket.id) return
+
+      try {
+        // Fetch full ticket details to check assignee
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${newTicket.id}`)
+        const fullTicket = ticketRes?.data || ticketRes
+
+        // Check if ticket is assigned to current staff
+        const currentUserId = getCurrentUserId()
+        const isAssignedToMe = fullTicket.assignee?.id === currentUserId || 
+                              fullTicket.assigneeId === currentUserId ||
+                              fullTicket.assignee?.userId === currentUserId
+
+        if (isAssignedToMe) {
+          // Check if ticket already exists (avoid duplicates)
+          setTickets((prevTickets) => {
+            const exists = prevTickets.some(t => t.id === fullTicket.id)
+            if (exists) return prevTickets
+            // Add new ticket to the beginning of the list
+            return [fullTicket, ...prevTickets]
+          })
+        }
+      } catch (err) {
+        console.error('Failed to fetch new ticket details:', err)
+      }
+    }
+
+    // Listen for socket event from server (if server emits ticket:created or ticket:assigned)
+    const handleSocketTicketCreated = async (ticketData) => {
+      if (!ticketData || !ticketData.id) return
+
+      try {
+        // Fetch full ticket details
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`)
+        const fullTicket = ticketRes?.data || ticketRes
+
+        // Check if ticket is assigned to current staff
+        const currentUserId = getCurrentUserId()
+        const isAssignedToMe = fullTicket.assignee?.id === currentUserId || 
+                              fullTicket.assigneeId === currentUserId ||
+                              fullTicket.assignee?.userId === currentUserId
+
+        if (isAssignedToMe) {
+          setTickets((prevTickets) => {
+            const exists = prevTickets.some(t => t.id === fullTicket.id)
+            if (exists) return prevTickets
+            return [fullTicket, ...prevTickets]
+          })
+        }
+      } catch (err) {
+        console.error('Failed to fetch new ticket from socket:', err)
+      }
+    }
+
+    // Listen for ticket assigned event (when admin assigns ticket to staff)
+    const handleTicketAssigned = async (event) => {
+      const ticketData = event.detail || event
+      if (!ticketData || !ticketData.id) return
+
+      try {
+        // Fetch full ticket details
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`)
+        const fullTicket = ticketRes?.data || ticketRes
+
+        // Check if ticket is assigned to current staff
+        const currentUserId = getCurrentUserId()
+        const isAssignedToMe = fullTicket.assignee?.id === currentUserId || 
+                              fullTicket.assigneeId === currentUserId ||
+                              fullTicket.assignee?.userId === currentUserId
+
+        if (isAssignedToMe) {
+          setTickets((prevTickets) => {
+            const exists = prevTickets.some(t => t.id === fullTicket.id)
+            if (exists) return prevTickets
+            return [fullTicket, ...prevTickets]
+          })
+        }
+      } catch (err) {
+        console.error('Failed to fetch assigned ticket details:', err)
+      }
+    }
+
+    // Register event listeners
+    window.addEventListener('ticket:created', handleTicketCreated)
+    window.addEventListener('ticket:assigned', handleTicketAssigned)
+    
+    if (socket) {
+      socket.on('ticket:created', handleSocketTicketCreated)
+      socket.on('ticket:assigned', handleTicketAssigned)
+    }
+
+    return () => {
+      window.removeEventListener('ticket:created', handleTicketCreated)
+      window.removeEventListener('ticket:assigned', handleTicketAssigned)
+      if (socket) {
+        socket.off('ticket:created', handleSocketTicketCreated)
+        socket.off('ticket:assigned', handleTicketAssigned)
+      }
+    }
+  }, [socket])
 
   const handleAccept = async (ticketId) => {
     try {

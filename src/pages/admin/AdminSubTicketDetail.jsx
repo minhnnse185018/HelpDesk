@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../../api/client";
+import { downloadFile } from "../../utils/fileDownload";
 
 function formatDate(dateString) {
   if (!dateString) return "N/A";
@@ -367,20 +368,24 @@ function AdminSubTicketDetail() {
                               }}
                             >
                               <span style={{ fontSize: "3rem" }}>📄</span>
-                              <a
-                                href={attachment.filePath}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  downloadFile(attachment.filePath, attachment.fileName);
+                                }}
                                 style={{
+                                  background: "none",
+                                  border: "none",
                                   color: "#3b82f6",
                                   fontSize: "0.875rem",
                                   fontWeight: 500,
                                   textDecoration: "none",
+                                  cursor: "pointer",
+                                  padding: "0.25rem 0.5rem",
                                 }}
-                                onClick={(e) => e.stopPropagation()}
                               >
                                 Download
-                              </a>
+                              </button>
                             </div>
                           )}
                           <div
@@ -817,11 +822,8 @@ function AdminSubTicketDetail() {
                 </p>
                 
                 {/* Download Button */}
-                <a
-                  href={imagePopup.filePath}
-                  download={imagePopup.fileName}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => downloadFile(imagePopup.filePath, imagePopup.fileName)}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -835,6 +837,7 @@ function AdminSubTicketDetail() {
                     fontWeight: 600,
                     transition: "all 0.2s ease",
                     border: "none",
+                    cursor: "pointer",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = "#2563eb";
@@ -846,7 +849,7 @@ function AdminSubTicketDetail() {
                   }}
                 >
                   ⬇️ Download Image
-                </a>
+                </button>
               </div>
             </div>
           </div>

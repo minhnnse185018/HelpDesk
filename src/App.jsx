@@ -9,6 +9,7 @@ import StudentDashboard from "./pages/student/StudentDashboard.jsx";
 import CreateTicket from "./pages/student/CreateTicket.jsx";
 import MyTickets from "./pages/student/MyTickets.jsx";
 import StudentTicketDetail from "./pages/student/StudentTicketDetail.jsx";
+import RateTickets from "./pages/student/RateTickets.jsx";
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
 import TicketManagement from "./pages/admin/TicketManagement.jsx";
 import EditTicket from "./pages/admin/EditTicket.jsx";
@@ -54,6 +55,7 @@ function App() {
           <Route path="create-ticket" element={<CreateTicket />} />
           <Route path="my-tickets" element={<MyTickets />} />
           <Route path="my-tickets/:id" element={<StudentTicketDetail />} />
+          <Route path="rate-tickets" element={<RateTickets />} />
           <Route path="notifications" element={<NotificationsPage />} />
         </Route>
 

@@ -5,7 +5,9 @@ import { getNormalizedRoleFromPayload } from "../utils/roles";
 import { GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import axios from "axios";
+import Snowfall from "react-snowfall";
 import { useCapsLockWarning } from "../hooks/useCapsLockWarning";
+import RobotFace from "../components/RobotFace";
 
 function Login() {
   const navigate = useNavigate();
@@ -69,11 +71,18 @@ function Login() {
       const payload = raw?.data || raw;
       const nested = payload?.data || {};
 
+      // Handle different response formats
       const accessToken =
-        payload?.accessToken || raw?.accessToken || nested?.accessToken;
+        nested?.accessToken ||
+        payload?.accessToken || 
+        raw?.accessToken ||
+        nested?.data?.accessToken;
 
       const refreshToken =
-        payload?.refreshToken || raw?.refreshToken || nested?.refreshToken;
+        nested?.refreshToken ||
+        payload?.refreshToken || 
+        raw?.refreshToken ||
+        nested?.data?.refreshToken;
 
       const normalizedRole = getNormalizedRoleFromPayload(raw, "STUDENT");
       const usernameFromPayload =
@@ -186,6 +195,10 @@ function Login() {
 
   return (
     <div className="login-page">
+      <Snowfall color='#82C3D9' />
+      {/* Robot Face theo dõi chuột */}
+      <RobotFace size={140} position="right" />
+      
       <div className="login-card">
         {/* Illustration */}
         <div className="login-illustration" aria-hidden="true">
