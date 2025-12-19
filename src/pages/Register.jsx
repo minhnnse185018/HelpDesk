@@ -48,8 +48,8 @@ function Register() {
     setStatusMessage('')
 
     const validationErrors = validateRegisterPayload(form)
-    if (!isValidPassword(form.confirmPassword, 8)) {
-      validationErrors.confirmPassword = 'Confirm password must be at least 8 characters'
+    if (!isValidPassword(form.confirmPassword, 6)) {
+      validationErrors.confirmPassword = 'Confirm password must be at least 6 characters'
     }
 
     if (Object.keys(validationErrors).length) {
@@ -146,7 +146,7 @@ function Register() {
                 onKeyUp={handlePasswordKeyEventPassword}
                 onBlur={resetCapsPassword}
                 aria-invalid={Boolean(errors.password)}
-                placeholder="At least 8 characters"
+                placeholder="At least 6 characters"
               />
               {capsLockOnPassword && !errors.password && (
                 <span

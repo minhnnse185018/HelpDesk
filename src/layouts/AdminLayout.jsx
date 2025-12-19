@@ -103,7 +103,7 @@ function AdminLayout() {
       <div className="app-main">
         <header className="top-bar top-bar-admin">
           <div className="top-bar-left">
-            <span className="page-title-prefix">Admin</span>
+            <span className="page-title-prefix"></span>
           </div>
           <div className="top-bar-right">
             <NotificationBell />

@@ -77,7 +77,77 @@ function StatusTickets({ status, searchTerm = "" }) {
       loadTickets();
     }, 30000);
     
-    return () => clearInterval(interval);
+    // Listen for ticket assigned events (real-time update)
+    const handleTicketAssigned = async (event) => {
+      const updatedTicket = event.detail;
+      if (!updatedTicket || !updatedTicket.id) return;
+
+      try {
+        // Fetch full ticket details including room, categories, etc.
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${updatedTicket.id}`);
+        const fullTicket = ticketRes?.data || ticketRes;
+
+        // Fetch room details if needed
+        if (fullTicket.roomId && (!fullTicket.room?.code || !fullTicket.room?.floor)) {
+          try {
+            const roomRes = await apiClient.get(`/api/v1/rooms/${fullTicket.roomId}`);
+            fullTicket.room = roomRes.data || roomRes;
+          } catch (err) {
+            console.error(`Failed to fetch room ${fullTicket.roomId}:`, err);
+          }
+        }
+
+        // Update state based on current status filter
+        setTickets((prevTickets) => {
+          // If ticket status changed and no longer matches current filter, remove it
+          if (status && fullTicket.status !== status) {
+            return prevTickets.filter((ticket) => ticket.id !== fullTicket.id);
+          }
+          
+          // If ticket status matches current filter, update it
+          if (!status || fullTicket.status === status) {
+            const exists = prevTickets.some(t => t.id === fullTicket.id);
+            if (exists) {
+              // Update existing ticket
+              return prevTickets.map((ticket) =>
+                ticket.id === fullTicket.id ? fullTicket : ticket
+              );
+            } else {
+              // Add new ticket if it matches the filter
+              return [fullTicket, ...prevTickets];
+            }
+          }
+          
+          return prevTickets;
+        });
+      } catch (err) {
+        console.error('Failed to fetch assigned ticket details:', err);
+        // Fallback: update with the ticket from event if fetch fails
+        if (status && updatedTicket.status !== status) {
+          setTickets((prevTickets) => 
+            prevTickets.filter((ticket) => ticket.id !== updatedTicket.id)
+          );
+        } else if (!status || updatedTicket.status === status) {
+          setTickets((prevTickets) => {
+            const exists = prevTickets.some(t => t.id === updatedTicket.id);
+            if (exists) {
+              return prevTickets.map((ticket) =>
+                ticket.id === updatedTicket.id ? updatedTicket : ticket
+              );
+            } else {
+              return [updatedTicket, ...prevTickets];
+            }
+          });
+        }
+      }
+    };
+
+    window.addEventListener('ticket:assigned', handleTicketAssigned);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('ticket:assigned', handleTicketAssigned);
+    };
   }, [status]);
 
   const handleDeleteClick = (ticketId) => {
@@ -102,22 +172,48 @@ function StatusTickets({ status, searchTerm = "" }) {
     try {
       await apiClient.post(`/api/v1/tickets/${ticketId}/assign-category`, { staffId, priority });
       
-      // Fetch updated ticket to emit with event
+      // Fetch updated ticket to emit with event and update state
       try {
         const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketId}`);
         const updatedTicket = ticketRes?.data || ticketRes;
+
+        // Fetch room details if needed
+        if (updatedTicket.roomId && (!updatedTicket.room?.code || !updatedTicket.room?.floor)) {
+          try {
+            const roomRes = await apiClient.get(`/api/v1/rooms/${updatedTicket.roomId}`);
+            updatedTicket.room = roomRes.data || roomRes;
+          } catch (err) {
+            console.error(`Failed to fetch room ${updatedTicket.roomId}:`, err);
+          }
+        }
         
-        // Emit event for real-time update
+        // Update state directly with the updated ticket
+        // If status changed to "assigned" and current filter is not "assigned", remove from list
+        // If status changed and matches current filter, update in place
+        setTickets((prevTickets) => {
+          if (status && updatedTicket.status !== status) {
+            // Ticket status changed and no longer matches current filter, remove it
+            return prevTickets.filter((ticket) => ticket.id !== updatedTicket.id);
+          } else {
+            // Update ticket in place
+            return prevTickets.map((ticket) =>
+              ticket.id === updatedTicket.id ? updatedTicket : ticket
+            );
+          }
+        });
+        
+        // Emit event for real-time update to other components
         window.dispatchEvent(new CustomEvent('ticket:assigned', { 
           detail: updatedTicket 
         }));
       } catch (fetchErr) {
         console.error('Failed to fetch updated ticket:', fetchErr);
+        // Fallback: reload all tickets if fetch fails
+        loadTickets();
       }
       
       setNotification({ type: "success", message: "Ticket assigned successfully!" });
       setAssignModal(null);
-      loadTickets();
     } catch (err) {
       console.error("Failed to assign:", err);
       console.error("Error details:", err.response?.data);
