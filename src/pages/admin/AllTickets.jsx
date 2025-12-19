@@ -217,17 +217,88 @@ function AllTickets({ searchTerm = "" }) {
       }
     };
 
+    // Listen for ticket assigned events (real-time update)
+    const handleTicketAssigned = async (event) => {
+      const updatedTicket = event.detail;
+      if (!updatedTicket || !updatedTicket.id) return;
+
+      try {
+        // Fetch full ticket details including room, categories, etc.
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${updatedTicket.id}`);
+        const fullTicket = ticketRes?.data || ticketRes;
+
+        // Fetch room details if needed
+        if (fullTicket.roomId && (!fullTicket.room?.code || !fullTicket.room?.floor)) {
+          try {
+            const roomRes = await apiClient.get(`/api/v1/rooms/${fullTicket.roomId}`);
+            fullTicket.room = roomRes.data || roomRes;
+          } catch (err) {
+            console.error(`Failed to fetch room ${fullTicket.roomId}:`, err);
+          }
+        }
+
+        // Update existing ticket in the list
+        setTickets((prevTickets) => {
+          return prevTickets.map((ticket) =>
+            ticket.id === fullTicket.id ? fullTicket : ticket
+          );
+        });
+      } catch (err) {
+        console.error('Failed to fetch assigned ticket details:', err);
+        // Fallback: update with the ticket from event if fetch fails
+        setTickets((prevTickets) => {
+          return prevTickets.map((ticket) =>
+            ticket.id === updatedTicket.id ? updatedTicket : ticket
+          );
+        });
+      }
+    };
+
+    // Listen for socket event from server (if server emits ticket:assigned)
+    const handleSocketTicketAssigned = async (ticketData) => {
+      if (!ticketData || !ticketData.id) return;
+
+      try {
+        // Fetch full ticket details
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`);
+        const fullTicket = ticketRes?.data || ticketRes;
+
+        // Fetch room details if needed
+        if (fullTicket.roomId && (!fullTicket.room?.code || !fullTicket.room?.floor)) {
+          try {
+            const roomRes = await apiClient.get(`/api/v1/rooms/${fullTicket.roomId}`);
+            fullTicket.room = roomRes.data || roomRes;
+          } catch (err) {
+            console.error(`Failed to fetch room ${fullTicket.roomId}:`, err);
+          }
+        }
+
+        // Update existing ticket in the list
+        setTickets((prevTickets) => {
+          return prevTickets.map((ticket) =>
+            ticket.id === fullTicket.id ? fullTicket : ticket
+          );
+        });
+      } catch (err) {
+        console.error('Failed to fetch assigned ticket from socket:', err);
+      }
+    };
+
     // Register event listeners
     window.addEventListener('ticket:created', handleTicketCreated);
+    window.addEventListener('ticket:assigned', handleTicketAssigned);
     
     if (socket) {
       socket.on('ticket:created', handleSocketTicketCreated);
+      socket.on('ticket:assigned', handleSocketTicketAssigned);
     }
 
     return () => {
       window.removeEventListener('ticket:created', handleTicketCreated);
+      window.removeEventListener('ticket:assigned', handleTicketAssigned);
       if (socket) {
         socket.off('ticket:created', handleSocketTicketCreated);
+        socket.off('ticket:assigned', handleSocketTicketAssigned);
       }
     };
   }, [socket]);
@@ -257,17 +328,46 @@ function AllTickets({ searchTerm = "" }) {
         priority,
       });
       
+      // Wait a bit for database transaction to complete and socket to emit
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Fetch updated ticket to emit with event
       try {
         const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketId}`);
         const updatedTicket = ticketRes?.data || ticketRes;
-        
-        // Emit event for real-time update
-        window.dispatchEvent(new CustomEvent('ticket:assigned', { 
-          detail: updatedTicket 
-        }));
+
+        // Verify status was updated
+        if (updatedTicket.status === 'assigned') {
+          // Fetch room details if needed
+          if (updatedTicket.roomId && (!updatedTicket.room?.code || !updatedTicket.room?.floor)) {
+            try {
+              const roomRes = await apiClient.get(`/api/v1/rooms/${updatedTicket.roomId}`);
+              updatedTicket.room = roomRes.data || roomRes;
+            } catch (err) {
+              console.error(`Failed to fetch room ${updatedTicket.roomId}:`, err);
+            }
+          }
+          
+          // Update state directly with the updated ticket
+          setTickets((prevTickets) => {
+            return prevTickets.map((ticket) =>
+              ticket.id === updatedTicket.id ? updatedTicket : ticket
+            );
+          });
+          
+          // Emit event for real-time update to other components
+          window.dispatchEvent(new CustomEvent('ticket:assigned', { 
+            detail: updatedTicket 
+          }));
+        } else {
+          // Status not updated yet, reload all tickets
+          console.warn('Ticket status not updated to assigned yet, reloading all tickets...');
+          loadTickets();
+        }
       } catch (fetchErr) {
         console.error('Failed to fetch updated ticket:', fetchErr);
+        // Fallback: reload all tickets if fetch fails
+        loadTickets();
       }
       
       setNotification({
@@ -275,7 +375,6 @@ function AllTickets({ searchTerm = "" }) {
         message: "Ticket assigned successfully!",
       });
       setAssignModal(null);
-      loadTickets();
     } catch (err) {
       console.error("Failed to assign:", err);
       console.error("Error details:", err.response?.data);
