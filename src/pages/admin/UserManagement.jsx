@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiClient } from '../../api/client'
-import { ActionButton, DeleteConfirmModal, AlertModal } from '../../components/templates'
+import { ActionButton, DeleteConfirmModal, AlertModal, WarningMessage } from '../../components/templates'
 import { formatDate } from '../../utils/ticketHelpers.jsx'
 
 const roleOptions = [
@@ -92,7 +92,13 @@ function UserManagement() {
   // Handle form input changes (chỉ update state, không gọi API)
   const handleRoleChange = (event) => {
     const role = event.target.value
-    setFormData((prev) => ({ ...prev, role }))
+    setFormData((prev) => {
+      // Khi chuyển từ staff sang student, reset departmentId
+      if (prev.role === 'staff' && role === 'student') {
+        return { ...prev, role, departmentId: '' }
+      }
+      return { ...prev, role }
+    })
   }
 
   const handleDepartmentChange = (event) => {
@@ -108,42 +114,63 @@ function UserManagement() {
     setActionError('')
     
     try {
-      const promises = []
+      const currentRole = selectedUser?.role || ''
+      const newRole = formData.role
+      const currentDeptId = selectedUser?.departmentId || ''
+      const newDeptId = formData.departmentId || ''
       
-      // Update role nếu có thay đổi
-      if (formData.role && formData.role !== selectedUser?.role) {
-        promises.push(
-          apiClient.patch(`/api/v1/users/${selectedId}/role`, { role: formData.role })
-        )
-      }
-      
-      // Assign department nếu có thay đổi và user là staff
-      if (formData.role === 'staff' || selectedRole === 'staff') {
-        const currentDeptId = selectedUser?.departmentId || ''
-        if (formData.departmentId && formData.departmentId !== currentDeptId) {
-          // Validate: chỉ staff mới được assign vào department
-          if (formData.role === 'staff' || selectedRole === 'staff') {
-            promises.push(
-              apiClient.post(`/api/v1/users/${selectedId}/assign-department`, { 
-                departmentId: formData.departmentId 
-              })
-            )
-          }
-        } else if (!formData.departmentId && currentDeptId) {
-          // Nếu bỏ chọn department (chọn empty), có thể cần API để unassign
-          // Tùy vào backend có hỗ trợ không, nếu không thì bỏ qua
+      // BƯỚC 1: Update role trước nếu có thay đổi
+      // Điều này quan trọng vì khi chuyển từ student sang staff, 
+      // cần role là staff trước khi có thể assign department
+      if (newRole && newRole !== currentRole) {
+        try {
+          await apiClient.patch(`/api/v1/users/${selectedId}/role`, { role: newRole })
+          // Reload user để có role mới trước khi assign department
+          await loadSelectedUser()
+        } catch (err) {
+          // Backend sẽ validate và quăng lỗi nếu staff có ticket không thể chuyển role
+          const errorMessage = err?.response?.data?.message || err?.message || 'Failed to update role'
+          throw new Error(errorMessage)
         }
       }
       
-      if (promises.length > 0) {
-        await Promise.all(promises)
-        await Promise.all([loadUsers(), loadSelectedUser()])
-        setAlertModal({
-          type: 'success',
-          title: 'Success',
-          message: 'User updated successfully!'
-        })
+      // BƯỚC 2: Xử lý department sau khi role đã được update
+      // Nếu chuyển từ staff sang student → unassign department
+      if (currentRole === 'staff' && newRole === 'student' && currentDeptId) {
+        // Unassign department khi chuyển từ staff sang student
+        try {
+          await apiClient.delete(`/api/v1/users/${selectedId}/assign-department`)
+        } catch (err) {
+          // Nếu API không hỗ trợ delete, có thể backend yêu cầu gọi API khác
+          console.warn('Failed to unassign department when changing to student:', err)
+          // Vẫn tiếp tục vì role đã được update
+        }
       }
+      // Nếu user là staff (role mới hoặc role hiện tại) và có thay đổi department
+      else if (newRole === 'staff' && newDeptId !== currentDeptId) {
+        // Chỉ xử lý department nếu role mới là staff
+        if (newDeptId) {
+          // Assign department mới
+          await apiClient.post(`/api/v1/users/${selectedId}/assign-department`, { 
+            departmentId: newDeptId 
+          })
+        } else if (currentDeptId && !newDeptId && currentRole === 'staff') {
+          // Bỏ chọn department (unassign) - chỉ khi đang là staff
+          try {
+            await apiClient.delete(`/api/v1/users/${selectedId}/assign-department`)
+          } catch (err) {
+            console.warn('Failed to unassign department:', err)
+          }
+        }
+      }
+      
+      // Reload data sau khi update
+      await Promise.all([loadUsers(), loadSelectedUser()])
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'User updated successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to save changes')
       setAlertModal({
@@ -385,10 +412,18 @@ function UserManagement() {
                         </option>
                       ))}
                     </select>
+                    {/* Hiển thị warning khi chuyển từ staff sang student */}
+                    {formData.role === 'student' && selectedRole === 'staff' && (
+                      <WarningMessage 
+                        message="Department will be unassigned when role changes to Student!" 
+                      />
+                    )}
                   </div>
                 </div>
 
-                {(formData.role === 'staff' || selectedRole === 'staff') && (
+                {/* Chỉ hiển thị department field khi role mới chọn là staff */}
+                {/* Nếu chọn student, field sẽ ẩn ngay lập tức (chưa cần save) */}
+                {formData.role === 'staff' && (
                   <div className="detail-section">
                     <div className="form-field">
                       <label className="form-label">Assign Department</label>
@@ -399,7 +434,7 @@ function UserManagement() {
                         disabled={updating || deleting}
                       >
                         <option value="">
-                          {selectedUser?.departmentId ? '-- Change Department --' : '-- Select Department --'}
+                          {selectedUser?.departmentId ? '-- Unassign Department --' : '-- Select Department --'}
                         </option>
                         {departments.map((dept) => (
                           <option key={dept.id} value={dept.id}>

@@ -33,6 +33,41 @@ const enrichTicketWithRoom = async (ticket) => {
   return ticket;
 };
 
+// Helper function to enrich ticket with category data
+const enrichTicketWithCategories = async (ticket) => {
+  if (Array.isArray(ticket.ticketCategories) && ticket.ticketCategories.length > 0) {
+    ticket.ticketCategories = await Promise.all(
+      ticket.ticketCategories.map(async (tc) => {
+        // Nếu đã có category object đầy đủ, không cần fetch lại
+        if (tc.category && tc.category.name) {
+          return tc;
+        }
+        
+        // Nếu chỉ có categoryId, fetch category details
+        if (tc.categoryId && !tc.category) {
+          try {
+            const catRes = await apiClient.get(`/api/v1/categories/${tc.categoryId}`);
+            return { ...tc, category: catRes?.data || catRes };
+          } catch (err) {
+            console.error(`Failed to fetch category ${tc.categoryId}:`, err);
+            return tc;
+          }
+        }
+        
+        return tc;
+      })
+    );
+  }
+  return ticket;
+};
+
+// Helper function to fully enrich ticket with all related data
+const enrichTicket = async (ticket) => {
+  await enrichTicketWithRoom(ticket);
+  await enrichTicketWithCategories(ticket);
+  return ticket;
+};
+
 
 function AllTickets({ searchTerm = "" }) {
   const navigate = useNavigate();
@@ -99,12 +134,50 @@ function AllTickets({ searchTerm = "" }) {
         // Continue without subTickets data
       }
 
-      // Fetch room details for tickets with incomplete room data
+      // Enrich tickets with room and category data
       ticketsArray = await Promise.all(
-        ticketsArray.map(enrichTicketWithRoom)
+        ticketsArray.map(enrichTicket)
       );
 
-      setTickets(ticketsArray);
+      // Merge với local state để tránh mất data vừa được cập nhật
+      // Đặc biệt quan trọng khi user back từ ticket detail sau khi assign
+      setTickets((prevTickets) => {
+        const prevTicketsMap = new Map(prevTickets.map(t => [t.id, t]));
+        const mergedTickets = ticketsArray.map(serverTicket => {
+          const localTicket = prevTicketsMap.get(serverTicket.id);
+          
+          // Nếu local ticket có status "assigned" và server trả về "open" nhưng có assignee
+          // => server có thể chưa cập nhật kịp, giữ lại status "assigned" từ local
+          if (localTicket && 
+              localTicket.status === "assigned" && 
+              serverTicket.status === "open" &&
+              (serverTicket.assigneeId || serverTicket.assignee)) {
+            return { ...serverTicket, status: "assigned" };
+          }
+          
+          // Nếu local ticket có category data đầy đủ hơn server ticket, merge lại
+          if (localTicket && 
+              Array.isArray(localTicket.ticketCategories) && 
+              localTicket.ticketCategories.length > 0 &&
+              localTicket.ticketCategories.every(tc => tc.category && tc.category.name) &&
+              (!Array.isArray(serverTicket.ticketCategories) || 
+               serverTicket.ticketCategories.some(tc => !tc.category || !tc.category.name))) {
+            return { ...serverTicket, ticketCategories: localTicket.ticketCategories };
+          }
+          
+          return serverTicket;
+        });
+        
+        // Thêm các ticket từ local state không có trong server response
+        prevTickets.forEach(localTicket => {
+          const existsInServer = mergedTickets.some(t => t.id === localTicket.id);
+          if (!existsInServer) {
+            mergedTickets.push(localTicket);
+          }
+        });
+        
+        return mergedTickets;
+      });
     } catch (err) {
       console.error("Failed to load tickets:", err);
       setError(
@@ -148,8 +221,10 @@ function AllTickets({ searchTerm = "" }) {
       if (fetchFullDetails) {
         const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`);
         fullTicket = ticketRes?.data || ticketRes;
-        await enrichTicketWithRoom(fullTicket);
       }
+      
+      // Enrich with room and category data (whether fetched or not)
+      await enrichTicket(fullTicket);
 
       setTickets((prevTickets) => {
         const exists = prevTickets.some(t => t.id === fullTicket.id);
@@ -158,14 +233,73 @@ function AllTickets({ searchTerm = "" }) {
       });
     } catch (err) {
       console.error('Failed to add ticket to list:', err);
-      // Fallback: add ticket as-is if fetch failed
-      if (fetchFullDetails) {
+      // Fallback: enrich and add ticket as-is if fetch failed
+      try {
+        await enrichTicket(ticketData);
+        setTickets((prevTickets) => {
+          const exists = prevTickets.some(t => t.id === ticketData.id);
+          if (exists) return prevTickets;
+          return [ticketData, ...prevTickets];
+        });
+      } catch (enrichErr) {
+        console.error('Failed to enrich ticket:', enrichErr);
+        // Last resort: add ticket as-is
         setTickets((prevTickets) => {
           const exists = prevTickets.some(t => t.id === ticketData.id);
           if (exists) return prevTickets;
           return [ticketData, ...prevTickets];
         });
       }
+    }
+  }, []);
+
+  // Helper function to update ticket in list (handles all status changes)
+  const updateTicketInList = useCallback(async (ticketData, fetchFullDetails = true) => {
+    if (!ticketData || !ticketData.id) return;
+
+    try {
+      let updatedTicket = ticketData;
+      
+      if (fetchFullDetails) {
+        try {
+          const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`);
+          updatedTicket = ticketRes?.data || ticketRes;
+        } catch (fetchErr) {
+          console.error('Failed to fetch ticket details:', fetchErr);
+          // Use ticketData as-is if fetch fails
+          updatedTicket = ticketData;
+        }
+      }
+      
+      // Enrich with room and category data
+      await enrichTicket(updatedTicket);
+      
+      setTickets((prevTickets) => {
+        const existingTicket = prevTickets.find(t => t.id === updatedTicket.id);
+        
+        // Nếu ticket đã tồn tại, update nó với data mới nhất
+        if (existingTicket) {
+          // Chỉ preserve status "assigned" nếu local state có và server trả về "open" (server chưa cập nhật kịp)
+          // Với các status khác, luôn trust server data
+          if (existingTicket.status === "assigned" && 
+              updatedTicket.status === "open" &&
+              (updatedTicket.assigneeId || updatedTicket.assignee)) {
+            return prevTickets.map(t => 
+              t.id === updatedTicket.id 
+                ? { ...updatedTicket, status: "assigned" }
+                : t
+            );
+          }
+          
+          // Update với data mới nhất từ server
+          return prevTickets.map(t => t.id === updatedTicket.id ? updatedTicket : t);
+        }
+        
+        // Nếu ticket chưa tồn tại, thêm vào danh sách
+        return [updatedTicket, ...prevTickets];
+      });
+    } catch (err) {
+      console.error('Failed to update ticket in list:', err);
     }
   }, []);
 
@@ -176,14 +310,13 @@ function AllTickets({ searchTerm = "" }) {
       addTicketToList(event.detail, true);
     };
 
-    // Listen for ticket assigned event
-    const handleTicketAssigned = (event) => {
+    // Generic handler for all ticket updates (assigned, accepted, in_progress, resolved, etc.)
+    const handleTicketUpdated = async (event) => {
       const updatedTicket = event.detail;
       if (!updatedTicket?.id) return;
       
-      setTickets((prevTickets) => 
-        prevTickets.map(t => t.id === updatedTicket.id ? updatedTicket : t)
-      );
+      // Update ticket với data mới nhất
+      await updateTicketInList(updatedTicket, true);
     };
 
     // Listen for socket event from server
@@ -191,22 +324,54 @@ function AllTickets({ searchTerm = "" }) {
       addTicketToList(ticketData, true);
     };
 
-    // Register event listeners
+    // Generic handler for all socket ticket updates
+    const handleSocketTicketUpdated = async (ticketData) => {
+      if (!ticketData?.id) return;
+      await updateTicketInList(ticketData, true);
+    };
+
+    // Register event listeners for all ticket update events
     window.addEventListener('ticket:created', handleTicketCreated);
-    window.addEventListener('ticket:assigned', handleTicketAssigned);
+    window.addEventListener('ticket:assigned', handleTicketUpdated);
+    window.addEventListener('ticket:accepted', handleTicketUpdated);
+    window.addEventListener('ticket:updated', handleTicketUpdated);
+    window.addEventListener('ticket:resolved', handleTicketUpdated);
+    window.addEventListener('ticket:denied', handleTicketUpdated);
+    window.addEventListener('ticket:closed', handleTicketUpdated);
     
     if (socket) {
       socket.on('ticket:created', handleSocketTicketCreated);
+      socket.on('ticket:assigned', handleSocketTicketUpdated);
+      socket.on('ticket:accepted', handleSocketTicketUpdated);
+      socket.on('ticket:updated', handleSocketTicketUpdated);
+      socket.on('ticket:resolved', handleSocketTicketUpdated);
+      socket.on('ticket:denied', handleSocketTicketUpdated);
+      socket.on('ticket:closed', handleSocketTicketUpdated);
+      // Listen for generic ticket update event (nếu server emit)
+      socket.on('ticket:status-changed', handleSocketTicketUpdated);
     }
 
     return () => {
       window.removeEventListener('ticket:created', handleTicketCreated);
-      window.removeEventListener('ticket:assigned', handleTicketAssigned);
+      window.removeEventListener('ticket:assigned', handleTicketUpdated);
+      window.removeEventListener('ticket:accepted', handleTicketUpdated);
+      window.removeEventListener('ticket:updated', handleTicketUpdated);
+      window.removeEventListener('ticket:resolved', handleTicketUpdated);
+      window.removeEventListener('ticket:denied', handleTicketUpdated);
+      window.removeEventListener('ticket:closed', handleTicketUpdated);
+      
       if (socket) {
         socket.off('ticket:created', handleSocketTicketCreated);
+        socket.off('ticket:assigned', handleSocketTicketUpdated);
+        socket.off('ticket:accepted', handleSocketTicketUpdated);
+        socket.off('ticket:updated', handleSocketTicketUpdated);
+        socket.off('ticket:resolved', handleSocketTicketUpdated);
+        socket.off('ticket:denied', handleSocketTicketUpdated);
+        socket.off('ticket:closed', handleSocketTicketUpdated);
+        socket.off('ticket:status-changed', handleSocketTicketUpdated);
       }
     };
-  }, [socket, addTicketToList]);
+  }, [socket, addTicketToList, updateTicketInList]);
 
   const handleDeleteClick = useCallback((ticketId) => {
     setDeleteConfirmModal(ticketId);
@@ -230,31 +395,95 @@ function AllTickets({ searchTerm = "" }) {
 
   const handleAssign = useCallback(async (ticketId, staffId, priority) => {
     try {
+      // Step 1: Assign ticket
       await apiClient.post(`/api/v1/tickets/${ticketId}/assign-category`, {
         staffId,
         priority,
       });
       
-      // Fetch updated ticket to emit with event
+      // Step 2: Update status to "assigned" if needed
       try {
-        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketId}`);
-        const updatedTicket = ticketRes?.data || ticketRes;
-        await enrichTicketWithRoom(updatedTicket);
-        
-        // Emit event for real-time update
-        window.dispatchEvent(new CustomEvent('ticket:assigned', { 
-          detail: updatedTicket 
-        }));
-      } catch (fetchErr) {
-        console.error('Failed to fetch updated ticket:', fetchErr);
+        await apiClient.patch(`/api/v1/tickets/${ticketId}`, {
+          status: "assigned"
+        });
+      } catch (updateErr) {
+        console.error('Failed to update ticket status:', updateErr);
+        // Continue anyway, status might be updated by backend
       }
+      
+      // Step 3: Đợi một chút để server cập nhật xong (tránh race condition)
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Step 4: Fetch lại ticket đầy đủ từ server để đảm bảo có tất cả data mới nhất
+      let updatedTicket;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount < maxRetries) {
+        try {
+          const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketId}`);
+          updatedTicket = ticketRes?.data || ticketRes;
+          
+          // Verify ticket đã được assign và status đã được cập nhật
+          if (updatedTicket && 
+              (updatedTicket.assigneeId || updatedTicket.assignee) && 
+              (updatedTicket.status === "assigned" || updatedTicket.status === "open")) {
+            // Nếu status vẫn là "open" nhưng đã có assignee, set thành "assigned"
+            if (updatedTicket.status === "open") {
+              updatedTicket.status = "assigned";
+            }
+            break; // Đã có data đầy đủ, thoát khỏi retry loop
+          }
+          
+          // Nếu chưa có assignee, đợi thêm và retry
+          if (retryCount < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+          retryCount++;
+        } catch (fetchErr) {
+          console.error(`Failed to fetch updated ticket (attempt ${retryCount + 1}):`, fetchErr);
+          if (retryCount < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+          retryCount++;
+        }
+      }
+      
+      // Nếu vẫn không fetch được, thử lần cuối với data từ assign response
+      if (!updatedTicket || !updatedTicket.id) {
+        console.warn('Could not fetch updated ticket, using fallback');
+        try {
+          const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketId}`);
+          updatedTicket = ticketRes?.data || ticketRes;
+        } catch (err) {
+          console.error('Final fetch attempt failed:', err);
+          setNotification({
+            type: "error",
+            message: "Ticket assigned but failed to refresh data. Please refresh the page.",
+          });
+          setAssignModal(null);
+          return;
+        }
+      }
+      
+      // Step 5: Enrich ticket với tất cả related data (room, category, etc.)
+      await enrichTicket(updatedTicket);
+      
+      // Step 6: Update local state với data đầy đủ
+      setTickets((prevTickets) => 
+        prevTickets.map(t => t.id === updatedTicket.id ? updatedTicket : t)
+      );
+      
+      // Step 7: Emit event for real-time update
+      window.dispatchEvent(new CustomEvent('ticket:assigned', { 
+        detail: updatedTicket 
+      }));
       
       setNotification({
         type: "success",
         message: "Ticket assigned successfully!",
       });
       setAssignModal(null);
-      loadTickets();
     } catch (err) {
       console.error("Failed to assign:", err);
       console.error("Error details:", err.response?.data);
@@ -263,7 +492,7 @@ function AllTickets({ searchTerm = "" }) {
         message: err.response?.data?.message || "Failed to assign ticket",
       });
     }
-  }, [loadTickets]);
+  }, []);
 
   // Filter tickets based on search term - memoized
   const filteredTickets = useMemo(() => {
