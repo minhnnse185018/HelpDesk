@@ -292,6 +292,14 @@ function OverdueTickets({ searchTerm = "" }) {
                   style={{
                     borderBottom: "1px solid #f3f4f6",
                     backgroundColor: "#fef2f2",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#fee2e2";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "#fef2f2";
                   }}
                 >
                   <td
@@ -359,21 +367,11 @@ function OverdueTickets({ searchTerm = "" }) {
                   >
                     {formatDate(ticket.createdAt)}
                   </td>
-                  <td style={{ padding: "1rem" }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "0.5rem",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <ActionButton
-                        variant="secondary"
-                        onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
-                      >
-                        View
-                      </ActionButton>
-                    </div>
+                  <td 
+                    style={{ padding: "1rem" }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Actions column - empty since click on row navigates to detail */}
                   </td>
                 </tr>
                 ))

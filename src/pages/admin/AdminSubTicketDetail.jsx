@@ -2,41 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { downloadFile } from "../../utils/fileDownload";
-
-function formatDate(dateString) {
-  if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "N/A";
-  return date.toLocaleString("vi-VN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-const getStatusColor = (status) => {
-  const colors = {
-    open: { bg: "#dbeafe", text: "#1e40af", border: "#93c5fd" },
-    assigned: { bg: "#fef3c7", text: "#92400e", border: "#fcd34d" },
-    in_progress: { bg: "#e0e7ff", text: "#3730a3", border: "#a5b4fc" },
-    resolved: { bg: "#d1fae5", text: "#065f46", border: "#6ee7b7" },
-    closed: { bg: "#e5e7eb", text: "#374151", border: "#d1d5db" },
-    denied: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
-  };
-  return colors[status] || colors.open;
-};
-
-const getPriorityColor = (priority) => {
-  const colors = {
-    low: { bg: "#dbeafe", text: "#1e40af" },
-    medium: { bg: "#fef3c7", text: "#92400e" },
-    high: { bg: "#fed7aa", text: "#9a3412" },
-    critical: { bg: "#fecaca", text: "#991b1b" },
-  };
-  return colors[priority] || { bg: "#f3f4f6", text: "#374151" };
-};
+import { formatDate, getStatusColor, getPriorityColor } from "../../utils/ticketHelpers.jsx";
 
 function AdminSubTicketDetail() {
   const { id } = useParams();

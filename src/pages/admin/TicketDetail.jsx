@@ -7,6 +7,7 @@ import NotificationModal from "../../components/modals/NotificationModal";
 import DuplicateCheckModal from "../../components/modals/DuplicateCheckModal";
 import { fontSize, fontWeight } from "../../utils/fontStyles";
 import { downloadFile, openFileInNewTab, getFilenameFromUrl } from "../../utils/fileDownload";
+import { formatDate } from "../../utils/ticketHelpers.jsx";
 
 const ESCALATION_TEMPLATE =
   "This issue is beyond the IT department’s handling capability and should be escalated to a professional maintenance/vendor team.";
@@ -92,10 +93,6 @@ function TicketDetail() {
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleString("en-US");
-  };
 
   const getStatusColor = (status) => {
     const colors = {
@@ -302,12 +299,14 @@ function TicketDetail() {
                   <span
                     style={{
                       padding: "0.375rem 0.875rem",
-                      fontSize: fontSize.xs,
+                      fontSize: "0.75rem",
                       fontWeight: 500,
                       borderRadius: "9999px",
                       backgroundColor: statusColor.bg,
                       color: statusColor.text,
                       border: `1px solid ${statusColor.border}`,
+                      display: "inline-block",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {(ticket.status || "").toUpperCase()}
@@ -316,11 +315,13 @@ function TicketDetail() {
                     <span
                       style={{
                         padding: "0.375rem 0.875rem",
-                        fontSize: fontSize.xs,
+                        fontSize: "0.75rem",
                         fontWeight: 500,
                         borderRadius: "9999px",
                         backgroundColor: priorityColor.bg,
                         color: priorityColor.text,
+                        display: "inline-block",
+                        whiteSpace: "nowrap",
                       }}
                     >
                       {ticket.priority.toUpperCase()}

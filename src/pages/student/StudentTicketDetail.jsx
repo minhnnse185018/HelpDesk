@@ -3,19 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { ActionButton, DeleteConfirmModal } from "../../components/templates";
 import { downloadFile } from "../../utils/fileDownload";
+import { formatDate } from "../../utils/ticketHelpers.jsx";
 
-function formatDate(dateString) {
-  if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "N/A";
-  return date.toLocaleString("en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function getStatusConfig(status) {
   const map = {
@@ -89,19 +78,6 @@ function StudentTicketDetail() {
     return statusMap[status] || status;
   };
 
-  const getStatusColor = (status) => {
-    const statusColorMap = {
-      open: { bg: "#dbeafe", text: "#1e40af", border: "#93c5fd" },
-      assigned: { bg: "#fef3c7", text: "#92400e", border: "#fcd34d" },
-      accepted: { bg: "#e0e7ff", text: "#3730a3", border: "#a5b4fc" },
-      in_progress: { bg: "#e0e7ff", text: "#3730a3", border: "#a5b4fc" },
-      denied: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
-      resolved: { bg: "#d1fae5", text: "#065f46", border: "#6ee7b7" },
-      closed: { bg: "#e5e7eb", text: "#374151", border: "#d1d5db" },
-      escalated: { bg: "#ffe4e6", text: "#be123c", border: "#fecdd3" },
-    };
-    return statusColorMap[status] || statusColorMap.open;
-  };
 
   const getCategoryNames = (ticketCategories) => {
     if (!ticketCategories || ticketCategories.length === 0) return "N/A";
@@ -559,14 +535,15 @@ function StudentTicketDetail() {
                   return (
                     <span
                       style={{
-                        display: "inline-block",
-                        padding: "0.375rem 0.75rem",
                         fontSize: "0.75rem",
-                        fontWeight: "600",
-                        borderRadius: "6px",
+                        fontWeight: 500,
+                        padding: "0.375rem 0.875rem",
+                        borderRadius: "9999px",
                         backgroundColor: statusColor.bg,
                         color: statusColor.text,
                         border: `1px solid ${statusColor.border}`,
+                        display: "inline-block",
+                        whiteSpace: "nowrap",
                       }}
                     >
                       {getStatusLabel(ticket.status)}
@@ -962,14 +939,15 @@ function StudentTicketDetail() {
                               <td style={{ padding: "0.75rem" }}>
                                 <span
                                   style={{
-                                    display: "inline-block",
-                                    padding: "0.35rem 0.7rem",
                                     fontSize: "0.75rem",
-                                    fontWeight: "600",
-                                    borderRadius: "6px",
+                                    fontWeight: 500,
+                                    padding: "0.375rem 0.875rem",
+                                    borderRadius: "9999px",
                                     backgroundColor: statusColor.bg,
                                     color: statusColor.text,
                                     border: `1px solid ${statusColor.border}`,
+                                    display: "inline-block",
+                                    whiteSpace: "nowrap",
                                   }}
                                 >
                                   {getStatusLabel(subTicket.status)}

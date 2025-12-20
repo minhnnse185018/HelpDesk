@@ -236,7 +236,17 @@ function PendingSplitTickets({ searchTerm = "" }) {
                   filteredTickets.map((ticket) => (
                   <tr
                     key={ticket.id}
-                    style={{ borderBottom: "1px solid #f3f4f6" }}
+                    style={{ 
+                      borderBottom: "1px solid #f3f4f6",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#f9fafb";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
                   >
                     <td
                       style={{
@@ -270,7 +280,10 @@ function PendingSplitTickets({ searchTerm = "" }) {
                     >
                       {formatDate(ticket.createdAt)}
                     </td>
-                    <td style={{ padding: "1rem", textAlign: "center" }}>
+                    <td 
+                      style={{ padding: "1rem", textAlign: "center" }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button
                         type="button"
                         onClick={() => setSplitModal(ticket)}

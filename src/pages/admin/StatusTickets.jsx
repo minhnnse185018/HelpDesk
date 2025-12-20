@@ -77,77 +77,7 @@ function StatusTickets({ status, searchTerm = "" }) {
       loadTickets();
     }, 30000);
     
-    // Listen for ticket assigned events (real-time update)
-    const handleTicketAssigned = async (event) => {
-      const updatedTicket = event.detail;
-      if (!updatedTicket || !updatedTicket.id) return;
-
-      try {
-        // Fetch full ticket details including room, categories, etc.
-        const ticketRes = await apiClient.get(`/api/v1/tickets/${updatedTicket.id}`);
-        const fullTicket = ticketRes?.data || ticketRes;
-
-        // Fetch room details if needed
-        if (fullTicket.roomId && (!fullTicket.room?.code || !fullTicket.room?.floor)) {
-          try {
-            const roomRes = await apiClient.get(`/api/v1/rooms/${fullTicket.roomId}`);
-            fullTicket.room = roomRes.data || roomRes;
-          } catch (err) {
-            console.error(`Failed to fetch room ${fullTicket.roomId}:`, err);
-          }
-        }
-
-        // Update state based on current status filter
-        setTickets((prevTickets) => {
-          // If ticket status changed and no longer matches current filter, remove it
-          if (status && fullTicket.status !== status) {
-            return prevTickets.filter((ticket) => ticket.id !== fullTicket.id);
-          }
-          
-          // If ticket status matches current filter, update it
-          if (!status || fullTicket.status === status) {
-            const exists = prevTickets.some(t => t.id === fullTicket.id);
-            if (exists) {
-              // Update existing ticket
-              return prevTickets.map((ticket) =>
-                ticket.id === fullTicket.id ? fullTicket : ticket
-              );
-            } else {
-              // Add new ticket if it matches the filter
-              return [fullTicket, ...prevTickets];
-            }
-          }
-          
-          return prevTickets;
-        });
-      } catch (err) {
-        console.error('Failed to fetch assigned ticket details:', err);
-        // Fallback: update with the ticket from event if fetch fails
-        if (status && updatedTicket.status !== status) {
-          setTickets((prevTickets) => 
-            prevTickets.filter((ticket) => ticket.id !== updatedTicket.id)
-          );
-        } else if (!status || updatedTicket.status === status) {
-          setTickets((prevTickets) => {
-            const exists = prevTickets.some(t => t.id === updatedTicket.id);
-            if (exists) {
-              return prevTickets.map((ticket) =>
-                ticket.id === updatedTicket.id ? updatedTicket : ticket
-              );
-            } else {
-              return [updatedTicket, ...prevTickets];
-            }
-          });
-        }
-      }
-    };
-
-    window.addEventListener('ticket:assigned', handleTicketAssigned);
-    
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('ticket:assigned', handleTicketAssigned);
-    };
+    return () => clearInterval(interval);
   }, [status]);
 
   const handleDeleteClick = (ticketId) => {
@@ -172,48 +102,22 @@ function StatusTickets({ status, searchTerm = "" }) {
     try {
       await apiClient.post(`/api/v1/tickets/${ticketId}/assign-category`, { staffId, priority });
       
-      // Fetch updated ticket to emit with event and update state
+      // Fetch updated ticket to emit with event
       try {
         const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketId}`);
         const updatedTicket = ticketRes?.data || ticketRes;
-
-        // Fetch room details if needed
-        if (updatedTicket.roomId && (!updatedTicket.room?.code || !updatedTicket.room?.floor)) {
-          try {
-            const roomRes = await apiClient.get(`/api/v1/rooms/${updatedTicket.roomId}`);
-            updatedTicket.room = roomRes.data || roomRes;
-          } catch (err) {
-            console.error(`Failed to fetch room ${updatedTicket.roomId}:`, err);
-          }
-        }
         
-        // Update state directly with the updated ticket
-        // If status changed to "assigned" and current filter is not "assigned", remove from list
-        // If status changed and matches current filter, update in place
-        setTickets((prevTickets) => {
-          if (status && updatedTicket.status !== status) {
-            // Ticket status changed and no longer matches current filter, remove it
-            return prevTickets.filter((ticket) => ticket.id !== updatedTicket.id);
-          } else {
-            // Update ticket in place
-            return prevTickets.map((ticket) =>
-              ticket.id === updatedTicket.id ? updatedTicket : ticket
-            );
-          }
-        });
-        
-        // Emit event for real-time update to other components
+        // Emit event for real-time update
         window.dispatchEvent(new CustomEvent('ticket:assigned', { 
           detail: updatedTicket 
         }));
       } catch (fetchErr) {
         console.error('Failed to fetch updated ticket:', fetchErr);
-        // Fallback: reload all tickets if fetch fails
-        loadTickets();
       }
       
       setNotification({ type: "success", message: "Ticket assigned successfully!" });
       setAssignModal(null);
+      loadTickets();
     } catch (err) {
       console.error("Failed to assign:", err);
       console.error("Error details:", err.response?.data);
@@ -451,7 +355,17 @@ function StatusTickets({ status, searchTerm = "" }) {
                 filteredTickets.map((ticket) => (
                   <tr
                     key={ticket.id}
-                    style={{ borderBottom: "1px solid #f3f4f6" }}
+                    style={{ 
+                      borderBottom: "1px solid #f3f4f6",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#f9fafb";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
                   >
                     <td style={{ padding: "1rem" }}>
                       <div
@@ -565,20 +479,18 @@ function StatusTickets({ status, searchTerm = "" }) {
                     >
                       {formatDate(ticket.createdAt)}
                     </td>
-                    <td style={{ padding: "1rem" }}>
+                    <td 
+                      style={{ padding: "1rem" }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div
                         style={{
                           display: "flex",
                           gap: "0.5rem",
                           justifyContent: "center",
+                          flexWrap: "nowrap",
                         }}
                       >
-                        <ActionButton
-                          variant="secondary"
-                          onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
-                        >
-                          View
-                        </ActionButton>
                         {ticket.status !== "in_progress" &&
                           ticket.status !== "closed" &&
                           ticket.status !== "escalated" && (

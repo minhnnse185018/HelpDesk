@@ -2,19 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { useNotificationSocket } from "../../context/NotificationSocketContext";
+import { formatDate } from "../../utils/ticketHelpers.jsx";
 
-function formatDateTime(dateString) {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return dateString;
-  return date.toLocaleString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function NotificationsPage() {
   const navigate = useNavigate();
@@ -282,7 +271,7 @@ function NotificationsPage() {
                       {notification.actor?.username && (
                         <span>By {notification.actor.username}</span>
                       )}
-                      <span>{formatDateTime(notification.createdAt)}</span>
+                      <span>{formatDate(notification.createdAt)}</span>
                     </div>
                   </div>
 

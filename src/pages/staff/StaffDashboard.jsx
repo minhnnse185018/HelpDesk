@@ -4,6 +4,7 @@ import { apiClient } from '../../api/client'
 import { ActionButton } from '../../components/templates'
 import { useNotificationSocket } from '../../context/NotificationSocketContext'
 import Snowfall from 'react-snowfall'
+import { formatDate } from '../../utils/ticketHelpers.jsx'
 
 function StaffDashboard() {
   const navigate = useNavigate()
@@ -195,18 +196,6 @@ function StaffDashboard() {
     return labels[status] || status
   }
   
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A'
-    const date = new Date(dateString)
-    if (isNaN(date.getTime())) return 'N/A'
-    return date.toLocaleString('vi-VN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
 
   if (loading) {
     return (
@@ -347,13 +336,10 @@ function StaffDashboard() {
                       </span>
                     </td>
                     <td>{ticket.slaDue}</td>
-                    <td>
-                      <ActionButton
-                        variant="secondary"
-                        onClick={() => navigate(`/staff/tickets/${ticket.id}`)}
-                      >
-                        Details
-                      </ActionButton>
+                    <td
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* Actions column - empty since click on row navigates to detail */}
                     </td>
                   </tr>
                 ))

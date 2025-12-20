@@ -2,19 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 import { ActionButton, AlertModal } from '../../components/templates'
-
-function formatDate(dateString) {
-  if (!dateString) return 'N/A'
-  const date = new Date(dateString)
-  if (Number.isNaN(date.getTime())) return 'N/A'
-  return date.toLocaleString('vi-VN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+import { formatDate, getStatusBadge } from '../../utils/ticketHelpers.jsx'
 
 function formatDurationMinutes(minutes) {
   const total = Number(minutes)
@@ -50,31 +38,6 @@ function getPriorityBadge(priority) {
   )
 }
 
-function getStatusBadge(status) {
-  const configs = {
-    assigned: { bg: '#fef3c7', text: '#92400e', label: 'Assigned' },
-    in_progress: { bg: '#e0f2fe', text: '#075985', label: 'In Progress' },
-    resolved: { bg: '#dcfce7', text: '#166534', label: 'Resolved' },
-    denied: { bg: '#fee2e2', text: '#991b1b', label: 'Denied' },
-    escalated: { bg: '#fef08a', text: '#854d0e', label: 'Escalated' },
-  }
-  const config = configs[status] || { bg: '#e5e7eb', text: '#374151', label: status }
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        padding: '0.25rem 0.75rem',
-        borderRadius: '999px',
-        fontSize: '0.8rem',
-        fontWeight: 600,
-        backgroundColor: config.bg,
-        color: config.text,
-      }}
-    >
-      {config.label}
-    </span>
-  )
-}
 
 function StaffSubTicketDetail() {
   const { id } = useParams()

@@ -2,19 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 import { ActionButton } from '../../components/templates'
-
-function formatDate(dateString) {
-  if (!dateString) return 'N/A'
-  const date = new Date(dateString)
-  if (Number.isNaN(date.getTime())) return 'N/A'
-  return date.toLocaleString('vi-VN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+import { formatDate } from '../../utils/ticketHelpers.jsx'
 
 function getStatusBadge(status) {
   const configs = {
@@ -166,7 +154,23 @@ function StaffReassignRequests() {
               </thead>
               <tbody>
                 {filteredRequests.map((request) => (
-                  <tr key={request.id}>
+                  <tr 
+                    key={request.id}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => {
+                      if (request.subTicketId) {
+                        navigate(`/staff/sub-tickets/${request.subTicketId}`)
+                      } else if (request.ticketId) {
+                        navigate(`/staff/tickets/${request.ticketId}`)
+                      }
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#f9fafb";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
                     <td>
                       <span
                         style={{
@@ -206,19 +210,10 @@ function StaffReassignRequests() {
                     <td>{request.newAssignee || <span style={{ color: '#9ca3af' }}>Admin decides</span>}</td>
                     <td>{getStatusBadge(request.status)}</td>
                     <td>{formatDate(request.createdAt)}</td>
-                    <td>
-                      <ActionButton
-                        variant="secondary"
-                        onClick={() => {
-                          if (request.subTicketId) {
-                            navigate(`/staff/sub-tickets/${request.subTicketId}`)
-                          } else if (request.ticketId) {
-                            navigate(`/staff/tickets/${request.ticketId}`)
-                          }
-                        }}
-                      >
-                        View Details
-                      </ActionButton>
+                    <td
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* Actions column - empty since click on row navigates to detail */}
                     </td>
                   </tr>
                 ))}
