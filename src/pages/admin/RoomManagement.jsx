@@ -7,6 +7,7 @@ import {
   FormModalShell,
   DeleteConfirmModal,
   ActionButton,
+  AlertModal,
 } from '../../components/templates'
 
 function RoomManagement() {
@@ -21,6 +22,7 @@ function RoomManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [alertModal, setAlertModal] = useState(null)
 
   // Form state for create/edit
   const [formData, setFormData] = useState({
@@ -109,8 +111,18 @@ function RoomManagement() {
       setShowCreateModal(false)
       setFormData({ name: '', code: '', floor: '', capacity: '', description: '', isActive: true })
       await loadRooms()
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'Room created successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to create room')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to create room'
+      })
     } finally {
       setCreating(false)
     }
@@ -130,8 +142,18 @@ function RoomManagement() {
       }
       await apiClient.put(`/api/v1/rooms/${selectedId}`, payload)
       await Promise.all([loadRooms(), loadSelectedRoom()])
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'Room updated successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to update room')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to update room'
+      })
     } finally {
       setUpdating(false)
     }
@@ -152,8 +174,18 @@ function RoomManagement() {
       setSelectedRoom(null)
       setSelectedId(null)
       await loadRooms()
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'Room deleted successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to delete room')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to delete room'
+      })
     } finally {
       setDeleting(false)
     }
@@ -361,6 +393,16 @@ function RoomManagement() {
         } : null}
         itemLabel="Room"
       />
+
+      {alertModal && (
+        <AlertModal
+          isOpen={!!alertModal}
+          message={alertModal.message}
+          title={alertModal.title || 'Notice'}
+          type={alertModal.type || 'info'}
+          onClose={() => setAlertModal(null)}
+        />
+      )}
     </PageShell>
   )
 }

@@ -132,10 +132,20 @@ function Login() {
 
   const handleGoogleLogin = async (credentialResponse) => {
     try {
+      setServerError("");
+      setLoading(true);
+
+      if (!credentialResponse?.credential) {
+        setServerError("Google authentication failed. Please try again.");
+        setLoading(false);
+        return;
+      }
+
       const idToken = credentialResponse.credential;
 
       const baseUrl =
         import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
+      
       const res = await axios.post(`${baseUrl}/api/v1/auth/google`, {
         idToken,
       });
@@ -153,6 +163,7 @@ function Login() {
 
       if (!accessToken) {
         setServerError("Backend did not return an accessToken");
+        setLoading(false);
         return;
       }
 
@@ -167,29 +178,66 @@ function Login() {
 
       const username = decoded.email?.split("@")[0];
 
-      // Store tokens
+      // Store tokens - đảm bảo lưu trước khi navigate
       localStorage.setItem("accessToken", accessToken);
       if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
-
       localStorage.setItem("role", normalizedRole);
       if (username) localStorage.setItem("username", username);
 
-      // Delay 100ms to allow Google iframe to release
+      // Verify tokens are saved before navigating
+      const savedToken = localStorage.getItem("accessToken");
+      if (!savedToken) {
+        console.error("❌ Token was not saved properly");
+        setServerError("Failed to save authentication token");
+        setLoading(false);
+        return;
+      }
+
+      // Delay để đảm bảo token được lưu và Google iframe được release
+      // Tăng delay lên 200ms để đảm bảo mọi thứ được lưu đúng
       setTimeout(() => {
+        // Double check token trước khi navigate
+        const verifyToken = localStorage.getItem("accessToken");
+        if (!verifyToken) {
+          console.error("❌ Token lost before navigation");
+          setServerError("Authentication token was lost. Please try again.");
+          setLoading(false);
+          return;
+        }
+
         let destination = "/student/dashboard";
         if (normalizedRole === "ADMIN") {
           destination = "/admin/dashboard";
         } else if (normalizedRole === "STAFF") {
           destination = "/staff/dashboard";
         }
+        
+        console.log("✅ Navigating to:", destination);
         navigate(destination, { replace: true });
 
         // Start auto-refresh after successful login
         window.dispatchEvent(new Event("auth-login-success"));
-      }, 100);
+      }, 200);
     } catch (err) {
-      console.error(err);
-      setServerError("Google login failed");
+      console.error("Google login error:", err);
+      
+      // Better error handling
+      let errorMessage = "Google login failed";
+      
+      if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.response?.status === 401) {
+        errorMessage = "Authentication failed. Please try again.";
+      } else if (err?.response?.status === 403) {
+        errorMessage = "Access denied. Please contact administrator.";
+      } else if (err?.message) {
+        errorMessage = err.message;
+      } else if (err?.code === "ERR_NETWORK") {
+        errorMessage = "Network error. Please check your connection.";
+      }
+      
+      setServerError(errorMessage);
+      setLoading(false);
     }
   };
 
@@ -349,7 +397,13 @@ function Login() {
             >
               <GoogleLogin
                 onSuccess={handleGoogleLogin}
-                onError={() => setServerError("Google login failed")}
+                onError={(error) => {
+                  console.error("Google OAuth error:", error);
+                  // Suppress the runtime.lastError - it's a known Chrome extension issue
+                  if (error?.error !== "popup_closed_by_user") {
+                    setServerError("Google authentication failed. Please make sure your origin is authorized in Google Cloud Console.");
+                  }
+                }}
                 size="large"
                 width="280"
                 useOneTap={false}

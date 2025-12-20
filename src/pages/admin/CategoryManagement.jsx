@@ -7,6 +7,7 @@ import {
   FormModalShell,
   DeleteConfirmModal,
   ActionButton,
+  AlertModal,
 } from '../../components/templates'
 
 function CategoryManagement() {
@@ -22,6 +23,7 @@ function CategoryManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [alertModal, setAlertModal] = useState(null)
 
   // Form state for create/edit
   const [formData, setFormData] = useState({
@@ -118,8 +120,18 @@ function CategoryManagement() {
       setShowCreateModal(false)
       setFormData({ name: '', code: '', description: '', departmentId: '', isActive: true })
       await loadCategories()
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'Category created successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to create category')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to create category'
+      })
     } finally {
       setCreating(false)
     }
@@ -134,8 +146,18 @@ function CategoryManagement() {
     try {
       await apiClient.patch(`/api/v1/categories/${selectedId}`, formData)
       await Promise.all([loadCategories(), loadSelectedCategory()])
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'Category updated successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to update category')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to update category'
+      })
     } finally {
       setUpdating(false)
     }
@@ -156,8 +178,18 @@ function CategoryManagement() {
       setSelectedCategory(null)
       setSelectedId(null)
       await loadCategories()
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'Category deleted successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to delete category')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to delete category'
+      })
     } finally {
       setDeleting(false)
     }
@@ -355,6 +387,16 @@ function CategoryManagement() {
         } : null}
         itemLabel="Category"
       />
+
+      {alertModal && (
+        <AlertModal
+          isOpen={!!alertModal}
+          message={alertModal.message}
+          title={alertModal.title || 'Notice'}
+          type={alertModal.type || 'info'}
+          onClose={() => setAlertModal(null)}
+        />
+      )}
     </PageShell>
   )
 }

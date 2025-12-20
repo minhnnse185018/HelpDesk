@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { ActionButton, DeleteConfirmModal } from "../../components/templates";
 import { downloadFile } from "../../utils/fileDownload";
-import { formatDate } from "../../utils/ticketHelpers.jsx";
+import { formatDate, getStatusColor } from "../../utils/ticketHelpers.jsx";
 
 
 function getStatusConfig(status) {
