@@ -7,8 +7,8 @@ const getBaseUrl = () => {
   if (fromEnv && typeof fromEnv === "string") {
     return fromEnv.trim().replace(/\/$/, "");
   }
-  console.warn("VITE_API_BASE_URL is not set; fallback http://localhost:3001");
-  return "http://localhost:3001";
+  console.warn("VITE_API_BASE_URL is not set; fallback https://helpdesk-backend.onrender.com");
+  return "https://helpdesk-backend.onrender.com";
 };
 
 const buildUrl = (path) => {

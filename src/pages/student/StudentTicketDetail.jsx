@@ -1321,7 +1321,6 @@ function StudentTicketDetail() {
           deleteConfirm
             ? {
                 Title: deleteConfirm.title,
-                ID: deleteConfirm.id,
               }
             : null
         }

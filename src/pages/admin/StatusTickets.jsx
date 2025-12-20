@@ -4,9 +4,11 @@ import { apiClient } from "../../api/client";
 import { formatDate, getPriorityBadge, getStatusBadge } from "../../utils/ticketHelpers.jsx";
 import AssignTicketModal from "../../components/modals/AssignTicketModal";
 import { ActionButton, AlertModal } from "../../components/templates";
+import { useNotificationSocket } from "../../context/NotificationSocketContext";
 
 function StatusTickets({ status, searchTerm = "" }) {
   const navigate = useNavigate();
+  const { socket } = useNotificationSocket();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -59,7 +61,35 @@ function StatusTickets({ status, searchTerm = "" }) {
         })
       );
 
-      setTickets(ticketsArray);
+      // Merge với local state: giữ lại ticket có status "assigned" từ local state nếu server trả về "open"
+      // (tránh trường hợp server chưa cập nhật kịp)
+      setTickets((prevTickets) => {
+        const prevTicketsMap = new Map(prevTickets.map(t => [t.id, t]));
+        const mergedTickets = ticketsArray.map(serverTicket => {
+          const localTicket = prevTicketsMap.get(serverTicket.id);
+          
+          // Nếu local ticket có status "assigned" và server trả về "open" nhưng có assignee
+          // => có thể server chưa cập nhật kịp, giữ lại status "assigned" từ local
+          if (localTicket && 
+              localTicket.status === "assigned" && 
+              serverTicket.status === "open" &&
+              (serverTicket.assigneeId || serverTicket.assignee)) {
+            return { ...serverTicket, status: "assigned" };
+          }
+          
+          return serverTicket;
+        });
+        
+        // Thêm các ticket từ local state không có trong server response (nếu phù hợp filter)
+        prevTickets.forEach(localTicket => {
+          const existsInServer = mergedTickets.some(t => t.id === localTicket.id);
+          if (!existsInServer && (!status || localTicket.status === status)) {
+            mergedTickets.push(localTicket);
+          }
+        });
+        
+        return mergedTickets;
+      });
     } catch (err) {
       console.error("Failed to load tickets:", err);
       setError("Failed to load tickets. Please try again later.");
@@ -71,13 +101,126 @@ function StatusTickets({ status, searchTerm = "" }) {
   useEffect(() => {
     loadTickets();
     
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 5 minutes (300000ms) - giảm tần suất vì đã có socket
     const interval = setInterval(() => {
       loadTickets();
-    }, 30000);
+    }, 300000);
     
     return () => clearInterval(interval);
   }, [status]);
+
+  // Helper function to update ticket in list (handles all status changes)
+  const updateTicketInList = async (ticketData, fetchFullDetails = true) => {
+    if (!ticketData || !ticketData.id) return;
+
+    try {
+      let updatedTicket = ticketData;
+      
+      if (fetchFullDetails) {
+        try {
+          const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`);
+          updatedTicket = ticketRes?.data || ticketRes;
+        } catch (fetchErr) {
+          console.error('Failed to fetch ticket details:', fetchErr);
+          updatedTicket = ticketData;
+        }
+      }
+      
+      // Fetch room details if needed
+      if (updatedTicket.roomId && (!updatedTicket.room?.code || !updatedTicket.room?.floor)) {
+        try {
+          const roomRes = await apiClient.get(`/api/v1/rooms/${updatedTicket.roomId}`);
+          updatedTicket.room = roomRes.data || roomRes;
+        } catch (err) {
+          console.error(`Failed to fetch room ${updatedTicket.roomId}:`, err);
+        }
+      }
+      
+      setTickets((prevTickets) => {
+        const existingTicket = prevTickets.find(t => t.id === updatedTicket.id);
+        
+        // Preserve status "assigned" nếu local state đã có và server chưa cập nhật kịp
+        // Với các status khác, luôn trust server data
+        if (existingTicket && 
+            existingTicket.status === "assigned" && 
+            updatedTicket.status === "open" &&
+            (updatedTicket.assigneeId || updatedTicket.assignee)) {
+          updatedTicket.status = "assigned";
+        }
+        
+        // Chỉ cập nhật nếu ticket phù hợp với status filter
+        if (status && updatedTicket.status !== status) {
+          // Nếu ticket không còn phù hợp với filter, xóa khỏi danh sách
+          return prevTickets.filter(t => t.id !== updatedTicket.id);
+        }
+        
+        const exists = prevTickets.some(t => t.id === updatedTicket.id);
+        if (exists) {
+          return prevTickets.map(t => t.id === updatedTicket.id ? updatedTicket : t);
+        }
+        // Nếu ticket mới và phù hợp với filter, thêm vào danh sách
+        if (!status || updatedTicket.status === status) {
+          return [updatedTicket, ...prevTickets];
+        }
+        return prevTickets;
+      });
+    } catch (err) {
+      console.error('Failed to update ticket in list:', err);
+    }
+  };
+
+  // Listen for ticket events (real-time update via socket và window events)
+  useEffect(() => {
+    // Generic handler for all ticket updates
+    const handleTicketUpdated = async (event) => {
+      const updatedTicket = event.detail;
+      if (!updatedTicket?.id) return;
+      await updateTicketInList(updatedTicket, true);
+    };
+
+    // Generic handler for socket ticket updates
+    const handleSocketTicketUpdated = async (ticketData) => {
+      if (!ticketData?.id) return;
+      await updateTicketInList(ticketData, true);
+    };
+
+    // Register event listeners for all ticket update events
+    window.addEventListener('ticket:assigned', handleTicketUpdated);
+    window.addEventListener('ticket:accepted', handleTicketUpdated);
+    window.addEventListener('ticket:updated', handleTicketUpdated);
+    window.addEventListener('ticket:resolved', handleTicketUpdated);
+    window.addEventListener('ticket:denied', handleTicketUpdated);
+    window.addEventListener('ticket:closed', handleTicketUpdated);
+    
+    if (socket) {
+      socket.on('ticket:assigned', handleSocketTicketUpdated);
+      socket.on('ticket:accepted', handleSocketTicketUpdated);
+      socket.on('ticket:updated', handleSocketTicketUpdated);
+      socket.on('ticket:resolved', handleSocketTicketUpdated);
+      socket.on('ticket:denied', handleSocketTicketUpdated);
+      socket.on('ticket:closed', handleSocketTicketUpdated);
+      socket.on('ticket:status-changed', handleSocketTicketUpdated);
+    }
+
+    return () => {
+      window.removeEventListener('ticket:assigned', handleTicketUpdated);
+      window.removeEventListener('ticket:accepted', handleTicketUpdated);
+      window.removeEventListener('ticket:updated', handleTicketUpdated);
+      window.removeEventListener('ticket:resolved', handleTicketUpdated);
+      window.removeEventListener('ticket:denied', handleTicketUpdated);
+      window.removeEventListener('ticket:closed', handleTicketUpdated);
+      
+      if (socket) {
+        socket.off('ticket:assigned', handleSocketTicketUpdated);
+        socket.off('ticket:accepted', handleSocketTicketUpdated);
+        socket.off('ticket:updated', handleSocketTicketUpdated);
+        socket.off('ticket:resolved', handleSocketTicketUpdated);
+        socket.off('ticket:denied', handleSocketTicketUpdated);
+        socket.off('ticket:closed', handleSocketTicketUpdated);
+        socket.off('ticket:status-changed', handleSocketTicketUpdated);
+      }
+    };
+  }, [socket, status]);
 
   const handleDeleteClick = (ticketId) => {
     setDeleteConfirmModal(ticketId);
@@ -99,24 +242,87 @@ function StatusTickets({ status, searchTerm = "" }) {
 
   const handleAssign = async (ticketId, staffId, priority) => {
     try {
-      await apiClient.post(`/api/v1/tickets/${ticketId}/assign-category`, { staffId, priority });
+      const assignRes = await apiClient.post(`/api/v1/tickets/${ticketId}/assign-category`, { staffId, priority });
       
-      // Fetch updated ticket to emit with event
-      try {
-        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketId}`);
-        const updatedTicket = ticketRes?.data || ticketRes;
+      // Check if response contains updated ticket
+      let updatedTicket = assignRes?.data || assignRes;
+      
+      // If response doesn't contain full ticket, fetch it
+      if (!updatedTicket || !updatedTicket.id || !updatedTicket.status) {
+        try {
+          const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketId}`);
+          updatedTicket = ticketRes?.data || ticketRes;
+        } catch (fetchErr) {
+          console.error('Failed to fetch updated ticket:', fetchErr);
+        }
+      }
+      
+      // If ticket has assignee but status is still "open", update status to "assigned"
+      if (updatedTicket && (updatedTicket.assigneeId || updatedTicket.assignee) && updatedTicket.status === "open") {
+        try {
+          // Update status to "assigned" via API
+          await apiClient.patch(`/api/v1/tickets/${ticketId}`, {
+            status: "assigned"
+          });
+          
+          // Fetch lại ticket từ server để verify status đã được cập nhật
+          try {
+            const verifyRes = await apiClient.get(`/api/v1/tickets/${ticketId}`);
+            const verifiedTicket = verifyRes?.data || verifyRes;
+            
+            // Chỉ sử dụng ticket từ server nếu status đã được cập nhật thành "assigned"
+            if (verifiedTicket && verifiedTicket.status === "assigned") {
+              updatedTicket = verifiedTicket;
+            } else {
+              // Nếu server chưa cập nhật, vẫn set local state nhưng log warning
+              console.warn('Server status not updated yet, using local update');
+              updatedTicket.status = "assigned";
+            }
+          } catch (verifyErr) {
+            console.error('Failed to verify ticket status:', verifyErr);
+            // Fallback: set local status
+            updatedTicket.status = "assigned";
+          }
+        } catch (updateErr) {
+          console.error('Failed to update ticket status:', updateErr);
+          setNotification({ 
+            type: "error", 
+            message: "Ticket assigned but failed to update status. Please refresh the page." 
+          });
+          // Vẫn cập nhật local state để UI hiển thị đúng
+          updatedTicket.status = "assigned";
+        }
+      }
+      
+      if (updatedTicket) {
+        // Fetch room details if needed
+        if (updatedTicket.roomId && (!updatedTicket.room?.code || !updatedTicket.room?.floor)) {
+          try {
+            const roomRes = await apiClient.get(`/api/v1/rooms/${updatedTicket.roomId}`);
+            updatedTicket.room = roomRes.data || roomRes;
+          } catch (err) {
+            console.error(`Failed to fetch room ${updatedTicket.roomId}:`, err);
+          }
+        }
         
-        // Emit event for real-time update
+        // Update local state immediately
+        setTickets((prevTickets) => {
+          // Nếu ticket không còn phù hợp với status filter, xóa khỏi danh sách
+          if (status && updatedTicket.status !== status) {
+            return prevTickets.filter(t => t.id !== updatedTicket.id);
+          }
+          return prevTickets.map(t => t.id === updatedTicket.id ? updatedTicket : t);
+        });
+        
+        // Emit event for real-time update (socket và window event listeners sẽ xử lý)
         window.dispatchEvent(new CustomEvent('ticket:assigned', { 
           detail: updatedTicket 
         }));
-      } catch (fetchErr) {
-        console.error('Failed to fetch updated ticket:', fetchErr);
       }
       
       setNotification({ type: "success", message: "Ticket assigned successfully!" });
       setAssignModal(null);
-      loadTickets();
+      // Không cần gọi loadTickets() vì đã cập nhật local state và có socket listeners
     } catch (err) {
       console.error("Failed to assign:", err);
       console.error("Error details:", err.response?.data);

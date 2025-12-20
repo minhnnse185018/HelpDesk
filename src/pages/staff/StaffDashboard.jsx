@@ -279,7 +279,6 @@ function StaffDashboard() {
                 <th>Room</th>
                 <th>Status</th>
                 <th>SLA Due</th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
