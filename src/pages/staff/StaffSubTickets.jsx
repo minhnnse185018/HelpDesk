@@ -2,49 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { ActionButton, AlertModal } from "../../components/templates";
-
-function formatDate(dateString) {
-  if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "N/A";
-  return date.toLocaleString("vi-VN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function getPriorityBadge(priority) {
-  const configs = {
-    low: { className: "status-new", label: "Low" },
-    medium: { className: "status-in-progress", label: "Medium" },
-    high: { className: "status-overdue", label: "High" },
-    critical: { className: "status-overdue", label: "Critical" },
-  };
-  const config = configs[priority] || {
-    className: "status-new",
-    label: priority,
-  };
-  return (
-    <span className={`status-badge ${config.className}`}>{config.label}</span>
-  );
-}
-
-function getStatusBadge(status) {
-  const configs = {
-    assigned: { className: "status-in-progress", label: "Assigned" },
-    in_progress: { className: "status-in-progress", label: "In Progress" },
-    resolved: { className: "status-resolved", label: "Resolved" },
-    denied: { className: "status-overdue", label: "Denied" },
-    escalated: { className: "status-overdue", label: "Escalated" },
-  };
-  const config = configs[status] || { className: "status-new", label: status };
-  return (
-    <span className={`status-badge ${config.className}`}>{config.label}</span>
-  );
-}
+import { formatDate, getStatusBadge, getPriorityBadge } from "../../utils/ticketHelpers.jsx";
 
 function StaffSubTickets() {
   const navigate = useNavigate();
@@ -225,7 +183,17 @@ function StaffSubTickets() {
               </thead>
               <tbody>
                 {subTickets.map((subTicket) => (
-                  <tr key={subTicket.id}>
+                  <tr 
+                    key={subTicket.id}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => navigate(`/staff/sub-tickets/${subTicket.id}`)}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#f9fafb";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
                     <td>{subTicket.parentTicket?.title || "N/A"}</td>
                     <td>{subTicket.parentTicket?.room?.name || "N/A"}</td>
                     <td>{subTicket.category?.name || "N/A"}</td>
@@ -234,7 +202,9 @@ function StaffSubTickets() {
                     <td>{formatDate(subTicket.assignedAt)}</td>
                     <td>{formatDate(subTicket.acceptedAt)}</td>
                     <td>{formatDate(subTicket.dueDate)}</td>
-                    <td>
+                    <td
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div
                         style={{
                           display: "flex",
@@ -244,14 +214,6 @@ function StaffSubTickets() {
                           alignItems: "center",
                         }}
                       >
-                        <ActionButton
-                          variant="secondary"
-                          onClick={() =>
-                            navigate(`/staff/sub-tickets/${subTicket.id}`)
-                          }
-                        >
-                          Details
-                        </ActionButton>
 
                         {subTicket.status === "assigned" && (
                           <>
@@ -746,62 +708,6 @@ function ReassignRequestModal({ category, subTicket, onClose, onSubmit }) {
               Admin will review and assign a suitable staff member
             </p>
           </div>
-
-          {departmentId && (
-            <div style={{ marginBottom: "1rem" }}>
-              <label
-                htmlFor="suggestedStaff"
-                style={{
-                  display: "block",
-                  marginBottom: "0.5rem",
-                  fontWeight: 500,
-                }}
-              >
-                Suggest Staff Member (Optional)
-              </label>
-              {loadingStaff ? (
-                <div style={{ padding: "0.75rem", color: "#6b7280", fontSize: "0.875rem" }}>
-                  Loading staff...
-                </div>
-              ) : staffList.length === 0 ? (
-                <div style={{ padding: "0.75rem", color: "#6b7280", fontSize: "0.875rem" }}>
-                  No staff members found in this department
-                </div>
-              ) : (
-                <select
-                  id="suggestedStaff"
-                  className="input"
-                  value={staffId}
-                  onChange={(e) => setStaffId(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "0.75rem",
-                    fontSize: "0.875rem",
-                    border: "1px solid rgba(255,255,255,0.18)",
-                    borderRadius: "8px",
-                    backgroundColor: "rgba(255, 255, 255, 0.72)",
-                    color: "#374151",
-                  }}
-                >
-                  <option value="">-- Select a staff member (optional) --</option>
-                  {staffList.map((staff) => (
-                    <option key={staff.id} value={staff.id}>
-                      {staff.fullName || staff.username} {staff.email ? `(${staff.email})` : ""}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <p
-                style={{
-                  fontSize: "0.75rem",
-                  color: "#6b7280",
-                  marginTop: "0.25rem",
-                }}
-              >
-                Suggest a staff member from your department for reassignment
-              </p>
-            </div>
-          )}
 
           <div
             style={{

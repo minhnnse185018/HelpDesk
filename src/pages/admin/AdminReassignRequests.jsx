@@ -1,19 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
-
-function formatDate(dateString) {
-  if (!dateString) return 'N/A'
-  const date = new Date(dateString)
-  if (Number.isNaN(date.getTime())) return 'N/A'
-  return date.toLocaleString('vi-VN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+import { formatDate } from '../../utils/ticketHelpers.jsx'
 
 function getStatusBadge(status) {
   const configs = {

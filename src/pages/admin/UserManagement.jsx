@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiClient } from '../../api/client'
 import { ActionButton, DeleteConfirmModal } from '../../components/templates'
+import { formatDate } from '../../utils/ticketHelpers.jsx'
 
 const roleOptions = [
   { value: 'staff', label: 'Staff' },
@@ -340,7 +341,7 @@ function UserManagement() {
                   <div>
                     <p className="detail-label">Created At</p>
                     <p className="detail-value">
-                      {selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleString('vi-VN') : '—'}
+                      {selectedUser.createdAt ? formatDate(selectedUser.createdAt) : '—'}
                     </p>
                   </div>
                 </div>

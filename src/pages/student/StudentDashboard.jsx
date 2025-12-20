@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 import { ActionButton } from '../../components/templates'
 import Snowfall from 'react-snowfall'
+import { formatDate } from '../../utils/ticketHelpers.jsx'
 
 function StudentDashboard() {
   const navigate = useNavigate()
@@ -98,7 +99,7 @@ function StudentDashboard() {
         status: statusObj.label,
         statusKey: statusObj.key,
         slaDue: t.dueDate
-          ? new Date(t.dueDate).toLocaleString('en-GB')
+          ? formatDate(t.dueDate)
           : '-',
       }
     })

@@ -3,71 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 import { ActionButton, AlertModal } from '../../components/templates'
 import { useNotificationSocket } from '../../context/NotificationSocketContext'
-
-function formatDate(dateString) {
-  if (!dateString) return 'N/A'
-  const date = new Date(dateString)
-  if (Number.isNaN(date.getTime())) return 'N/A'
-  return date.toLocaleString('vi-VN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function getPriorityBadge(priority) {
-  if (!priority) return '-'
-  const configs = {
-    low: { bg: '#ecfdf3', text: '#166534', label: 'Low' },
-    medium: { bg: '#fef3c7', text: '#92400e', label: 'Medium' },
-    high: { bg: '#fee2e2', text: '#b91c1c', label: 'High' },
-    critical: { bg: '#7f1d1d', text: '#fef2f2', label: 'Critical' },
-  }
-  const config = configs[priority] || { bg: '#f3f4f6', text: '#4b5563', label: priority }
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        padding: '0.15rem 0.6rem',
-        borderRadius: '999px',
-        fontSize: '0.75rem',
-        fontWeight: 600,
-        backgroundColor: config.bg,
-        color: config.text,
-      }}
-    >
-      {config.label}
-    </span>
-  )
-}
-
-function getStatusBadge(status) {
-  const configs = {
-    assigned: { bg: '#fef3c7', text: '#92400e', label: 'Assigned' },
-    in_progress: { bg: '#e0f2fe', text: '#075985', label: 'In Progress' },
-    resolved: { bg: '#dcfce7', text: '#166534', label: 'Resolved' },
-    cancelled: { bg: '#f3f4f6', text: '#4b5563', label: 'Cancelled' },
-    closed: { bg: '#e5e7eb', text: '#374151', label: 'Closed' },
-  }
-  const config = configs[status] || { bg: '#e5e7eb', text: '#374151', label: status }
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        padding: '0.15rem 0.6rem',
-        borderRadius: '999px',
-        fontSize: '0.75rem',
-        fontWeight: 600,
-        backgroundColor: config.bg,
-        color: config.text,
-      }}
-    >
-      {config.label}
-    </span>
-  )
-}
+import { formatDate, getStatusBadge, getPriorityBadge } from '../../utils/ticketHelpers.jsx'
 
 function StaffAssignedTickets() {
   const navigate = useNavigate()
@@ -493,7 +429,17 @@ function StaffAssignedTickets() {
               </thead>
               <tbody>
                 {filteredTickets.map((ticket) => (
-                  <tr key={ticket.id}>
+                  <tr 
+                    key={ticket.id}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => navigate(`/staff/tickets/${ticket.id}`)}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#f9fafb";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
                     <td>{ticket.title}</td>
                     <td>{ticket.room?.name || 'N/A'}</td>
                     <td>{ticket.department?.name || 'N/A'}</td>
@@ -506,6 +452,7 @@ function StaffAssignedTickets() {
                         whiteSpace: 'nowrap',
                         minWidth: '300px', // Increased to accommodate Reassign button
                       }}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       {/* đảm bảo tất cả button nằm trên một dòng */}
                       <div
@@ -560,13 +507,6 @@ function StaffAssignedTickets() {
                             Reassign
                           </ActionButton>
                         )}
-
-                        <ActionButton
-                          variant="secondary"
-                          onClick={() => navigate(`/staff/tickets/${ticket.id}`)}
-                        >
-                          Details
-                        </ActionButton>
                       </div>
                     </td>
                   </tr>
@@ -949,52 +889,6 @@ function ReassignTicketModal({ ticketTitle, departmentId, onClose, onSubmit }) {
               required
             />
           </div>
-
-          {departmentId && (
-            <div style={{ marginBottom: '1rem' }}>
-              <label
-                htmlFor="suggestedStaff"
-                style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}
-              >
-                Suggest Staff Member (Optional)
-              </label>
-              {loadingStaff ? (
-                <div style={{ padding: '0.75rem', color: '#6b7280', fontSize: '0.875rem' }}>
-                  Loading staff...
-                </div>
-              ) : staffList.length === 0 ? (
-                <div style={{ padding: '0.75rem', color: '#6b7280', fontSize: '0.875rem' }}>
-                  No staff members found in this department
-                </div>
-              ) : (
-                <select
-                  id="suggestedStaff"
-                  className="input"
-                  value={staffId}
-                  onChange={(e) => setStaffId(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    fontSize: '0.875rem',
-                    border: '1px solid rgba(255,255,255,0.18)',
-                    borderRadius: '8px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.72)',
-                    color: '#374151',
-                  }}
-                >
-                  <option value="">-- Select a staff member (optional) --</option>
-                  {staffList.map((staff) => (
-                    <option key={staff.id} value={staff.id}>
-                      {staff.fullName || staff.username} {staff.email ? `(${staff.email})` : ''}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                Suggest a staff member from your department for reassignment
-              </p>
-            </div>
-          )}
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
             <ActionButton

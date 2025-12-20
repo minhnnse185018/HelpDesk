@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import {
@@ -10,15 +10,15 @@ import { useNotificationSocket } from "../../context/NotificationSocketContext";
 
 const getStatusColor = (status) => {
   const colors = {
-    open: { bg: "#e0e7ff", text: "#3730a3" },
-    assigned: { bg: "#dbeafe", text: "#1e40af" },
-    in_progress: { bg: "#fef3c7", text: "#92400e" },
-    resolved: { bg: "#d1fae5", text: "#065f46" },
-    denied: { bg: "#fee2e2", text: "#991b1b" },
-    closed: { bg: "#e5e7eb", text: "#374151" },
-    escalated: { bg: "#fef2f2", text: "#b91c1c" },
+    open: { bg: "#dbeafe", text: "#1e40af", border: "#93c5fd" },
+    assigned: { bg: "#fef3c7", text: "#92400e", border: "#fcd34d" },
+    in_progress: { bg: "#e0e7ff", text: "#3730a3", border: "#a5b4fc" },
+    resolved: { bg: "#d1fae5", text: "#065f46", border: "#6ee7b7" },
+    denied: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
+    closed: { bg: "#e5e7eb", text: "#374151", border: "#d1d5db" },
+    escalated: { bg: "#fef2f2", text: "#b91c1c", border: "#fecdd3" },
   };
-  return colors[status] || { bg: "#f3f4f6", text: "#374151" };
+  return colors[status] || { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" };
 };
 
 const getPriorityColor = (priority) => {
@@ -31,6 +31,29 @@ const getPriorityColor = (priority) => {
   return colors[priority] || { bg: "#f3f4f6", text: "#374151" };
 };
 
+// Helper function to fetch room details
+const fetchRoomDetails = async (roomId) => {
+  try {
+    const roomRes = await apiClient.get(`/api/v1/rooms/${roomId}`);
+    return roomRes.data || roomRes;
+  } catch (err) {
+    console.error(`Failed to fetch room ${roomId}:`, err);
+    return null;
+  }
+};
+
+// Helper function to enrich ticket with room data
+const enrichTicketWithRoom = async (ticket) => {
+  if (ticket.roomId && (!ticket.room?.code || !ticket.room?.floor)) {
+    const roomData = await fetchRoomDetails(ticket.roomId);
+    if (roomData) {
+      ticket.room = roomData;
+    }
+  }
+  return ticket;
+};
+
+
 function AllTickets({ searchTerm = "" }) {
   const navigate = useNavigate();
   const { socket } = useNotificationSocket();
@@ -42,18 +65,20 @@ function AllTickets({ searchTerm = "" }) {
   const [sortOrder, setSortOrder] = useState("asc");
   const [deleteConfirmModal, setDeleteConfirmModal] = useState(null);
 
-  const handleSortByPriority = () => {
+  const handleSortByPriority = useCallback(() => {
     const priorityMap = { low: 1, medium: 2, high: 3, critical: 4 };
-    const sorted = [...tickets].sort((a, b) => {
-      const aVal = priorityMap[a.priority] || 0;
-      const bVal = priorityMap[b.priority] || 0;
-      return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
+    setTickets((prevTickets) => {
+      const sorted = [...prevTickets].sort((a, b) => {
+        const aVal = priorityMap[a.priority] || 0;
+        const bVal = priorityMap[b.priority] || 0;
+        return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
+      });
+      return sorted;
     });
-    setTickets(sorted);
-    setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-  };
+    setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+  }, [sortOrder]);
 
-  const loadTickets = async () => {
+  const loadTickets = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -96,19 +121,7 @@ function AllTickets({ searchTerm = "" }) {
 
       // Fetch room details for tickets with incomplete room data
       ticketsArray = await Promise.all(
-        ticketsArray.map(async (ticket) => {
-          if (ticket.roomId && (!ticket.room?.code || !ticket.room?.floor)) {
-            try {
-              const roomRes = await apiClient.get(
-                `/api/v1/rooms/${ticket.roomId}`
-              );
-              ticket.room = roomRes.data || roomRes;
-            } catch (err) {
-              console.error(`Failed to fetch room ${ticket.roomId}:`, err);
-            }
-          }
-          return ticket;
-        })
+        ticketsArray.map(enrichTicketWithRoom)
       );
 
       setTickets(ticketsArray);
@@ -122,15 +135,13 @@ function AllTickets({ searchTerm = "" }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadTickets();
 
     // Auto-refresh every 5 minutes (300000ms)
-    const interval = setInterval(() => {
-      loadTickets();
-    }, 300000); // 5 minutes
+    const interval = setInterval(loadTickets, 300000);
 
     // Refresh when tab becomes visible (user switches back to tab)
     const handleVisibilityChange = () => {
@@ -145,143 +156,59 @@ function AllTickets({ searchTerm = "" }) {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
+  }, [loadTickets]);
+
+  // Helper function to add ticket to list (avoid duplicates)
+  const addTicketToList = useCallback(async (ticketData, fetchFullDetails = true) => {
+    if (!ticketData || !ticketData.id) return;
+
+    try {
+      let fullTicket = ticketData;
+      
+      if (fetchFullDetails) {
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`);
+        fullTicket = ticketRes?.data || ticketRes;
+        await enrichTicketWithRoom(fullTicket);
+      }
+
+      setTickets((prevTickets) => {
+        const exists = prevTickets.some(t => t.id === fullTicket.id);
+        if (exists) return prevTickets;
+        return [fullTicket, ...prevTickets];
+      });
+    } catch (err) {
+      console.error('Failed to add ticket to list:', err);
+      // Fallback: add ticket as-is if fetch failed
+      if (fetchFullDetails) {
+        setTickets((prevTickets) => {
+          const exists = prevTickets.some(t => t.id === ticketData.id);
+          if (exists) return prevTickets;
+          return [ticketData, ...prevTickets];
+        });
+      }
+    }
   }, []);
 
-  // Listen for new ticket created events (real-time update)
+  // Listen for ticket events (real-time update)
   useEffect(() => {
     // Listen for custom window event (from CreateTicket)
-    const handleTicketCreated = async (event) => {
-      const newTicket = event.detail;
-      if (!newTicket || !newTicket.id) return;
-
-      try {
-        // Fetch full ticket details including room, categories, etc.
-        const ticketRes = await apiClient.get(`/api/v1/tickets/${newTicket.id}`);
-        const fullTicket = ticketRes?.data || ticketRes;
-
-        // Fetch room details if needed
-        if (fullTicket.roomId && (!fullTicket.room?.code || !fullTicket.room?.floor)) {
-          try {
-            const roomRes = await apiClient.get(`/api/v1/rooms/${fullTicket.roomId}`);
-            fullTicket.room = roomRes.data || roomRes;
-          } catch (err) {
-            console.error(`Failed to fetch room ${fullTicket.roomId}:`, err);
-          }
-        }
-
-        // Check if ticket already exists (avoid duplicates)
-        setTickets((prevTickets) => {
-          const exists = prevTickets.some(t => t.id === fullTicket.id);
-          if (exists) return prevTickets;
-          
-          // Add new ticket to the beginning of the list
-          return [fullTicket, ...prevTickets];
-        });
-      } catch (err) {
-        console.error('Failed to fetch new ticket details:', err);
-        // Fallback: just add the ticket as-is
-        setTickets((prevTickets) => {
-          const exists = prevTickets.some(t => t.id === newTicket.id);
-          if (exists) return prevTickets;
-          return [newTicket, ...prevTickets];
-        });
-      }
+    const handleTicketCreated = (event) => {
+      addTicketToList(event.detail, true);
     };
 
-    // Listen for socket event from server (if server emits ticket:created)
-    const handleSocketTicketCreated = async (ticketData) => {
-      if (!ticketData || !ticketData.id) return;
-
-      try {
-        // Fetch full ticket details
-        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`);
-        const fullTicket = ticketRes?.data || ticketRes;
-
-        // Fetch room details if needed
-        if (fullTicket.roomId && (!fullTicket.room?.code || !fullTicket.room?.floor)) {
-          try {
-            const roomRes = await apiClient.get(`/api/v1/rooms/${fullTicket.roomId}`);
-            fullTicket.room = roomRes.data || roomRes;
-          } catch (err) {
-            console.error(`Failed to fetch room ${fullTicket.roomId}:`, err);
-          }
-        }
-
-        setTickets((prevTickets) => {
-          const exists = prevTickets.some(t => t.id === fullTicket.id);
-          if (exists) return prevTickets;
-          return [fullTicket, ...prevTickets];
-        });
-      } catch (err) {
-        console.error('Failed to fetch new ticket from socket:', err);
-      }
-    };
-
-    // Listen for ticket assigned events (real-time update)
-    const handleTicketAssigned = async (event) => {
+    // Listen for ticket assigned event
+    const handleTicketAssigned = (event) => {
       const updatedTicket = event.detail;
-      if (!updatedTicket || !updatedTicket.id) return;
-
-      try {
-        // Fetch full ticket details including room, categories, etc.
-        const ticketRes = await apiClient.get(`/api/v1/tickets/${updatedTicket.id}`);
-        const fullTicket = ticketRes?.data || ticketRes;
-
-        // Fetch room details if needed
-        if (fullTicket.roomId && (!fullTicket.room?.code || !fullTicket.room?.floor)) {
-          try {
-            const roomRes = await apiClient.get(`/api/v1/rooms/${fullTicket.roomId}`);
-            fullTicket.room = roomRes.data || roomRes;
-          } catch (err) {
-            console.error(`Failed to fetch room ${fullTicket.roomId}:`, err);
-          }
-        }
-
-        // Update existing ticket in the list
-        setTickets((prevTickets) => {
-          return prevTickets.map((ticket) =>
-            ticket.id === fullTicket.id ? fullTicket : ticket
-          );
-        });
-      } catch (err) {
-        console.error('Failed to fetch assigned ticket details:', err);
-        // Fallback: update with the ticket from event if fetch fails
-        setTickets((prevTickets) => {
-          return prevTickets.map((ticket) =>
-            ticket.id === updatedTicket.id ? updatedTicket : ticket
-          );
-        });
-      }
+      if (!updatedTicket?.id) return;
+      
+      setTickets((prevTickets) => 
+        prevTickets.map(t => t.id === updatedTicket.id ? updatedTicket : t)
+      );
     };
 
-    // Listen for socket event from server (if server emits ticket:assigned)
-    const handleSocketTicketAssigned = async (ticketData) => {
-      if (!ticketData || !ticketData.id) return;
-
-      try {
-        // Fetch full ticket details
-        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`);
-        const fullTicket = ticketRes?.data || ticketRes;
-
-        // Fetch room details if needed
-        if (fullTicket.roomId && (!fullTicket.room?.code || !fullTicket.room?.floor)) {
-          try {
-            const roomRes = await apiClient.get(`/api/v1/rooms/${fullTicket.roomId}`);
-            fullTicket.room = roomRes.data || roomRes;
-          } catch (err) {
-            console.error(`Failed to fetch room ${fullTicket.roomId}:`, err);
-          }
-        }
-
-        // Update existing ticket in the list
-        setTickets((prevTickets) => {
-          return prevTickets.map((ticket) =>
-            ticket.id === fullTicket.id ? fullTicket : ticket
-          );
-        });
-      } catch (err) {
-        console.error('Failed to fetch assigned ticket from socket:', err);
-      }
+    // Listen for socket event from server
+    const handleSocketTicketCreated = (ticketData) => {
+      addTicketToList(ticketData, true);
     };
 
     // Register event listeners
@@ -290,7 +217,6 @@ function AllTickets({ searchTerm = "" }) {
     
     if (socket) {
       socket.on('ticket:created', handleSocketTicketCreated);
-      socket.on('ticket:assigned', handleSocketTicketAssigned);
     }
 
     return () => {
@@ -298,17 +224,18 @@ function AllTickets({ searchTerm = "" }) {
       window.removeEventListener('ticket:assigned', handleTicketAssigned);
       if (socket) {
         socket.off('ticket:created', handleSocketTicketCreated);
-        socket.off('ticket:assigned', handleSocketTicketAssigned);
       }
     };
-  }, [socket]);
+  }, [socket, addTicketToList]);
 
-  const handleDeleteClick = (ticketId) => {
+  const handleDeleteClick = useCallback((ticketId) => {
     setDeleteConfirmModal(ticketId);
-  };
+  }, []);
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = useCallback(async () => {
     const ticketId = deleteConfirmModal;
+    if (!ticketId) return;
+    
     setDeleteConfirmModal(null);
 
     try {
@@ -319,55 +246,27 @@ function AllTickets({ searchTerm = "" }) {
       console.error("Failed to delete:", err);
       setNotification({ type: "error", message: "Failed to delete ticket" });
     }
-  };
+  }, [deleteConfirmModal, loadTickets]);
 
-  const handleAssign = async (ticketId, staffId, priority) => {
+  const handleAssign = useCallback(async (ticketId, staffId, priority) => {
     try {
       await apiClient.post(`/api/v1/tickets/${ticketId}/assign-category`, {
         staffId,
         priority,
       });
       
-      // Wait a bit for database transaction to complete and socket to emit
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
       // Fetch updated ticket to emit with event
       try {
         const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketId}`);
         const updatedTicket = ticketRes?.data || ticketRes;
-
-        // Verify status was updated
-        if (updatedTicket.status === 'assigned') {
-          // Fetch room details if needed
-          if (updatedTicket.roomId && (!updatedTicket.room?.code || !updatedTicket.room?.floor)) {
-            try {
-              const roomRes = await apiClient.get(`/api/v1/rooms/${updatedTicket.roomId}`);
-              updatedTicket.room = roomRes.data || roomRes;
-            } catch (err) {
-              console.error(`Failed to fetch room ${updatedTicket.roomId}:`, err);
-            }
-          }
-          
-          // Update state directly with the updated ticket
-          setTickets((prevTickets) => {
-            return prevTickets.map((ticket) =>
-              ticket.id === updatedTicket.id ? updatedTicket : ticket
-            );
-          });
-          
-          // Emit event for real-time update to other components
-          window.dispatchEvent(new CustomEvent('ticket:assigned', { 
-            detail: updatedTicket 
-          }));
-        } else {
-          // Status not updated yet, reload all tickets
-          console.warn('Ticket status not updated to assigned yet, reloading all tickets...');
-          loadTickets();
-        }
+        await enrichTicketWithRoom(updatedTicket);
+        
+        // Emit event for real-time update
+        window.dispatchEvent(new CustomEvent('ticket:assigned', { 
+          detail: updatedTicket 
+        }));
       } catch (fetchErr) {
         console.error('Failed to fetch updated ticket:', fetchErr);
-        // Fallback: reload all tickets if fetch fails
-        loadTickets();
       }
       
       setNotification({
@@ -375,6 +274,7 @@ function AllTickets({ searchTerm = "" }) {
         message: "Ticket assigned successfully!",
       });
       setAssignModal(null);
+      loadTickets();
     } catch (err) {
       console.error("Failed to assign:", err);
       console.error("Error details:", err.response?.data);
@@ -383,13 +283,13 @@ function AllTickets({ searchTerm = "" }) {
         message: err.response?.data?.message || "Failed to assign ticket",
       });
     }
-  };
+  }, [loadTickets]);
 
-  // Filter tickets based on search term
-  const filteredTickets = tickets.filter((ticket) => {
-    if (!searchTerm) return true;
+  // Filter tickets based on search term - memoized
+  const filteredTickets = useMemo(() => {
+    if (!searchTerm) return tickets;
     const searchLower = searchTerm.toLowerCase();
-    return (
+    return tickets.filter((ticket) => (
       ticket.title?.toLowerCase().includes(searchLower) ||
       ticket.room?.name?.toLowerCase().includes(searchLower) ||
       ticket.room?.code?.toLowerCase().includes(searchLower) ||
@@ -398,8 +298,8 @@ function AllTickets({ searchTerm = "" }) {
       ticket.assignee?.fullName?.toLowerCase().includes(searchLower) ||
       ticket.status?.toLowerCase().includes(searchLower) ||
       ticket.priority?.toLowerCase().includes(searchLower)
-    );
-  });
+    ));
+  }, [tickets, searchTerm]);
 
   if (loading) {
     return (
@@ -553,7 +453,7 @@ function AllTickets({ searchTerm = "" }) {
                 </th>
                 <th
                   style={{
-                    padding: "1rem",
+                    padding: "0.75rem",
                     textAlign: "left",
                     fontWeight: 600,
                     color: "#374151",
@@ -677,7 +577,17 @@ function AllTickets({ searchTerm = "" }) {
                 filteredTickets.map((ticket) => (
                   <tr
                     key={ticket.id}
-                    style={{ borderBottom: "1px solid #f3f4f6" }}
+                    style={{ 
+                      borderBottom: "1px solid #f3f4f6",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#f9fafb";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
                   >
                     <td style={{ padding: "1rem" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem", flexWrap: "wrap" }}>
@@ -772,11 +682,14 @@ function AllTickets({ searchTerm = "" }) {
                       <span
                         style={{
                           fontSize: "0.75rem",
-                          fontWeight: 600,
-                          padding: "0.25rem 0.75rem",
+                          fontWeight: 500,
+                          padding: "0.375rem 0.875rem",
                           borderRadius: "9999px",
                           backgroundColor: getStatusColor(ticket.status).bg,
                           color: getStatusColor(ticket.status).text,
+                          border: `1px solid ${getStatusColor(ticket.status).border}`,
+                          display: "inline-block",
+                          whiteSpace: "nowrap",
                         }}
                       >
                         {ticket.status?.toUpperCase() || "N/A"}
@@ -786,11 +699,13 @@ function AllTickets({ searchTerm = "" }) {
                       <span
                         style={{
                           fontSize: "0.75rem",
-                          fontWeight: 600,
-                          padding: "0.25rem 0.75rem",
+                          fontWeight: 500,
+                          padding: "0.375rem 0.875rem",
                           borderRadius: "9999px",
                           backgroundColor: getPriorityColor(ticket.priority).bg,
                           color: getPriorityColor(ticket.priority).text,
+                          display: "inline-block",
+                          whiteSpace: "nowrap",
                         }}
                       >
                         {ticket.priority?.toUpperCase() || "N/A"}
@@ -870,80 +785,34 @@ function AllTickets({ searchTerm = "" }) {
                     >
                       {formatDate(ticket.createdAt)}
                     </td>
-                    <td style={{ padding: "1rem" }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "0.5rem",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() =>
-                            navigate(`/admin/tickets/${ticket.id}`)
-                          }
-                          style={{
-                            padding: "0.5rem 1rem",
-                            fontSize: "0.8rem",
-                            fontWeight: 500,
-                            backgroundColor: "rgba(99, 102, 241, 0.08)",
-                            color: "#6366f1",
-                            border: "1px solid rgba(99, 102, 241, 0.2)",
-                            borderRadius: "14px",
-                            cursor: "pointer",
-                            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                            backdropFilter: "blur(40px) saturate(200%)",
-                            boxShadow:
-                              "0 8px 32px rgba(99, 102, 241, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(99, 102, 241, 0.1)",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.backgroundColor =
-                              "rgba(99, 102, 241, 0.15)";
-                            e.currentTarget.style.transform =
-                              "translateY(-1px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.backgroundColor =
-                              "rgba(99, 102, 241, 0.08)";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          View
-                        </button>
+                    <td 
+                      style={{ padding: "0.75rem", position: "relative" }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center", flexWrap: "nowrap" }}>
                         {ticket.status !== "in_progress" &&
                           ticket.status !== "closed" &&
                           ticket.status !== "escalated" && (
                             <button
                               type="button"
-                              onClick={() =>
-                                navigate(`/admin/tickets/edit/${ticket.id}`)
-                              }
+                              onClick={() => navigate(`/admin/tickets/edit/${ticket.id}`)}
                               style={{
-                                padding: "0.5rem 1rem",
-                                fontSize: "0.8rem",
+                                padding: "0.375rem 0.75rem",
+                                fontSize: "0.75rem",
                                 fontWeight: 500,
                                 backgroundColor: "rgba(59, 130, 246, 0.08)",
                                 color: "#2563eb",
                                 border: "1px solid rgba(59, 130, 246, 0.2)",
-                                borderRadius: "14px",
+                                borderRadius: "8px",
                                 cursor: "pointer",
-                                transition:
-                                  "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                                backdropFilter: "blur(40px) saturate(200%)",
-                                boxShadow:
-                                  "0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(59, 130, 246, 0.1)",
+                                transition: "all 0.2s",
+                                whiteSpace: "nowrap",
                               }}
                               onMouseOver={(e) => {
-                                e.currentTarget.style.backgroundColor =
-                                  "rgba(59, 130, 246, 0.15)";
-                                e.currentTarget.style.transform =
-                                  "translateY(-1px)";
+                                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.15)";
                               }}
                               onMouseOut={(e) => {
-                                e.currentTarget.style.backgroundColor =
-                                  "rgba(59, 130, 246, 0.08)";
-                                e.currentTarget.style.transform = "translateY(0)";
+                                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.08)";
                               }}
                             >
                               Edit
@@ -955,38 +824,28 @@ function AllTickets({ searchTerm = "" }) {
                             Array.isArray(ticket.ticketCategories) &&
                             ticket.ticketCategories.length >= 2;
                           
-                          // Ẩn nút Assign nếu ticket là pending split
                           if (!canAssign || isPendingSplit) return null;
                           return (
                             <button
                               type="button"
                               onClick={() => setAssignModal(ticket)}
                               style={{
-                                padding: "0.5rem 1rem",
-                                fontSize: "0.8rem",
+                                padding: "0.375rem 0.75rem",
+                                fontSize: "0.75rem",
                                 fontWeight: 500,
                                 backgroundColor: "rgba(16, 185, 129, 0.08)",
                                 color: "#10b981",
                                 border: "1px solid rgba(16, 185, 129, 0.2)",
-                                borderRadius: "14px",
+                                borderRadius: "8px",
                                 cursor: "pointer",
-                                transition:
-                                  "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                                backdropFilter: "blur(40px) saturate(200%)",
-                                boxShadow:
-                                  "0 8px 32px rgba(16, 185, 129, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(16, 185, 129, 0.1)",
+                                transition: "all 0.2s",
+                                whiteSpace: "nowrap",
                               }}
                               onMouseOver={(e) => {
-                                e.currentTarget.style.backgroundColor =
-                                  "rgba(16, 185, 129, 0.15)";
-                                e.currentTarget.style.transform =
-                                  "translateY(-1px)";
+                                e.currentTarget.style.backgroundColor = "rgba(16, 185, 129, 0.15)";
                               }}
                               onMouseOut={(e) => {
-                                e.currentTarget.style.backgroundColor =
-                                  "rgba(16, 185, 129, 0.08)";
-                                e.currentTarget.style.transform =
-                                  "translateY(0)";
+                                e.currentTarget.style.backgroundColor = "rgba(16, 185, 129, 0.08)";
                               }}
                             >
                               Assign
@@ -997,29 +856,22 @@ function AllTickets({ searchTerm = "" }) {
                           type="button"
                           onClick={() => handleDeleteClick(ticket.id)}
                           style={{
-                            padding: "0.5rem 1rem",
-                            fontSize: "0.8rem",
+                            padding: "0.375rem 0.75rem",
+                            fontSize: "0.75rem",
                             fontWeight: 500,
                             backgroundColor: "rgba(239, 68, 68, 0.08)",
                             color: "#dc2626",
                             border: "1px solid rgba(239, 68, 68, 0.2)",
-                            borderRadius: "14px",
+                            borderRadius: "8px",
                             cursor: "pointer",
-                            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                            backdropFilter: "blur(40px) saturate(200%)",
-                            boxShadow:
-                              "0 8px 32px rgba(239, 68, 68, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(239, 68, 68, 0.1)",
+                            transition: "all 0.2s",
+                            whiteSpace: "nowrap",
                           }}
                           onMouseOver={(e) => {
-                            e.currentTarget.style.backgroundColor =
-                              "rgba(239, 68, 68, 0.15)";
-                            e.currentTarget.style.transform =
-                              "translateY(-1px)";
+                            e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.15)";
                           }}
                           onMouseOut={(e) => {
-                            e.currentTarget.style.backgroundColor =
-                              "rgba(239, 68, 68, 0.08)";
-                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.08)";
                           }}
                         >
                           Delete

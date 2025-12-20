@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 import Snowfall from 'react-snowfall'
+import { formatDate } from '../../utils/ticketHelpers.jsx'
 function AdminDashboard() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -191,18 +192,6 @@ function AdminDashboard() {
     return colors[status] || { bg: '#f3f4f6', text: '#374151' }
   }
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A'
-    const date = new Date(dateString)
-    if (isNaN(date.getTime())) return 'N/A'
-    return date.toLocaleString('vi-VN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
 
   const getMaxCount = () => {
     return Math.max(...categoryStats.map(c => c.count), 1)
@@ -337,7 +326,17 @@ function AdminDashboard() {
                 recentTickets.map((ticket) => {
                   const statusColor = getStatusColor(ticket.statusKey)
                   return (
-                    <tr key={ticket.id}>
+                    <tr 
+                      key={ticket.id}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f9fafb";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
                       <td>
                         <div style={{
                           fontWeight: 500,
@@ -384,34 +383,10 @@ function AdminDashboard() {
                           {ticket.status}
                         </span>
                       </td>
-                      <td>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/admin/tickets/${ticket.id}`)}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            fontSize: '0.8rem',
-                            fontWeight: 500,
-                            backgroundColor: 'rgba(99, 102, 241, 0.08)',
-                            color: '#6366f1',
-                            border: '1px solid rgba(99, 102, 241, 0.2)',
-                            borderRadius: '14px',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                            backdropFilter: 'blur(40px) saturate(200%)',
-                            boxShadow: '0 8px 32px rgba(99, 102, 241, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(99, 102, 241, 0.1)',
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(99, 102, 241, 0.15)'
-                            e.currentTarget.style.transform = 'translateY(-1px)'
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(99, 102, 241, 0.08)'
-                            e.currentTarget.style.transform = 'translateY(0)'
-                          }}
-                        >
-                          View
-                        </button>
+                      <td 
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Actions column - empty since click on row navigates to detail */}
                       </td>
                     </tr>
                   )

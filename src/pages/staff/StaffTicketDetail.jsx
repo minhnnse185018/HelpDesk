@@ -2,71 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 import { ActionButton, AlertModal } from '../../components/templates'
+import { formatDate, getStatusBadge, getPriorityBadge } from '../../utils/ticketHelpers.jsx'
 
-function formatDate(dateString) {
-  if (!dateString) return 'N/A'
-  const date = new Date(dateString)
-  if (Number.isNaN(date.getTime())) return 'N/A'
-  return date.toLocaleString('vi-VN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
-function getPriorityBadge(priority) {
-  const configs = {
-    low: { bg: '#ecfdf3', text: '#166534', label: 'Low' },
-    medium: { bg: '#fef3c7', text: '#92400e', label: 'Medium' },
-    high: { bg: '#fee2e2', text: '#b91c1c', label: 'High' },
-    critical: { bg: '#7f1d1d', text: '#fef2f2', label: 'Critical' },
-  }
-  const config = configs[priority] || { bg: '#f3f4f6', text: '#4b5563', label: priority }
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        padding: '0.25rem 0.75rem',
-        borderRadius: '999px',
-        fontSize: '0.8rem',
-        fontWeight: 600,
-        backgroundColor: config.bg,
-        color: config.text,
-      }}
-    >
-      {config.label}
-    </span>
-  )
-}
-
-function getStatusBadge(status) {
-  const configs = {
-    open: { bg: '#dbeafe', text: '#1e40af', label: 'Open' },
-    assigned: { bg: '#fef3c7', text: '#92400e', label: 'Assigned' },
-    in_progress: { bg: '#e0f2fe', text: '#075985', label: 'In Progress' },
-    resolved: { bg: '#dcfce7', text: '#166534', label: 'Resolved' },
-    cancelled: { bg: '#f3f4f6', text: '#4b5563', label: 'Cancelled' },
-    closed: { bg: '#e5e7eb', text: '#374151', label: 'Closed' },
-  }
-  const config = configs[status] || { bg: '#e5e7eb', text: '#374151', label: status }
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        padding: '0.25rem 0.75rem',
-        borderRadius: '999px',
-        fontSize: '0.8rem',
-        fontWeight: 600,
-        backgroundColor: config.bg,
-        color: config.text,
-      }}
-    >
-      {config.label}
-    </span>
-  )
-}
 
 function StaffTicketDetail() {
   const { id } = useParams()

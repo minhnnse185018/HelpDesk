@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import AssignTicketModal from "../../components/modals/AssignTicketModal";
 import NotificationModal from "../../components/modals/NotificationModal";
+import { formatDate, getStatusColor, getPriorityColor } from "../../utils/ticketHelpers.jsx";
 
 function SubTickets({ searchTerm = "" }) {
   const navigate = useNavigate();
@@ -103,30 +104,6 @@ function SubTickets({ searchTerm = "" }) {
     }
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      assigned: { bg: "#dbeafe", text: "#1e40af" },
-      in_progress: { bg: "#fef3c7", text: "#92400e" },
-      resolved: { bg: "#d1fae5", text: "#065f46" },
-      denied: { bg: "#fee2e2", text: "#991b1b" },
-    };
-    return colors[status] || { bg: "#f3f4f6", text: "#374151" };
-  };
-
-  const getPriorityColor = (priority) => {
-    const colors = {
-      low: { bg: "#dbeafe", text: "#1e40af" },
-      medium: { bg: "#fef3c7", text: "#92400e" },
-      high: { bg: "#fed7aa", text: "#9a3412" },
-      urgent: { bg: "#fecaca", text: "#991b1b" },
-    };
-    return colors[priority] || { bg: "#f3f4f6", text: "#374151" };
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleString("vi-VN");
-  };
 
   const handleAssign = async (subTicketId, staffId, priority) => {
     try {
@@ -153,9 +130,6 @@ function SubTickets({ searchTerm = "" }) {
     }
   };
 
-  const handleView = (subTicketId) => {
-    navigate(`/admin/sub-tickets/${subTicketId}`);
-  };
 
   const handleDeleteClick = (subTicketId) => {
     setDeleteConfirmModal(subTicketId);
@@ -368,7 +342,17 @@ function SubTickets({ searchTerm = "" }) {
                   return (
                     <tr
                       key={subTicket.id}
-                      style={{ borderBottom: "1px solid #f3f4f6" }}
+                      style={{ 
+                        borderBottom: "1px solid #f3f4f6",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => navigate(`/admin/sub-tickets/${subTicket.id}`)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f9fafb";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
                     >
                       <td style={{ padding: "1rem" }}>
                         <div
@@ -417,11 +401,14 @@ function SubTickets({ searchTerm = "" }) {
                         <span
                           style={{
                             fontSize: "0.75rem",
-                            fontWeight: 600,
-                            padding: "0.25rem 0.75rem",
+                            fontWeight: 500,
+                            padding: "0.375rem 0.875rem",
                             borderRadius: "9999px",
                             backgroundColor: statusColor.bg,
                             color: statusColor.text,
+                            border: `1px solid ${statusColor.border}`,
+                            display: "inline-block",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           {subTicket.status.toUpperCase()}
@@ -431,11 +418,13 @@ function SubTickets({ searchTerm = "" }) {
                         <span
                           style={{
                             fontSize: "0.75rem",
-                            fontWeight: 600,
-                            padding: "0.25rem 0.75rem",
+                            fontWeight: 500,
+                            padding: "0.375rem 0.875rem",
                             borderRadius: "9999px",
                             backgroundColor: priorityColor.bg,
                             color: priorityColor.text,
+                            display: "inline-block",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           {subTicket.priority?.toUpperCase() || "N/A"}
@@ -497,47 +486,18 @@ function SubTickets({ searchTerm = "" }) {
                       >
                         {formatDate(subTicket.createdAt)}
                       </td>
-                      <td style={{ padding: "1rem" }}>
+                      <td 
+                        style={{ padding: "1rem" }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div
                           style={{
                             display: "flex",
                             gap: "0.5rem",
                             justifyContent: "center",
+                            flexWrap: "nowrap",
                           }}
                         >
-                          <button
-                            type="button"
-                            onClick={() => handleView(subTicket.id)}
-                            style={{
-                              padding: "0.5rem 1rem",
-                              fontSize: "0.8rem",
-                              fontWeight: 500,
-                              backgroundColor: "rgba(59, 130, 246, 0.08)",
-                              color: "#3b82f6",
-                              border: "1px solid rgba(59, 130, 246, 0.2)",
-                              borderRadius: "14px",
-                              cursor: "pointer",
-                              transition:
-                                "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                              backdropFilter: "blur(40px) saturate(200%)",
-                              boxShadow:
-                                "0 8px 32px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(59, 130, 246, 0.1)",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.backgroundColor =
-                                "rgba(59, 130, 246, 0.15)";
-                              e.currentTarget.style.transform =
-                                "translateY(-1px)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.backgroundColor =
-                                "rgba(59, 130, 246, 0.08)";
-                              e.currentTarget.style.transform =
-                                "translateY(0)";
-                            }}
-                          >
-                            View
-                          </button>
                           {subTicket.status === "open" && (
                             <button
                               type="button"
