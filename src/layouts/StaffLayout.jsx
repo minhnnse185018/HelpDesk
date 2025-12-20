@@ -4,6 +4,7 @@ import { logout } from "../api/auth";
 import { useAuthProfile } from "../hooks/useAuthProfile";
 import ProfileModal from "../components/ProfileModal";
 import NotificationBell from "../components/notifications/NotificationBell";
+import LogoutIcon from "../components/icons/LogoutIcon";
 
 function StaffLayout() {
   const navigate = useNavigate();
@@ -67,7 +68,21 @@ function StaffLayout() {
               <span className="user-role">{displayRole}</span>
             </div>
           </div>
-          <button className="btn btn-secondary" onClick={handleLogout}>Logout</button>
+          <button 
+            className="btn btn-secondary" 
+            onClick={handleLogout}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0.5rem",
+              minWidth: "40px",
+              minHeight: "40px",
+            }}
+            title="Logout"
+          >
+            <LogoutIcon size={24} color="currentColor" />
+          </button>
         </div>
       </header>
 
