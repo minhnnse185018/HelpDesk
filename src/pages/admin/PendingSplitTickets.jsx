@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { apiClient } from "../../api/client";
 import { formatDate } from "../../utils/ticketHelpers.jsx";
 import SplitCategoriesModal from "../../components/modals/SplitCategoriesModal";
-import NotificationModal from "../../components/modals/NotificationModal";
+import { AlertModal } from "../../components/templates";
 
 function PendingSplitTickets({ searchTerm = "" }) {
   const [tickets, setTickets] = useState([]);
@@ -333,9 +333,11 @@ function PendingSplitTickets({ searchTerm = "" }) {
       )}
 
       {notification && (
-        <NotificationModal
-          type={notification.type}
+        <AlertModal
+          isOpen={!!notification}
           message={notification.message}
+          title={notification.type === 'success' ? 'Success' : notification.type === 'error' ? 'Error' : 'Notice'}
+          type={notification.type || 'info'}
           onClose={() => setNotification(null)}
         />
       )}

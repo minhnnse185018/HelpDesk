@@ -7,6 +7,7 @@ import {
   FormModalShell,
   DeleteConfirmModal,
   ActionButton,
+  AlertModal,
 } from '../../components/templates'
 
 function DepartmentManagement() {
@@ -21,6 +22,7 @@ function DepartmentManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [alertModal, setAlertModal] = useState(null)
 
   // Form state for create/edit
   const [formData, setFormData] = useState({
@@ -100,8 +102,18 @@ function DepartmentManagement() {
       setShowCreateModal(false)
       setFormData({ name: '', code: '', description: '', isActive: true })
       await loadDepartments()
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'Department created successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to create department')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to create department'
+      })
     } finally {
       setCreating(false)
     }
@@ -116,8 +128,18 @@ function DepartmentManagement() {
     try {
       await apiClient.put(`/api/v1/departments/${selectedId}`, formData)
       await Promise.all([loadDepartments(), loadSelectedDepartment()])
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'Department updated successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to update department')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to update department'
+      })
     } finally {
       setUpdating(false)
     }
@@ -138,8 +160,18 @@ function DepartmentManagement() {
       setSelectedDepartment(null)
       setSelectedId(null)
       await loadDepartments()
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'Department deleted successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to delete department')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to delete department'
+      })
     } finally {
       setDeleting(false)
     }
@@ -311,6 +343,16 @@ function DepartmentManagement() {
         } : null}
         itemLabel="Department"
       />
+
+      {alertModal && (
+        <AlertModal
+          isOpen={!!alertModal}
+          message={alertModal.message}
+          title={alertModal.title || 'Notice'}
+          type={alertModal.type || 'info'}
+          onClose={() => setAlertModal(null)}
+        />
+      )}
     </PageShell>
   )
 

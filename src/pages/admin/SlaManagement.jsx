@@ -7,6 +7,7 @@ import {
   FormModalShell,
   DeleteConfirmModal,
   ActionButton,
+  AlertModal,
 } from '../../components/templates'
 
 const priorityOptions = [
@@ -28,6 +29,7 @@ function SlaManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [alertModal, setAlertModal] = useState(null)
 
   // Form state for create/edit
   const [formData, setFormData] = useState({
@@ -116,8 +118,18 @@ function SlaManagement() {
       setShowCreateModal(false)
       setFormData({ name: '', priority: '', responseTimeMinutes: '', resolutionTimeMinutes: '', description: '', isActive: true })
       await loadSlaPolicies()
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'SLA policy created successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to create SLA policy')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to create SLA policy'
+      })
     } finally {
       setCreating(false)
     }
@@ -137,8 +149,18 @@ function SlaManagement() {
       }
       await apiClient.patch(`/api/v1/sla-policies/${selectedId}`, payload)
       await Promise.all([loadSlaPolicies(), loadSelectedSla()])
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'SLA policy updated successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to update SLA policy')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to update SLA policy'
+      })
     } finally {
       setUpdating(false)
     }
@@ -159,8 +181,18 @@ function SlaManagement() {
       setSelectedSla(null)
       setSelectedId(null)
       await loadSlaPolicies()
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'SLA policy deleted successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to delete SLA policy')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to delete SLA policy'
+      })
     } finally {
       setDeleting(false)
     }
@@ -380,6 +412,16 @@ function SlaManagement() {
         } : null}
         itemLabel="SLA Policy"
       />
+
+      {alertModal && (
+        <AlertModal
+          isOpen={!!alertModal}
+          message={alertModal.message}
+          title={alertModal.title || 'Notice'}
+          type={alertModal.type || 'info'}
+          onClose={() => setAlertModal(null)}
+        />
+      )}
     </PageShell>
   )
 }

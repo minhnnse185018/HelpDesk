@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../../api/client'
+import { AlertModal } from '../../components/templates'
 
 function EditTicket() {
   const navigate = useNavigate()
@@ -502,57 +503,14 @@ function EditTicket() {
         </form>
       </div>
 
-      {/* Notification */}
       {notification && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '2rem',
-            right: '2rem',
-            zIndex: 9999,
-            backgroundColor: notification.type === 'success' ? 'rgba(220, 252, 231, 0.25)' : 'rgba(254, 226, 226, 0.25)',
-            border: `1px solid ${notification.type === 'success' ? 'rgba(134, 239, 172, 0.3)' : 'rgba(254, 202, 202, 0.3)'}`,
-            borderRadius: '16px',
-            padding: '1rem 1.5rem',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
-            backdropFilter: 'blur(40px) saturate(200%)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            minWidth: '300px',
-            maxWidth: '500px',
-          }}
-        >
-          <div style={{ fontSize: '1.25rem', flexShrink: 0 }}>
-            {notification.type === 'success' ? '✅' : '❌'}
-          </div>
-          <div
-            style={{
-              flex: 1,
-              color: notification.type === 'success' ? '#166534' : '#991b1b',
-              fontSize: '0.875rem',
-              fontWeight: 500
-            }}
-          >
-            {notification.message}
-          </div>
-          <button
-            type="button"
-            onClick={() => setNotification(null)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: notification.type === 'success' ? '#166534' : '#991b1b',
-              cursor: 'pointer',
-              fontSize: '1.25rem',
-              padding: '0',
-              lineHeight: 1,
-              flexShrink: 0
-            }}
-          >
-            ×
-          </button>
-        </div>
+        <AlertModal
+          isOpen={!!notification}
+          message={notification.message}
+          title={notification.type === 'success' ? 'Success' : 'Error'}
+          type={notification.type || 'info'}
+          onClose={() => setNotification(null)}
+        />
       )}
     </div>
   )

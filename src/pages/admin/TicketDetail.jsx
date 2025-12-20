@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { ActionButton } from "../../components/templates";
 import SplitCategoriesModal from "../../components/modals/SplitCategoriesModal";
-import NotificationModal from "../../components/modals/NotificationModal";
+import { AlertModal } from "../../components/templates";
 import DuplicateCheckModal from "../../components/modals/DuplicateCheckModal";
 import { fontSize, fontWeight } from "../../utils/fontStyles";
 import { downloadFile, openFileInNewTab, getFilenameFromUrl } from "../../utils/fileDownload";
@@ -1204,9 +1204,11 @@ function TicketDetail() {
 
         {/* Notification Modal */}
         {notification && (
-          <NotificationModal
-            type={notification.type}
+          <AlertModal
+            isOpen={!!notification}
             message={notification.message}
+            title={notification.type === 'success' ? 'Success' : notification.type === 'error' ? 'Error' : 'Notice'}
+            type={notification.type || 'info'}
             onClose={() => setNotification(null)}
           />
         )}

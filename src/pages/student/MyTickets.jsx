@@ -462,7 +462,7 @@ function MyTickets() {
                         return (
                           <tr
                             key={ticket.id}
-                            onClick={() => navigate(`/student/tickets/${ticket.id}`)}
+                            onClick={() => navigate(`/student/my-tickets/${ticket.id}`)}
                             style={{
                               cursor: 'pointer',
                               borderBottom: '1px solid #e5e7eb',

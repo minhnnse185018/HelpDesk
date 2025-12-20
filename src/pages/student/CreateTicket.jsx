@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
-import { ActionButton } from '../../components/templates'
+import { ActionButton, AlertModal } from '../../components/templates'
 
 function CreateTicket() {
   const navigate = useNavigate()
@@ -11,6 +11,7 @@ function CreateTicket() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [files, setFiles] = useState([])
+  const [alertModal, setAlertModal] = useState(null)
 
   const [formData, setFormData] = useState({
     title: '',
@@ -140,9 +141,23 @@ function CreateTicket() {
         detail: newTicket 
       }))
 
-      navigate('/student/my-tickets')
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'Ticket created successfully!'
+      })
+      
+      setTimeout(() => {
+        navigate('/student/my-tickets')
+      }, 1500)
     } catch (err) {
-      setError(err?.message || 'Failed to create ticket')
+      const errorMessage = err?.message || 'Failed to create ticket'
+      setError(errorMessage)
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: errorMessage
+      })
     } finally {
       setSubmitting(false)
     }
@@ -630,6 +645,16 @@ function CreateTicket() {
           </div>
         </form>
       </div>
+
+      {alertModal && (
+        <AlertModal
+          isOpen={!!alertModal}
+          message={alertModal.message}
+          title={alertModal.title || 'Notice'}
+          type={alertModal.type || 'info'}
+          onClose={() => setAlertModal(null)}
+        />
+      )}
     </div>
   )
 }

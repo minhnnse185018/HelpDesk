@@ -75,7 +75,7 @@ export const validateRegisterPayload = ({
 
   if (!isValidEmail(email)) errors.email = 'Invalid email'
   if (!isValidPassword(password))
-    errors.password = 'Password must be at least 8 characters'
+    errors.password = 'Password must be at least 6 characters'
   if (!isNonEmpty(username)) errors.username = 'Full name cannot be empty'
   if (!isValidPhone(phoneNumber))
     errors.phoneNumber = 'Invalid phone number'

@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { formatDate, getPriorityBadge, getStatusBadge } from "../../utils/ticketHelpers.jsx";
 import AssignTicketModal from "../../components/modals/AssignTicketModal";
-import NotificationModal from "../../components/modals/NotificationModal";
-import { ActionButton } from "../../components/templates";
+import { ActionButton, AlertModal } from "../../components/templates";
 
 function StatusTickets({ status, searchTerm = "" }) {
   const navigate = useNavigate();
@@ -538,9 +537,11 @@ function StatusTickets({ status, searchTerm = "" }) {
       )}
 
       {notification && (
-        <NotificationModal
-          type={notification.type}
+        <AlertModal
+          isOpen={!!notification}
           message={notification.message}
+          title={notification.type === 'success' ? 'Success' : notification.type === 'error' ? 'Error' : 'Notice'}
+          type={notification.type || 'info'}
           onClose={() => setNotification(null)}
         />
       )}

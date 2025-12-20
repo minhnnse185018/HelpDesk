@@ -7,7 +7,7 @@ import {
   getPriorityBadge,
 } from "../../utils/ticketHelpers.jsx";
 import AssignTicketModal from "../../components/modals/AssignTicketModal";
-import NotificationModal from "../../components/modals/NotificationModal";
+import { AlertModal } from "../../components/templates";
 import { useNotificationSocket } from "../../context/NotificationSocketContext";
 
 
@@ -848,9 +848,11 @@ function AllTickets({ searchTerm = "" }) {
       )}
 
       {notification && (
-        <NotificationModal
-          type={notification.type}
+        <AlertModal
+          isOpen={!!notification}
           message={notification.message}
+          title={notification.type === 'success' ? 'Success' : notification.type === 'error' ? 'Error' : 'Notice'}
+          type={notification.type || 'info'}
           onClose={() => setNotification(null)}
         />
       )}

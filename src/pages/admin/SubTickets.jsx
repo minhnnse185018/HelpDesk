@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import AssignTicketModal from "../../components/modals/AssignTicketModal";
-import NotificationModal from "../../components/modals/NotificationModal";
+import { AlertModal } from "../../components/templates";
 import { formatDate, getStatusColor, getPriorityColor } from "../../utils/ticketHelpers.jsx";
 
 function SubTickets({ searchTerm = "" }) {
@@ -588,9 +588,11 @@ function SubTickets({ searchTerm = "" }) {
 
       {/* Notification Modal */}
       {notification && (
-        <NotificationModal
-          type={notification.type}
+        <AlertModal
+          isOpen={!!notification}
           message={notification.message}
+          title={notification.type === 'success' ? 'Success' : notification.type === 'error' ? 'Error' : 'Notice'}
+          type={notification.type || 'info'}
           onClose={() => setNotification(null)}
         />
       )}

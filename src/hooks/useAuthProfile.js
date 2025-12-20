@@ -20,6 +20,14 @@ export function useAuthProfile() {
   const [loading, setLoading] = useState(true)
 
   const refreshProfile = useCallback(async () => {
+    // Kiểm tra token trước khi fetch profile
+    const accessToken = localStorage.getItem('accessToken')
+    if (!accessToken) {
+      console.warn('⚠️ No access token found, skipping profile fetch')
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     try {
       const response = await getUserProfile()
@@ -55,11 +63,41 @@ export function useAuthProfile() {
       if (payload?.email) localStorage.setItem('email', payload.email)
     } catch (error) {
       console.error('Failed to fetch profile:', error?.message || error)
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      localStorage.removeItem('role')
-      localStorage.removeItem('username')
-      navigate('/login', { replace: true })
+      
+      // Kiểm tra lại token sau khi có lỗi - có thể token đã bị xóa bởi process khác
+      const currentToken = localStorage.getItem('accessToken')
+      if (!currentToken) {
+        console.log('🚪 Token was removed, redirecting to login...')
+        navigate('/login', { replace: true })
+        return
+      }
+      
+      // Chỉ xóa token và redirect về login nếu thực sự là lỗi authentication (401/403)
+      // Với các lỗi khác (network, 500, etc.) thì giữ nguyên token để retry sau
+      const errorStatus = error?.response?.status
+      if (errorStatus === 401 || errorStatus === 403) {
+        console.log('🚪 Authentication failed (401/403), logging out...')
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        localStorage.removeItem('role')
+        localStorage.removeItem('username')
+        navigate('/login', { replace: true })
+      } else {
+        // Với lỗi khác (network, 500, etc.), chỉ log warning và giữ nguyên session
+        console.warn('⚠️ Profile fetch failed but keeping session (will retry later)')
+        // Set profile mặc định từ localStorage nếu có
+        const storedRole = localStorage.getItem('role')
+        const storedUsername = localStorage.getItem('username')
+        const storedEmail = localStorage.getItem('email')
+        if (storedRole) {
+          setProfile(prev => ({
+            ...prev,
+            role: storedRole,
+            name: storedUsername || prev.name,
+            email: storedEmail || prev.email
+          }))
+        }
+      }
     } finally {
       setLoading(false)
     }

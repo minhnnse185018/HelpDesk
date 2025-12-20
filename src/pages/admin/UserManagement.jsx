@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiClient } from '../../api/client'
-import { ActionButton, DeleteConfirmModal } from '../../components/templates'
+import { ActionButton, DeleteConfirmModal, AlertModal } from '../../components/templates'
 import { formatDate } from '../../utils/ticketHelpers.jsx'
 
 const roleOptions = [
@@ -21,6 +21,7 @@ function UserManagement() {
   const [departments, setDepartments] = useState([])
   const [assigningDepartment, setAssigningDepartment] = useState(false)
   const [activeTab, setActiveTab] = useState('staff')
+  const [alertModal, setAlertModal] = useState(null)
   
   // Form state để lưu giá trị tạm thời trước khi save
   const [formData, setFormData] = useState({
@@ -137,9 +138,19 @@ function UserManagement() {
       if (promises.length > 0) {
         await Promise.all(promises)
         await Promise.all([loadUsers(), loadSelectedUser()])
+        setAlertModal({
+          type: 'success',
+          title: 'Success',
+          message: 'User updated successfully!'
+        })
       }
     } catch (err) {
       setActionError(err?.message || 'Failed to save changes')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to save changes'
+      })
     } finally {
       setUpdating(false)
     }
@@ -160,8 +171,18 @@ function UserManagement() {
       setSelectedUser(null)
       setSelectedId(null)
       await loadUsers()
+      setAlertModal({
+        type: 'success',
+        title: 'Success',
+        message: 'User deleted successfully!'
+      })
     } catch (err) {
       setActionError(err?.message || 'Failed to delete user')
+      setAlertModal({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Failed to delete user'
+      })
     } finally {
       setDeleting(false)
     }
@@ -442,6 +463,16 @@ function UserManagement() {
         } : null}
         itemLabel="User"
       />
+
+      {alertModal && (
+        <AlertModal
+          isOpen={!!alertModal}
+          message={alertModal.message}
+          title={alertModal.title || 'Notice'}
+          type={alertModal.type || 'info'}
+          onClose={() => setAlertModal(null)}
+        />
+      )}
     </div>
   )
 }
