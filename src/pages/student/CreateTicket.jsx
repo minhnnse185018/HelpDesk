@@ -556,8 +556,9 @@ function CreateTicket() {
                           </div>
 
                           {/* Remove Button */}
-                          <button
+                          <ActionButton
                             type="button"
+                            variant="danger"
                             onClick={() => removeFile(index)}
                             disabled={submitting}
                             style={{
@@ -566,32 +567,19 @@ function CreateTicket() {
                               right: '0.5rem',
                               width: '1.75rem',
                               height: '1.75rem',
+                              minWidth: '1.75rem',
+                              padding: '0',
                               borderRadius: '50%',
-                              backgroundColor: 'rgba(220, 38, 38, 0.9)',
-                              color: 'white',
-                              border: 'none',
-                              cursor: submitting ? 'not-allowed' : 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               fontSize: '1rem',
                               fontWeight: '700',
                               lineHeight: '1',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!submitting) {
-                                e.currentTarget.style.backgroundColor = 'rgba(220, 38, 38, 1)'
-                                e.currentTarget.style.transform = 'scale(1.1)'
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'rgba(220, 38, 38, 0.9)'
-                              e.currentTarget.style.transform = 'scale(1)'
                             }}
                           >
                             ×
-                          </button>
+                          </ActionButton>
                         </div>
                       )
                     })}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { apiClient } from "../../api/client";
 import { fontSize, fontWeight } from "../../utils/fontStyles";
+import { ActionButton } from "../templates";
 
 function SplitCategoriesModal({ ticket, onClose, onSubmit }) {
   const [submitting, setSubmitting] = useState(false);
@@ -366,48 +367,22 @@ function SplitCategoriesModal({ ticket, onClose, onSubmit }) {
             justifyContent: "flex-end",
           }}
         >
-          <button
+          <ActionButton
             type="button"
+            variant="secondary"
             onClick={onClose}
             disabled={submitting}
-            style={{
-              padding: "0.625rem 1.25rem",
-              fontSize: "0.9rem",
-              fontWeight: 500,
-              backgroundColor: "rgba(0, 0, 0, 0.03)",
-              color: "#6b7280",
-              border: "1px solid rgba(0, 0, 0, 0.06)",
-              borderRadius: "14px",
-              cursor: submitting ? "not-allowed" : "pointer",
-              opacity: submitting ? 0.5 : 1,
-              backdropFilter: "blur(30px)",
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-            }}
           >
             Cancel
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton
             type="button"
+            variant="success"
             onClick={handleSubmit}
             disabled={submitting}
-            style={{
-              padding: "0.625rem 1.25rem",
-              fontSize: "0.9rem",
-              fontWeight: 500,
-              backgroundColor: "rgba(255, 255, 255, 0.08)",
-              color: "#1d1d1f",
-              border: "1px solid rgba(255, 255, 255, 0.18)",
-              borderRadius: "14px",
-              cursor: submitting ? "not-allowed" : "pointer",
-              opacity: submitting ? 0.5 : 1,
-              backdropFilter: "blur(40px) saturate(200%)",
-              boxShadow:
-                "0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -1px 0 rgba(0, 0, 0, 0.05)",
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-            }}
           >
             {submitting ? "Splitting..." : "Split Tickets"}
-          </button>
+          </ActionButton>
         </div>
       </div>
     </div>

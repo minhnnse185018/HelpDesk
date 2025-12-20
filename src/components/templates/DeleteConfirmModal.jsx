@@ -1,3 +1,5 @@
+import ActionButton from './ActionButton'
+
 /**
  * DeleteConfirmModal - Component shell cho modal xác nhận xóa
  * Props:
@@ -60,21 +62,21 @@ function DeleteConfirmModal({
             </div>
           )}
         </div>
-        <div className="modal-footer">
-          <button
-            className="btn btn-secondary"
+        <div className="modal-footer" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+          <ActionButton
+            variant="secondary"
             onClick={onClose}
             disabled={deleting}
           >
             Cancel
-          </button>
-          <button
-            className="btn btn-danger"
+          </ActionButton>
+          <ActionButton
+            variant="danger"
             onClick={onConfirm}
             disabled={deleting}
           >
             {deleting ? 'Deleting...' : `Delete ${itemLabel}`}
-          </button>
+          </ActionButton>
         </div>
       </div>
     </div>

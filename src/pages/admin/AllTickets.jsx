@@ -3,33 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import {
   formatDate,
+  getStatusBadge,
+  getPriorityBadge,
 } from "../../utils/ticketHelpers.jsx";
 import AssignTicketModal from "../../components/modals/AssignTicketModal";
 import NotificationModal from "../../components/modals/NotificationModal";
 import { useNotificationSocket } from "../../context/NotificationSocketContext";
 
-const getStatusColor = (status) => {
-  const colors = {
-    open: { bg: "#dbeafe", text: "#1e40af", border: "#93c5fd" },
-    assigned: { bg: "#fef3c7", text: "#92400e", border: "#fcd34d" },
-    in_progress: { bg: "#e0e7ff", text: "#3730a3", border: "#a5b4fc" },
-    resolved: { bg: "#d1fae5", text: "#065f46", border: "#6ee7b7" },
-    denied: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
-    closed: { bg: "#e5e7eb", text: "#374151", border: "#d1d5db" },
-    escalated: { bg: "#fef2f2", text: "#b91c1c", border: "#fecdd3" },
-  };
-  return colors[status] || { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" };
-};
-
-const getPriorityColor = (priority) => {
-  const colors = {
-    low: { bg: "#dbeafe", text: "#1e40af" },
-    medium: { bg: "#fef3c7", text: "#92400e" },
-    high: { bg: "#fed7aa", text: "#9a3412" },
-    critical: { bg: "#fecaca", text: "#991b1b" },
-  };
-  return colors[priority] || { bg: "#f3f4f6", text: "#374151" };
-};
 
 // Helper function to fetch room details
 const fetchRoomDetails = async (roomId) => {
@@ -679,37 +659,10 @@ function AllTickets({ searchTerm = "" }) {
                         )}
                     </td>
                     <td style={{ padding: "1rem" }}>
-                      <span
-                        style={{
-                          fontSize: "0.75rem",
-                          fontWeight: 500,
-                          padding: "0.375rem 0.875rem",
-                          borderRadius: "9999px",
-                          backgroundColor: getStatusColor(ticket.status).bg,
-                          color: getStatusColor(ticket.status).text,
-                          border: `1px solid ${getStatusColor(ticket.status).border}`,
-                          display: "inline-block",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {ticket.status?.toUpperCase() || "N/A"}
-                      </span>
+                      {getStatusBadge(ticket.status)}
                     </td>
                     <td style={{ padding: "1rem" }}>
-                      <span
-                        style={{
-                          fontSize: "0.75rem",
-                          fontWeight: 500,
-                          padding: "0.375rem 0.875rem",
-                          borderRadius: "9999px",
-                          backgroundColor: getPriorityColor(ticket.priority).bg,
-                          color: getPriorityColor(ticket.priority).text,
-                          display: "inline-block",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {ticket.priority?.toUpperCase() || "N/A"}
-                      </span>
+                      {getPriorityBadge(ticket.priority)}
                     </td>
                     <td style={{ padding: "1rem", color: "#6b7280" }}>
                       {ticket.room ? (

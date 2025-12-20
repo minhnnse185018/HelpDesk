@@ -1,3 +1,5 @@
+import ActionButton from './ActionButton'
+
 /**
  * FormModalShell - Component shell cho modal form create/edit
  * Props:
@@ -55,24 +57,24 @@ function FormModalShell({
             {children}
             {error && <div className="form-error">{error}</div>}
           </div>
-          <div className="modal-footer">
+          <div className="modal-footer" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
             {footerButtons || (
               <>
-                <button
+                <ActionButton
                   type="button"
-                  className="btn btn-secondary"
+                  variant="secondary"
                   onClick={onClose}
                   disabled={submitting}
                 >
                   {cancelLabel}
-                </button>
-                <button
+                </ActionButton>
+                <ActionButton
                   type="submit"
-                  className="btn btn-primary"
+                  variant="primary"
                   disabled={submitting}
                 >
                   {submitting ? 'Submitting...' : submitLabel}
-                </button>
+                </ActionButton>
               </>
             )}
           </div>

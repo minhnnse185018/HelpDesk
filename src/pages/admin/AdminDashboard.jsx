@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 import Snowfall from 'react-snowfall'
-import { formatDate } from '../../utils/ticketHelpers.jsx'
+import { formatDate, getStatusBadge } from '../../utils/ticketHelpers.jsx'
 function AdminDashboard() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -178,19 +178,6 @@ function AdminDashboard() {
     return labels[status] || status
   }
 
-  const getStatusColor = (status) => {
-    const colors = {
-      open: { bg: '#e0e7ff', text: '#3730a3' },
-      assigned: { bg: '#dbeafe', text: '#1e40af' },
-      in_progress: { bg: '#fef3c7', text: '#92400e' },
-      resolved: { bg: '#d1fae5', text: '#065f46' },
-      denied: { bg: '#fee2e2', text: '#991b1b' },
-      closed: { bg: '#e5e7eb', text: '#374151' },
-      escalated: { bg: '#fef2f2', text: '#b91c1c' },
-      overdue: { bg: '#fee2e2', text: '#dc2626' },
-    }
-    return colors[status] || { bg: '#f3f4f6', text: '#374151' }
-  }
 
 
   const getMaxCount = () => {
@@ -324,7 +311,6 @@ function AdminDashboard() {
                 </tr>
               ) : (
                 recentTickets.map((ticket) => {
-                  const statusColor = getStatusColor(ticket.statusKey)
                   return (
                     <tr 
                       key={ticket.id}
@@ -369,19 +355,7 @@ function AdminDashboard() {
                         )}
                       </td>
                       <td>
-                        <span
-                          style={{
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '9999px',
-                            backgroundColor: statusColor.bg,
-                            color: statusColor.text,
-                            display: 'inline-block',
-                          }}
-                        >
-                          {ticket.status}
-                        </span>
+                        {getStatusBadge(ticket.statusKey || ticket.status)}
                       </td>
                       <td 
                         onClick={(e) => e.stopPropagation()}
