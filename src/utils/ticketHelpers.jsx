@@ -28,6 +28,7 @@ export function getStatusColor(status) {
     denied: { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" },
     closed: { bg: "#e5e7eb", text: "#374151", border: "#d1d5db" },
     escalated: { bg: "#fef2f2", text: "#b91c1c", border: "#fecdd3" },
+    cancelled: { bg: "#f3f4f6", text: "#4b5563", border: "#d1d5db" },
   };
   return colors[status] || { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" };
 }

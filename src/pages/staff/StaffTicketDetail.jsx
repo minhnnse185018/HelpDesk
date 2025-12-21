@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 import { ActionButton, AlertModal } from '../../components/templates'
 import { formatDate, getStatusBadge, getPriorityBadge } from '../../utils/ticketHelpers.jsx'
+import { downloadFile } from '../../utils/fileDownload'
 
 
 
@@ -181,6 +182,15 @@ function StaffTicketDetail() {
     }
   }
 
+  // Helper function to get effective status (tickets with deniedReason are considered cancelled)
+  const getEffectiveStatus = (ticket) => {
+    // Tickets with deniedReason are considered cancelled, especially if status is "open"
+    if (ticket.deniedReason) {
+      return 'cancelled'
+    }
+    return ticket.status
+  }
+
   const canReassign = (status) => {
     return ['assigned', 'accepted', 'in_progress'].includes(status)
   }
@@ -239,43 +249,55 @@ function StaffTicketDetail() {
           <div>
             <h3 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>{ticket.title}</h3>
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              <div>Status: {getStatusBadge(ticket.status)}</div>
+              <div>Status: {getStatusBadge(getEffectiveStatus(ticket))}</div>
               <div>Priority: {getPriorityBadge(ticket.priority)}</div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {ticket.status === 'assigned' && (
-              <>
-                <ActionButton
-                  variant="success"
-                  onClick={handleAccept}
-                >
-                  Accept
-                </ActionButton>
-                <ActionButton
-                  variant="danger"
-                  onClick={() => setDenyModal(true)}
-                >
-                  Deny
-                </ActionButton>
-              </>
-            )}
-            {(ticket.status === 'accepted' || ticket.status === 'in_progress') && (
-              <ActionButton
-                variant="success"
-                onClick={() => setResolveModal(true)}
-              >
-                Resolve
-              </ActionButton>
-            )}
-            {canReassign(ticket.status) && (
-              <ActionButton
-                variant="info"
-                onClick={() => setReassignModal(true)}
-              >
-                Reassign
-              </ActionButton>
-            )}
+            {(() => {
+              const effectiveStatus = getEffectiveStatus(ticket)
+              // Don't show actions for cancelled tickets
+              if (effectiveStatus === 'cancelled') {
+                return null
+              }
+              
+              return (
+                <>
+                  {ticket.status === 'assigned' && !ticket.deniedReason && (
+                    <>
+                      <ActionButton
+                        variant="success"
+                        onClick={handleAccept}
+                      >
+                        Accept
+                      </ActionButton>
+                      <ActionButton
+                        variant="danger"
+                        onClick={() => setDenyModal(true)}
+                      >
+                        Deny
+                      </ActionButton>
+                    </>
+                  )}
+                  {(ticket.status === 'accepted' || ticket.status === 'in_progress') && !ticket.deniedReason && (
+                    <ActionButton
+                      variant="success"
+                      onClick={() => setResolveModal(true)}
+                    >
+                      Resolve
+                    </ActionButton>
+                  )}
+                  {canReassign(ticket.status) && !ticket.deniedReason && (
+                    <ActionButton
+                      variant="info"
+                      onClick={() => setReassignModal(true)}
+                    >
+                      Reassign
+                    </ActionButton>
+                  )}
+                </>
+              )
+            })()}
           </div>
         </div>
 
