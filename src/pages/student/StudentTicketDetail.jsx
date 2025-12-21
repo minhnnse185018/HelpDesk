@@ -1285,16 +1285,7 @@ function StudentTicketDetail() {
             </div>
 
             {/* Delete Button */}
-            <ActionButton
-              variant="danger"
-              onClick={() => setDeleteConfirm(ticket)}
-              style={{
-                width: "100%",
-                marginTop: "1.5rem",
-              }}
-            >
-              Delete Ticket
-            </ActionButton>
+
           </div>
         </div>
       )}

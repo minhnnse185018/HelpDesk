@@ -44,13 +44,25 @@ function StaffAssignedTickets() {
     }
   }
 
+  // Helper function to get effective status (tickets with deniedReason are considered cancelled)
+  const getEffectiveStatus = (ticket) => {
+    // Tickets with deniedReason are considered cancelled, especially if status is "open"
+    if (ticket.deniedReason) {
+      return 'cancelled'
+    }
+    return ticket.status
+  }
+
   // Filter tickets by status and search term
-  // Tickets with deniedReason are automatically considered cancelled
+  // Tickets with deniedReason (especially status "open" + deniedReason) are automatically considered cancelled
   let filteredTickets = activeTab === 'all' 
     ? tickets 
     : activeTab === 'cancelled'
       ? tickets.filter(ticket => ticket.status === 'cancelled' || ticket.deniedReason)
-      : tickets.filter(ticket => ticket.status === activeTab && !ticket.deniedReason)
+      : tickets.filter(ticket => {
+          const effectiveStatus = getEffectiveStatus(ticket)
+          return effectiveStatus === activeTab
+        })
   
   // Apply search filter
   if (searchTerm) {
@@ -66,14 +78,14 @@ function StaffAssignedTickets() {
   }
 
   // Count tickets by status
-  // Tickets with deniedReason count as cancelled
+  // Tickets with deniedReason (especially status "open" + deniedReason) count as cancelled
   const statusCounts = {
     all: tickets.length,
-    assigned: tickets.filter(t => t.status === 'assigned' && !t.deniedReason).length,
-    in_progress: tickets.filter(t => t.status === 'in_progress' && !t.deniedReason).length,
-    resolved: tickets.filter(t => t.status === 'resolved' && !t.deniedReason).length,
-    cancelled: tickets.filter(t => t.status === 'cancelled' || t.deniedReason).length,
-    closed: tickets.filter(t => t.status === 'closed' && !t.deniedReason).length,
+    assigned: tickets.filter(t => getEffectiveStatus(t) === 'assigned').length,
+    in_progress: tickets.filter(t => getEffectiveStatus(t) === 'in_progress').length,
+    resolved: tickets.filter(t => getEffectiveStatus(t) === 'resolved').length,
+    cancelled: tickets.filter(t => getEffectiveStatus(t) === 'cancelled').length,
+    closed: tickets.filter(t => getEffectiveStatus(t) === 'closed').length,
   }
 
   useEffect(() => {
@@ -444,7 +456,7 @@ function StaffAssignedTickets() {
                     <td>{ticket.room?.name || 'N/A'}</td>
                     <td>{ticket.department?.name || 'N/A'}</td>
                     <td>{getPriorityBadge(ticket.priority)}</td>
-                    <td>{getStatusBadge(ticket.status)}</td>
+                    <td>{getStatusBadge(getEffectiveStatus(ticket))}</td>
                     <td>{formatDate(ticket.createdAt)}</td>
                     <td>{formatDate(ticket.dueDate)}</td>
                     <td
@@ -463,50 +475,62 @@ function StaffAssignedTickets() {
                           alignItems: 'center',
                         }}
                       >
-                        {ticket.status === 'assigned' && (
-                          <>
-                            <ActionButton
-                              variant="success"
-                              onClick={() => handleAccept(ticket.id)}
-                            >
-                              Accept
-                            </ActionButton>
-                            <ActionButton
-                              variant="danger"
-                              onClick={() =>
-                                setDenyModal({ id: ticket.id, title: ticket.title })
-                              }
-                            >
-                              Deny
-                            </ActionButton>
-                          </>
-                        )}
+                        {(() => {
+                          const effectiveStatus = getEffectiveStatus(ticket)
+                          // Don't show actions for cancelled tickets
+                          if (effectiveStatus === 'cancelled') {
+                            return null
+                          }
+                          
+                          return (
+                            <>
+                              {ticket.status === 'assigned' && !ticket.deniedReason && (
+                                <>
+                                  <ActionButton
+                                    variant="success"
+                                    onClick={() => handleAccept(ticket.id)}
+                                  >
+                                    Accept
+                                  </ActionButton>
+                                  <ActionButton
+                                    variant="danger"
+                                    onClick={() =>
+                                      setDenyModal({ id: ticket.id, title: ticket.title })
+                                    }
+                                  >
+                                    Deny
+                                  </ActionButton>
+                                </>
+                              )}
 
-                        {ticket.status === 'in_progress' && (
-                          <ActionButton
-                            variant="success"
-                            onClick={() =>
-                              setResolveModal({ id: ticket.id, title: ticket.title })
-                            }
-                          >
-                            Resolve
-                          </ActionButton>
-                        )}
+                              {ticket.status === 'in_progress' && !ticket.deniedReason && (
+                                <ActionButton
+                                  variant="success"
+                                  onClick={() =>
+                                    setResolveModal({ id: ticket.id, title: ticket.title })
+                                  }
+                                >
+                                  Resolve
+                                </ActionButton>
+                              )}
 
-                        {canReassign(ticket.status) && (
-                          <ActionButton
-                            variant="warning"
-                            onClick={() =>
-                              setReassignModal({ 
-                                id: ticket.id, 
-                                title: ticket.title,
-                                departmentId: ticket.departmentId || ticket.department?.id
-                              })
-                            }
-                          >
-                            Reassign
-                          </ActionButton>
-                        )}
+                              {canReassign(ticket.status) && !ticket.deniedReason && (
+                                <ActionButton
+                                  variant="warning"
+                                  onClick={() =>
+                                    setReassignModal({ 
+                                      id: ticket.id, 
+                                      title: ticket.title,
+                                      departmentId: ticket.departmentId || ticket.department?.id
+                                    })
+                                  }
+                                >
+                                  Reassign
+                                </ActionButton>
+                              )}
+                            </>
+                          )
+                        })()}
                       </div>
                     </td>
                   </tr>

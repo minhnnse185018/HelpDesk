@@ -181,7 +181,7 @@ function MyTickets() {
 
   const getStatusLabel = (status) => {
     const statusMap = {
-      open: 'New',
+      open: 'Open',
       assigned: 'Assigned',
       accepted: 'In Progress',
       in_progress: 'In Progress',
@@ -363,7 +363,7 @@ function MyTickets() {
                   }}
                 >
                   <option value="">All Status</option>
-                  <option value="New">New</option>
+                  <option value="Open">Open</option>
                   <option value="Assigned">Assigned</option>
                   <option value="In Progress">In Progress</option>
                   <option value="Escalated">Escalated</option>
@@ -458,7 +458,10 @@ function MyTickets() {
                     </thead>
                     <tbody>
                       {filteredTickets.map((ticket) => {
-                        const statusColor = getStatusColor(ticket.status)
+                        // Map status to match getStatusColor keys
+                        // accepted -> in_progress (same color)
+                        const statusForColor = ticket.status === 'accepted' ? 'in_progress' : ticket.status
+                        const statusColor = getStatusColor(statusForColor)
                         return (
                           <tr
                             key={ticket.id}
@@ -669,7 +672,6 @@ function MyTickets() {
                     cursor: 'pointer',
                     color: 'white',
                     textDecoration: 'none',
-                    borderRadius: '6px',
                     fontSize: '0.75rem',
                     fontWeight: '600',
                     transition: 'all 0.2s'

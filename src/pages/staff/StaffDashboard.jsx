@@ -4,7 +4,7 @@ import { apiClient } from '../../api/client'
 import { ActionButton } from '../../components/templates'
 import { useNotificationSocket } from '../../context/NotificationSocketContext'
 import Snowfall from 'react-snowfall'
-import { formatDate } from '../../utils/ticketHelpers.jsx'
+import { formatDate, getStatusColor } from '../../utils/ticketHelpers.jsx'
 
 function StaffDashboard() {
   const navigate = useNavigate()
@@ -328,11 +328,29 @@ function StaffDashboard() {
                       )}
                     </td>
                     <td>
-                      <span
-                        className={`status-badge status-${ticket.statusKey}`}
-                      >
-                        {ticket.status}
-                      </span>
+                      {(() => {
+                        // Map status to match getStatusColor keys
+                        // accepted -> in_progress (same color)
+                        const statusForColor = ticket.statusKey === 'accepted' ? 'in_progress' : ticket.statusKey
+                        const colorConfig = getStatusColor(statusForColor)
+                        return (
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              fontWeight: 500,
+                              padding: "0.375rem 0.875rem",
+                              borderRadius: "9999px",
+                              backgroundColor: colorConfig.bg,
+                              color: colorConfig.text,
+                              border: `1px solid ${colorConfig.border}`,
+                              display: "inline-block",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {ticket.status}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td>{ticket.slaDue}</td>
                     <td

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 import { ActionButton } from '../../components/templates'
 import Snowfall from 'react-snowfall'
-import { formatDate } from '../../utils/ticketHelpers.jsx'
+import { formatDate, getStatusColor, getStatusBadge } from '../../utils/ticketHelpers.jsx'
 
 function StudentDashboard() {
   const navigate = useNavigate()
@@ -55,11 +55,8 @@ function StudentDashboard() {
 
   tickets.forEach((t) => {
     if (t.status === 'open') stats.open++
-    if (
-      t.status === 'assigned' ||
-      t.status === 'accepted' ||
-      t.status === 'in_progress'
-    )
+    // Only count accepted/in_progress as In Progress for dashboard
+    if (t.status === 'accepted' || t.status === 'in_progress')
       stats.inProgress++
     if (t.status === 'resolved') stats.resolved++
   })
@@ -70,21 +67,20 @@ function StudentDashboard() {
     { label: 'Resolved', value: stats.resolved },
   ]
 
-  const filters = ['All', 'New', 'In Progress', 'Resolved', 'Overdue']
+  const filters = ['All', 'Open', 'Assigned', 'In Progress', 'Resolved', 'Overdue']
 
+  // Map status to display label and status key for getStatusColor
   const getStatusDisplay = (status) => {
-    if (status === 'open') return { label: 'New', key: 'new' }
-    if (
-      status === 'assigned' ||
-      status === 'accepted' ||
-      status === 'in_progress'
-    )
-      return { label: 'In Progress', key: 'in-progress' }
-    if (status === 'resolved') return { label: 'Resolved', key: 'resolved' }
-    if (status === 'overdue') return { label: 'Overdue', key: 'overdue' }
-    if (status === 'closed') return { label: 'Closed', key: 'closed' }
-    if (status === 'denied') return { label: 'Denied', key: 'denied' }
-    return { label: status, key: status }
+    if (status === 'open') return { label: 'Open', key: 'open', statusKey: 'open' }
+    if (status === 'assigned') return { label: 'Assigned', key: 'assigned', statusKey: 'assigned' }
+    if (status === 'accepted') return { label: 'In Progress', key: 'in-progress', statusKey: 'in_progress' }
+    if (status === 'in_progress') return { label: 'In Progress', key: 'in-progress', statusKey: 'in_progress' }
+    if (status === 'resolved') return { label: 'Resolved', key: 'resolved', statusKey: 'resolved' }
+    if (status === 'overdue') return { label: 'Overdue', key: 'overdue', statusKey: 'overdue' }
+    if (status === 'closed') return { label: 'Closed', key: 'closed', statusKey: 'closed' }
+    if (status === 'denied') return { label: 'Denied', key: 'denied', statusKey: 'denied' }
+    if (status === 'escalated') return { label: 'Escalated', key: 'escalated', statusKey: 'escalated' }
+    return { label: status, key: status, statusKey: status }
   }
 
   const filteredTickets = tickets
@@ -98,6 +94,7 @@ function StudentDashboard() {
         room: t.room?.name || '-',
         status: statusObj.label,
         statusKey: statusObj.key,
+        statusKeyForColor: statusObj.statusKey, // Original status for getStatusColor
         slaDue: t.dueDate
           ? formatDate(t.dueDate)
           : '-',
@@ -105,7 +102,8 @@ function StudentDashboard() {
     })
     .filter((ticket) => {
       if (filter === 'All') return true
-      if (filter === 'New') return ticket.statusKey === 'new'
+      if (filter === 'Open') return ticket.statusKey === 'open'
+      if (filter === 'Assigned') return ticket.statusKey === 'assigned'
       if (filter === 'In Progress') return ticket.statusKey === 'in-progress'
       if (filter === 'Resolved') return ticket.statusKey === 'resolved'
       if (filter === 'Overdue') return ticket.statusKey === 'overdue'
@@ -186,11 +184,26 @@ function StudentDashboard() {
                       <td>{ticket.category}</td>
                       <td>{ticket.room}</td>
                       <td>
-                        <span
-                          className={`status-badge status-${ticket.statusKey}`}
-                        >
-                          {ticket.status}
-                        </span>
+                        {(() => {
+                          const colorConfig = getStatusColor(ticket.statusKeyForColor);
+                          return (
+                            <span
+                              style={{
+                                fontSize: "0.75rem",
+                                fontWeight: 500,
+                                padding: "0.375rem 0.875rem",
+                                borderRadius: "9999px",
+                                backgroundColor: colorConfig.bg,
+                                color: colorConfig.text,
+                                border: `1px solid ${colorConfig.border}`,
+                                display: "inline-block",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {ticket.status}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td>{ticket.slaDue}</td>
                     </tr>
