@@ -323,7 +323,7 @@ function StudentTicketDetail() {
                 </h3>
                 <div
                   style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}
-                >
+                > Status:
                   {statusCfg && (
                     <span
                       style={{
@@ -517,40 +517,7 @@ function StudentTicketDetail() {
                   </p>
                 </div>
               </div>
-              <div>
-                <p
-                  style={{
-                    fontSize: "0.75rem",
-                    fontWeight: "600",
-                    color: "#6b7280",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    marginBottom: "0.25rem",
-                  }}
-                >
-                  Status
-                </p>
-                {(() => {
-                  const statusColor = getStatusColor(ticket.status);
-                  return (
-                    <span
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 500,
-                        padding: "0.375rem 0.875rem",
-                        borderRadius: "9999px",
-                        backgroundColor: statusColor.bg,
-                        color: statusColor.text,
-                        border: `1px solid ${statusColor.border}`,
-                        display: "inline-block",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {getStatusLabel(ticket.status)}
-                    </span>
-                  );
-                })()}
-              </div>
+
             </div>
 
             {/* Description */}

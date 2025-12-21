@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { apiClient } from "../../api/client";
 import { fontSize, fontWeight } from "../../utils/fontStyles";
-import { ActionButton } from "../templates";
+import { ActionButton, WarningMessage } from "../templates";
 
 function SplitCategoriesModal({ ticket, onClose, onSubmit }) {
   const [submitting, setSubmitting] = useState(false);
@@ -10,6 +10,7 @@ function SplitCategoriesModal({ ticket, onClose, onSubmit }) {
   const [groupPriorities, setGroupPriorities] = useState({});
   const [categoriesWithDept, setCategoriesWithDept] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [splitWarning, setSplitWarning] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -108,23 +109,74 @@ function SplitCategoriesModal({ ticket, onClose, onSubmit }) {
     }));
   };
 
-  const handleSubmit = async () => {
-    const splits =
-      ticket.ticketCategories
-        ?.map((tc) => {
-          const categoryId = tc.category?.id;
-          if (!categoryId) return null;
-          return {
-            categoryIds: [categoryId],
-            priority: groupPriorities[categoryId] || "medium",
-            ...(groupAssignments[categoryId] && { staffId: groupAssignments[categoryId] }),
-          };
-        })
-        .filter(Boolean) || [];
+  // Check if all categories have staff selected
+  const isAllStaffSelected = () => {
+    if (categoriesWithDept.length === 0) return false;
+    
+    // Check if all categories have staff selected
+    const allSelected = categoriesWithDept.every((tc) => {
+      const categoryId = tc.category?.id;
+      return categoryId && groupAssignments[categoryId] && groupAssignments[categoryId] !== "";
+    });
+    
+    return allSelected;
+  };
 
-    setSubmitting(true);
-    await onSubmit(ticket.id, splits);
-    setSubmitting(false);
+  const handleSubmit = async () => {
+    // Check if all staff are selected
+    if (!isAllStaffSelected()) {
+      setSplitWarning("Warning: Please assign staff to all sub-tickets before submitting.");
+      return;
+    }
+
+    setSplitWarning(null);
+    const categoryCount = ticket.ticketCategories?.length || 0;
+    
+    // Validation: If ticket has exactly 2 categories, must split both
+    if (categoryCount === 2) {
+      const splits =
+        ticket.ticketCategories
+          ?.map((tc) => {
+            const categoryId = tc.category?.id;
+            if (!categoryId) return null;
+            return {
+              categoryIds: [categoryId],
+              priority: groupPriorities[categoryId] || "medium",
+              ...(groupAssignments[categoryId] && { staffId: groupAssignments[categoryId] }),
+            };
+          })
+          .filter(Boolean) || [];
+
+      // Check if all 2 categories are included in splits
+      if (splits.length !== 2) {
+        setSplitWarning("Warning: This ticket has exactly 2 categories. You must split both categories at the same time.");
+        return;
+      }
+
+      setSplitWarning(null);
+      setSubmitting(true);
+      await onSubmit(ticket.id, splits);
+      setSubmitting(false);
+    } else {
+      // For tickets with more than 2 categories, allow partial split
+      const splits =
+        ticket.ticketCategories
+          ?.map((tc) => {
+            const categoryId = tc.category?.id;
+            if (!categoryId) return null;
+            return {
+              categoryIds: [categoryId],
+              priority: groupPriorities[categoryId] || "medium",
+              ...(groupAssignments[categoryId] && { staffId: groupAssignments[categoryId] }),
+            };
+          })
+          .filter(Boolean) || [];
+
+      setSplitWarning(null);
+      setSubmitting(true);
+      await onSubmit(ticket.id, splits);
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -162,7 +214,7 @@ function SplitCategoriesModal({ ticket, onClose, onSubmit }) {
               color: "#111827",
             }}
           >
-            Split Categories & Assign Staff
+             Assign Staff
           </h3>
         </div>
 
@@ -189,7 +241,21 @@ function SplitCategoriesModal({ ticket, onClose, onSubmit }) {
             <p style={{ margin: 0, fontSize: "0.85rem", color: "#9ca3af" }}>
               Each category will be split into a separate sub-ticket and sent to the corresponding department
             </p>
+            {ticket.ticketCategories?.length === 2 && (
+              <WarningMessage
+                message="This ticket has exactly 2 categories. You must split both categories at the same time."
+                icon="⚠️"
+                style={{ marginTop: "0.75rem" }}
+              />
+            )}
           </div>
+
+          {splitWarning && (
+            <WarningMessage
+              message={splitWarning}
+              icon="⚠️"
+            />
+          )}
 
           {loadingCategories ? (
             <div style={{ 
@@ -377,11 +443,17 @@ function SplitCategoriesModal({ ticket, onClose, onSubmit }) {
           </ActionButton>
           <ActionButton
             type="button"
-            variant="success"
+            variant={isAllStaffSelected() ? "success" : "secondary"}
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || !isAllStaffSelected()}
+            style={!isAllStaffSelected() ? {
+              backgroundColor: "#9ca3af",
+              color: "#ffffff",
+              cursor: "not-allowed",
+              opacity: 0.7
+            } : {}}
           >
-            {submitting ? "Splitting..." : "Split Tickets"}
+            {submitting ? "Assigning..." : isAllStaffSelected() ? "Assign" : "Assign"}
           </ActionButton>
         </div>
       </div>

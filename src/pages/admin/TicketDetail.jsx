@@ -84,6 +84,28 @@ function TicketDetail() {
         }
       }
 
+      // Fetch category details for each sub-ticket
+      if (ticketData.subTickets && Array.isArray(ticketData.subTickets) && ticketData.subTickets.length > 0) {
+        try {
+          const subTicketCategoryPromises = ticketData.subTickets.map(async (subTicket) => {
+            if (subTicket.categoryId && !subTicket.category) {
+              try {
+                const catRes = await apiClient.get(`/api/v1/categories/${subTicket.categoryId}`);
+                subTicket.category = catRes.data || catRes;
+                console.log("📁 Sub-ticket category data fetched:", subTicket.category);
+              } catch (err) {
+                console.error(`Failed to fetch category ${subTicket.categoryId} for sub-ticket:`, err);
+              }
+            }
+            return subTicket;
+          });
+
+          await Promise.all(subTicketCategoryPromises);
+        } catch (err) {
+          console.error("Failed to fetch sub-ticket categories:", err);
+        }
+      }
+
       setTicket(ticketData);
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || "Failed to load ticket details");
@@ -348,12 +370,13 @@ function TicketDetail() {
                     Check Duplicates
                   </ActionButton>
                   {needsSplitting && (
+                    
                     <ActionButton
                       variant="success"
                       onClick={() => setSplitModal(ticket)}
                       style={{ whiteSpace: "nowrap", minWidth: "140px" }}
                     >
-                      Split Categories
+                      Assign Sub-Tickets
                     </ActionButton>
                   )}
                   {canEscalate && (

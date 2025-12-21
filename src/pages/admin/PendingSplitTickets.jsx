@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { formatDate } from "../../utils/ticketHelpers.jsx";
 import SplitCategoriesModal from "../../components/modals/SplitCategoriesModal";
 import { AlertModal } from "../../components/templates";
 
 function PendingSplitTickets({ searchTerm = "" }) {
+  const navigate = useNavigate();
+
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -312,7 +315,7 @@ function PendingSplitTickets({ searchTerm = "" }) {
                           e.currentTarget.style.transform = "translateY(0)";
                         }}
                       >
-                        Split Categories
+                        Assign
                       </button>
                     </td>
                   </tr>
