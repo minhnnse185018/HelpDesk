@@ -61,10 +61,131 @@ const enrichTicketWithCategories = async (ticket) => {
   return ticket;
 };
 
+// Helper function to enrich sub-tickets with category, department, and assignee
+const enrichSubTickets = async (subTickets) => {
+  if (!Array.isArray(subTickets) || subTickets.length === 0) {
+    return subTickets;
+  }
+
+  return await Promise.all(
+    subTickets.map(async (subTicket) => {
+      // Fetch category if missing
+      if (subTicket.categoryId && !subTicket.category) {
+        try {
+          const catRes = await apiClient.get(`/api/v1/categories/${subTicket.categoryId}`);
+          subTicket.category = catRes?.data || catRes;
+          
+          // Fetch department from category if missing
+          if (subTicket.category?.departmentId && !subTicket.category?.department) {
+            try {
+              const deptRes = await apiClient.get(`/api/v1/departments/${subTicket.category.departmentId}`);
+              subTicket.category.department = deptRes?.data || deptRes;
+            } catch (err) {
+              console.error(`Failed to fetch department for sub-ticket category:`, err);
+            }
+          }
+        } catch (err) {
+          console.error(`Failed to fetch category for sub-ticket:`, err);
+        }
+      }
+      
+      // Fetch assignee if only assignedTo ID is provided
+      if ((subTicket.assignedTo || subTicket.assigneeId) && !subTicket.assignee) {
+        const assigneeId = subTicket.assignedTo || subTicket.assigneeId;
+        try {
+          const assigneeRes = await apiClient.get(`/api/v1/users/${assigneeId}`);
+          subTicket.assignee = assigneeRes?.data || assigneeRes;
+        } catch (err) {
+          console.error(`Failed to fetch assignee for sub-ticket:`, err);
+        }
+      }
+      
+      return subTicket;
+    })
+  );
+};
+
+// Helper function to enrich ticket with data from sub-tickets if parent is missing info
+const enrichTicketFromSubTickets = (ticket) => {
+  if (!ticket.subTickets || !Array.isArray(ticket.subTickets) || ticket.subTickets.length === 0) {
+    return ticket;
+  }
+
+  // Get categories from sub-tickets if parent doesn't have categories
+  if (!ticket.ticketCategories || ticket.ticketCategories.length === 0) {
+    const categoryMap = new Map();
+    ticket.subTickets.forEach((subTicket) => {
+      if (subTicket.category && !categoryMap.has(subTicket.category.id)) {
+        categoryMap.set(subTicket.category.id, subTicket.category);
+      }
+    });
+    
+    if (categoryMap.size > 0) {
+      ticket.ticketCategories = Array.from(categoryMap.values()).map(category => ({
+        categoryId: category.id,
+        category: category
+      }));
+    }
+  }
+
+  // Get department from sub-tickets if parent doesn't have department
+  if (!ticket.department) {
+    // Try to get department from first sub-ticket's category
+    const firstSubTicket = ticket.subTickets[0];
+    if (firstSubTicket?.category?.department) {
+      ticket.department = firstSubTicket.category.department;
+    } else if (firstSubTicket?.category?.departmentId) {
+      // Department will be fetched in enrichSubTickets
+      // For now, we'll fetch it here if needed
+      // But ideally it should already be in category.department after enrichSubTickets
+    }
+  }
+
+  // Get assignee from sub-tickets if parent doesn't have assignee
+  // Check both assignee object and assignedTo/assigneeId
+  const subTicketsWithAssignee = ticket.subTickets.filter(st => 
+    st.assignee || st.assignedTo || st.assigneeId
+  );
+  
+  if (!ticket.assignee && subTicketsWithAssignee.length > 0) {
+    const assignees = subTicketsWithAssignee
+      .map(st => {
+        // If assignee object exists, use it
+        if (st.assignee) {
+          return st.assignee;
+        }
+        // Otherwise, return null (will be filtered out)
+        return null;
+      })
+      .filter(Boolean);
+    
+    // If all sub-tickets have the same assignee, use that
+    if (assignees.length > 0) {
+      const uniqueAssignees = Array.from(new Map(assignees.map(a => [a.id || a.userId, a])).values());
+      if (uniqueAssignees.length === 1) {
+        ticket.assignee = uniqueAssignees[0];
+      } else if (uniqueAssignees.length > 1) {
+        // Multiple assignees - use the first one
+        ticket.assignee = uniqueAssignees[0];
+      }
+    }
+  }
+
+  return ticket;
+};
+
 // Helper function to fully enrich ticket with all related data
 const enrichTicket = async (ticket) => {
   await enrichTicketWithRoom(ticket);
   await enrichTicketWithCategories(ticket);
+  
+  // Enrich sub-tickets if they exist
+  if (ticket.subTickets && Array.isArray(ticket.subTickets) && ticket.subTickets.length > 0) {
+    ticket.subTickets = await enrichSubTickets(ticket.subTickets);
+    // Enrich parent ticket with data from sub-tickets
+    enrichTicketFromSubTickets(ticket);
+  }
+  
   return ticket;
 };
 
@@ -921,25 +1042,36 @@ function AllTickets({ searchTerm = "" }) {
                     </td>
 
                     <td style={{ padding: "1rem", color: "#6b7280" }}>
-                      {ticket.department ? (
-                        <div>
-                          <div style={{ fontWeight: 500, color: "#6b7280" }}>
-                            {ticket.department.name || "N/A"}
-                          </div>
-                          {ticket.department.code && (
-                            <div
-                              style={{
-                                fontSize: "0.75rem",
-                                marginTop: "0.125rem",
-                              }}
-                            >
-                              ({ticket.department.code})
+                      {(() => {
+                        // Get department from parent or sub-tickets
+                        let department = ticket.department;
+                        if (!department && ticket.subTickets && Array.isArray(ticket.subTickets) && ticket.subTickets.length > 0) {
+                          const firstSubTicket = ticket.subTickets.find(st => st.category?.department);
+                          if (firstSubTicket?.category?.department) {
+                            department = firstSubTicket.category.department;
+                          }
+                        }
+                        
+                        return department ? (
+                          <div>
+                            <div style={{ fontWeight: 500, color: "#6b7280" }}>
+                              {department.name || "N/A"}
                             </div>
-                          )}
-                        </div>
-                      ) : (
-                        "N/A"
-                      )}
+                            {department.code && (
+                              <div
+                                style={{
+                                  fontSize: "0.75rem",
+                                  marginTop: "0.125rem",
+                                }}
+                              >
+                                ({department.code})
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          "N/A"
+                        );
+                      })()}
                     </td>
                     <td
                       style={{
@@ -948,23 +1080,71 @@ function AllTickets({ searchTerm = "" }) {
                         fontSize: "0.8rem",
                       }}
                     >
-                      {Array.isArray(ticket.ticketCategories) &&
-                      ticket.ticketCategories.length > 0
-                        ? ticket.ticketCategories
-                            .map((tc) => tc.category?.name)
-                            .filter(Boolean)
-                            .join(", ")
-                        : "N/A"}
+                      {(() => {
+                        // Get categories from parent or sub-tickets
+                        let categories = [];
+                        if (Array.isArray(ticket.ticketCategories) && ticket.ticketCategories.length > 0) {
+                          categories = ticket.ticketCategories.map((tc) => tc.category?.name).filter(Boolean);
+                        } else if (ticket.subTickets && Array.isArray(ticket.subTickets) && ticket.subTickets.length > 0) {
+                          // Get unique categories from sub-tickets
+                          const categoryMap = new Map();
+                          ticket.subTickets.forEach((st) => {
+                            if (st.category?.name && !categoryMap.has(st.category.id)) {
+                              categoryMap.set(st.category.id, st.category.name);
+                            }
+                          });
+                          categories = Array.from(categoryMap.values());
+                        }
+                        
+                        return categories.length > 0 ? categories.join(", ") : "N/A";
+                      })()}
                     </td>
                     <td style={{ padding: "1rem", color: "#6b7280" }}>
-                      <div style={{ fontWeight: 500, color: "#6b7280" }}>
-                        {ticket.assignee?.username || "N/A"}
-                      </div>
-                      {ticket.assignee?.fullName && (
-                        <div style={{ fontSize: "0.75rem", marginTop: "0.125rem" }}>
-                          {ticket.assignee.fullName}
-                        </div>
-                      )}
+                      {(() => {
+                        // Get assignee from parent or sub-tickets
+                        let assignee = ticket.assignee;
+                        if (!assignee && ticket.subTickets && Array.isArray(ticket.subTickets) && ticket.subTickets.length > 0) {
+                          // Check both assignee object and assignedTo/assigneeId
+                          const assignees = ticket.subTickets
+                            .filter(st => st.assignee || st.assignedTo || st.assigneeId)
+                            .map(st => st.assignee)
+                            .filter(Boolean);
+                          
+                          if (assignees.length > 0) {
+                            // If all sub-tickets have the same assignee, use that
+                            const uniqueAssignees = Array.from(new Map(assignees.map(a => [a.id || a.userId, a])).values());
+                            if (uniqueAssignees.length === 1) {
+                              assignee = uniqueAssignees[0];
+                            } else if (uniqueAssignees.length > 1) {
+                              // Multiple assignees - show first one with indicator
+                              assignee = uniqueAssignees[0];
+                            }
+                          }
+                        }
+                        
+                        return assignee ? (
+                          <>
+                            <div style={{ fontWeight: 500, color: "#6b7280" }}>
+                              {assignee.username || assignee.email || "N/A"}
+                            </div>
+                            {assignee.fullName && (
+                              <div style={{ fontSize: "0.75rem", marginTop: "0.125rem" }}>
+                                {assignee.fullName}
+                              </div>
+                            )}
+                            {ticket.subTickets && 
+                             Array.isArray(ticket.subTickets) && 
+                             ticket.subTickets.length > 0 &&
+                             ticket.subTickets.filter(st => st.assignee).length > 1 && (
+                              <div style={{ fontSize: "0.7rem", marginTop: "0.125rem", color: "#9ca3af", fontStyle: "italic" }}>
+                                +{ticket.subTickets.filter(st => st.assignee).length - 1} more
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          "N/A"
+                        );
+                      })()}
                     </td>
                     <td
                       style={{

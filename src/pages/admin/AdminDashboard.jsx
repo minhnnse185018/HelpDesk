@@ -294,7 +294,6 @@ function AdminDashboard() {
                 <th>Category</th>
                 <th>Room</th>
                 <th>Status</th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
