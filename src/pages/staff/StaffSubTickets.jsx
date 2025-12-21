@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { ActionButton, AlertModal } from "../../components/templates";
 import { formatDate, getStatusBadge, getPriorityBadge } from "../../utils/ticketHelpers.jsx";
+import { useNotificationSocket } from "../../context/NotificationSocketContext";
 
 function StaffSubTickets() {
   const navigate = useNavigate();
+  const { socket } = useNotificationSocket();
   const [subTickets, setSubTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -45,6 +47,101 @@ function StaffSubTickets() {
     
     return () => clearInterval(interval);
   }, []);
+
+  // Listen for sub-ticket events (real-time update)
+  useEffect(() => {
+    // Get current user ID to check if sub-ticket is assigned to this staff
+    const getCurrentUserId = () => {
+      try {
+        return localStorage.getItem('userId')
+      } catch {
+        return null
+      }
+    }
+
+    // Generic handler for sub-ticket updates
+    const handleSubTicketUpdated = async (event) => {
+      const subTicketData = event.detail
+      if (!subTicketData?.id) return
+
+      try {
+        // Fetch full sub-ticket details
+        const subTicketRes = await apiClient.get(`/api/v1/sub-tickets/${subTicketData.id}`)
+        const fullSubTicket = subTicketRes?.data || subTicketRes
+
+        // Check if sub-ticket is assigned to current staff
+        const currentUserId = getCurrentUserId()
+        const isAssignedToMe = fullSubTicket.assignee?.id === currentUserId || 
+                              fullSubTicket.assigneeId === currentUserId ||
+                              fullSubTicket.assignee?.userId === currentUserId
+
+        if (isAssignedToMe) {
+          // Update sub-ticket in list
+          setSubTickets((prevSubTickets) => {
+            return prevSubTickets.map(st => st.id === fullSubTicket.id ? fullSubTicket : st)
+          })
+        }
+      } catch (err) {
+        console.error('Failed to update sub-ticket from event:', err)
+      }
+    }
+
+    // Generic handler for socket sub-ticket updates
+    const handleSocketSubTicketUpdated = async (subTicketData) => {
+      if (!subTicketData?.id) return
+
+      try {
+        const subTicketRes = await apiClient.get(`/api/v1/sub-tickets/${subTicketData.id}`)
+        const fullSubTicket = subTicketRes?.data || subTicketRes
+
+        const currentUserId = getCurrentUserId()
+        const isAssignedToMe = fullSubTicket.assignee?.id === currentUserId || 
+                              fullSubTicket.assigneeId === currentUserId ||
+                              fullSubTicket.assignee?.userId === currentUserId
+
+        if (isAssignedToMe) {
+          setSubTickets((prevSubTickets) => {
+            return prevSubTickets.map(st => st.id === fullSubTicket.id ? fullSubTicket : st)
+          })
+        }
+      } catch (err) {
+        console.error('Failed to update sub-ticket from socket:', err)
+      }
+    }
+
+    // Register event listeners for sub-ticket updates
+    window.addEventListener('sub-ticket:accepted', handleSubTicketUpdated)
+    window.addEventListener('sub-ticket:updated', handleSubTicketUpdated)
+    window.addEventListener('sub-ticket:resolved', handleSubTicketUpdated)
+    window.addEventListener('sub-ticket:denied', handleSubTicketUpdated)
+    window.addEventListener('sub-ticket:assigned', handleSubTicketUpdated)
+    
+    if (socket) {
+      socket.on('sub-ticket:accepted', handleSocketSubTicketUpdated)
+      socket.on('sub-ticket:updated', handleSocketSubTicketUpdated)
+      socket.on('sub-ticket:resolved', handleSocketSubTicketUpdated)
+      socket.on('sub-ticket:denied', handleSocketSubTicketUpdated)
+      socket.on('sub-ticket:assigned', handleSocketSubTicketUpdated)
+      socket.on('sub-ticket:status-changed', handleSocketSubTicketUpdated)
+    }
+
+    return () => {
+      window.removeEventListener('sub-ticket:accepted', handleSubTicketUpdated)
+      window.removeEventListener('sub-ticket:updated', handleSubTicketUpdated)
+      window.removeEventListener('sub-ticket:resolved', handleSubTicketUpdated)
+      window.removeEventListener('sub-ticket:denied', handleSubTicketUpdated)
+      window.removeEventListener('sub-ticket:assigned', handleSubTicketUpdated)
+      
+      if (socket) {
+        socket.off('sub-ticket:accepted', handleSocketSubTicketUpdated)
+        socket.off('sub-ticket:updated', handleSocketSubTicketUpdated)
+        socket.off('sub-ticket:resolved', handleSocketSubTicketUpdated)
+        socket.off('sub-ticket:denied', handleSocketSubTicketUpdated)
+        socket.off('sub-ticket:assigned', handleSocketSubTicketUpdated)
+        socket.off('sub-ticket:status-changed', handleSocketSubTicketUpdated)
+      }
+    }
+  }, [socket])
 
   const handleAccept = async (subTicketId) => {
     try {

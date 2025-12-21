@@ -4,12 +4,14 @@ import { apiClient } from '../../api/client'
 import { ActionButton, AlertModal } from '../../components/templates'
 import { formatDate, getStatusBadge, getPriorityBadge } from '../../utils/ticketHelpers.jsx'
 import { downloadFile } from '../../utils/fileDownload'
+import { useNotificationSocket } from '../../context/NotificationSocketContext'
 
 
 
 function StaffTicketDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { socket } = useNotificationSocket()
   const [ticket, setTicket] = useState(null)
   const [subTickets, setSubTickets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -109,6 +111,74 @@ function StaffTicketDetail() {
     loadTicket()
     loadSubTickets()
   }, [id])
+
+  // Listen for ticket updates (real-time update)
+  useEffect(() => {
+    if (!id) return
+
+    // Generic handler for ticket updates
+    const handleTicketUpdated = async (event) => {
+      const updatedTicket = event.detail
+      if (!updatedTicket?.id || updatedTicket.id !== id) return
+
+      try {
+        // Reload ticket details
+        await loadTicket()
+        await loadSubTickets()
+      } catch (err) {
+        console.error('Failed to update ticket from event:', err)
+      }
+    }
+
+    // Generic handler for socket ticket updates
+    const handleSocketTicketUpdated = async (ticketData) => {
+      if (!ticketData?.id || ticketData.id !== id) return
+
+      try {
+        await loadTicket()
+        await loadSubTickets()
+      } catch (err) {
+        console.error('Failed to update ticket from socket:', err)
+      }
+    }
+
+    // Register event listeners
+    window.addEventListener('ticket:accepted', handleTicketUpdated)
+    window.addEventListener('ticket:updated', handleTicketUpdated)
+    window.addEventListener('ticket:resolved', handleTicketUpdated)
+    window.addEventListener('ticket:denied', handleTicketUpdated)
+    window.addEventListener('ticket:closed', handleTicketUpdated)
+    window.addEventListener('ticket:assigned', handleTicketUpdated)
+    
+    if (socket) {
+      socket.on('ticket:accepted', handleSocketTicketUpdated)
+      socket.on('ticket:updated', handleSocketTicketUpdated)
+      socket.on('ticket:resolved', handleSocketTicketUpdated)
+      socket.on('ticket:denied', handleSocketTicketUpdated)
+      socket.on('ticket:closed', handleSocketTicketUpdated)
+      socket.on('ticket:assigned', handleSocketTicketUpdated)
+      socket.on('ticket:status-changed', handleSocketTicketUpdated)
+    }
+
+    return () => {
+      window.removeEventListener('ticket:accepted', handleTicketUpdated)
+      window.removeEventListener('ticket:updated', handleTicketUpdated)
+      window.removeEventListener('ticket:resolved', handleTicketUpdated)
+      window.removeEventListener('ticket:denied', handleTicketUpdated)
+      window.removeEventListener('ticket:closed', handleTicketUpdated)
+      window.removeEventListener('ticket:assigned', handleTicketUpdated)
+      
+      if (socket) {
+        socket.off('ticket:accepted', handleSocketTicketUpdated)
+        socket.off('ticket:updated', handleSocketTicketUpdated)
+        socket.off('ticket:resolved', handleSocketTicketUpdated)
+        socket.off('ticket:denied', handleSocketTicketUpdated)
+        socket.off('ticket:closed', handleSocketTicketUpdated)
+        socket.off('ticket:assigned', handleSocketTicketUpdated)
+        socket.off('ticket:status-changed', handleSocketTicketUpdated)
+      }
+    }
+  }, [id, socket])
 
   const handleAccept = async () => {
     try {

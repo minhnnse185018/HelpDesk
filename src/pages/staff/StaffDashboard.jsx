@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../../api/client'
 import { ActionButton } from '../../components/templates'
@@ -19,85 +19,21 @@ function StaffDashboard() {
   const [slaStats, setSlaStats] = useState({ onTime: 0, overdue: 0 })
   const [recentTickets, setRecentTickets] = useState([])
 
-  useEffect(() => {
-    loadDashboardData()
-  }, [])
-
-  // Listen for new ticket created/assigned events (real-time update)
-  useEffect(() => {
-    // Get current user ID to check if ticket is assigned to this staff
-    const getCurrentUserId = () => {
-      try {
-        return localStorage.getItem('userId')
-      } catch {
-        return null
-      }
+  const getStatusLabel = (status) => {
+    const labels = {
+      open: 'Open',
+      assigned: 'Assigned',
+      accepted: 'Accepted',
+      in_progress: 'In Progress',
+      resolved: 'Resolved',
+      closed: 'Closed',
+      cancelled: 'Cancelled',
+      escalated: 'Escalated',
     }
+    return labels[status] || status
+  }
 
-    // Helper function to update dashboard when new ticket is assigned
-    const updateDashboardWithNewTicket = async (ticketData) => {
-      if (!ticketData || !ticketData.id) return
-
-      try {
-        // Fetch full ticket details
-        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`)
-        const fullTicket = ticketRes?.data || ticketRes
-
-        // Check if ticket is assigned to current staff
-        const currentUserId = getCurrentUserId()
-        const isAssignedToMe = fullTicket.assignee?.id === currentUserId || 
-                              fullTicket.assigneeId === currentUserId ||
-                              fullTicket.assignee?.userId === currentUserId
-
-        if (isAssignedToMe) {
-          // Reload dashboard data to get updated KPIs and recent tickets
-          await loadDashboardData()
-        }
-      } catch (err) {
-        console.error('Failed to update dashboard with new ticket:', err)
-      }
-    }
-
-    // Listen for custom window event (from CreateTicket or AssignTicket)
-    const handleTicketCreated = async (event) => {
-      await updateDashboardWithNewTicket(event.detail)
-    }
-
-    // Listen for ticket assigned event (when admin assigns ticket to staff)
-    const handleTicketAssigned = async (event) => {
-      const ticketData = event.detail || event
-      await updateDashboardWithNewTicket(ticketData)
-    }
-
-    // Listen for socket event from server
-    const handleSocketTicketCreated = async (ticketData) => {
-      await updateDashboardWithNewTicket(ticketData)
-    }
-
-    const handleSocketTicketAssigned = async (ticketData) => {
-      await updateDashboardWithNewTicket(ticketData)
-    }
-
-    // Register event listeners
-    window.addEventListener('ticket:created', handleTicketCreated)
-    window.addEventListener('ticket:assigned', handleTicketAssigned)
-    
-    if (socket) {
-      socket.on('ticket:created', handleSocketTicketCreated)
-      socket.on('ticket:assigned', handleSocketTicketAssigned)
-    }
-
-    return () => {
-      window.removeEventListener('ticket:created', handleTicketCreated)
-      window.removeEventListener('ticket:assigned', handleTicketAssigned)
-      if (socket) {
-        socket.off('ticket:created', handleSocketTicketCreated)
-        socket.off('ticket:assigned', handleSocketTicketAssigned)
-      }
-    }
-  }, [socket])
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true)
       const response = await apiClient.get('/api/v1/tickets/assigned-to-me')
@@ -180,21 +116,119 @@ function StaffDashboard() {
     } finally {
       setLoading(false)
     }
-  }
-  
-  const getStatusLabel = (status) => {
-    const labels = {
-      open: 'Open',
-      assigned: 'Assigned',
-      accepted: 'Accepted',
-      in_progress: 'In Progress',
-      resolved: 'Resolved',
-      closed: 'Closed',
-      cancelled: 'Cancelled',
-      escalated: 'Escalated',
+  }, [])
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [loadDashboardData])
+
+  // Listen for new ticket created/assigned events (real-time update)
+  useEffect(() => {
+    // Get current user ID to check if ticket is assigned to this staff
+    const getCurrentUserId = () => {
+      try {
+        return localStorage.getItem('userId')
+      } catch {
+        return null
+      }
     }
-    return labels[status] || status
-  }
+
+    // Helper function to update dashboard when new ticket is assigned
+    const updateDashboardWithNewTicket = async (ticketData) => {
+      if (!ticketData || !ticketData.id) return
+
+      try {
+        // Fetch full ticket details
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`)
+        const fullTicket = ticketRes?.data || ticketRes
+
+        // Check if ticket is assigned to current staff
+        const currentUserId = getCurrentUserId()
+        const isAssignedToMe = fullTicket.assignee?.id === currentUserId || 
+                              fullTicket.assigneeId === currentUserId ||
+                              fullTicket.assignee?.userId === currentUserId
+
+        if (isAssignedToMe) {
+          // Reload dashboard data to get updated KPIs and recent tickets
+          await loadDashboardData()
+        }
+      } catch (err) {
+        console.error('Failed to update dashboard with new ticket:', err)
+      }
+    }
+
+    // Listen for custom window event (from CreateTicket or AssignTicket)
+    const handleTicketCreated = async (event) => {
+      await updateDashboardWithNewTicket(event.detail)
+    }
+
+    // Listen for ticket assigned event (when admin assigns ticket to staff)
+    const handleTicketAssigned = async (event) => {
+      const ticketData = event.detail || event
+      await updateDashboardWithNewTicket(ticketData)
+    }
+
+    // Generic handler for all ticket updates
+    const handleTicketUpdated = async (event) => {
+      const ticketData = event.detail || event
+      await updateDashboardWithNewTicket(ticketData)
+    }
+
+    // Listen for socket event from server
+    const handleSocketTicketCreated = async (ticketData) => {
+      await updateDashboardWithNewTicket(ticketData)
+    }
+
+    const handleSocketTicketAssigned = async (ticketData) => {
+      await updateDashboardWithNewTicket(ticketData)
+    }
+
+    // Generic handler for all socket ticket updates
+    const handleSocketTicketUpdated = async (ticketData) => {
+      await updateDashboardWithNewTicket(ticketData)
+    }
+
+    // Register event listeners
+    window.addEventListener('ticket:created', handleTicketCreated)
+    window.addEventListener('ticket:assigned', handleTicketAssigned)
+    window.addEventListener('ticket:accepted', handleTicketUpdated)
+    window.addEventListener('ticket:updated', handleTicketUpdated)
+    window.addEventListener('ticket:resolved', handleTicketUpdated)
+    window.addEventListener('ticket:denied', handleTicketUpdated)
+    window.addEventListener('ticket:closed', handleTicketUpdated)
+    
+    if (socket) {
+      socket.on('ticket:created', handleSocketTicketCreated)
+      socket.on('ticket:assigned', handleSocketTicketAssigned)
+      socket.on('ticket:accepted', handleSocketTicketUpdated)
+      socket.on('ticket:updated', handleSocketTicketUpdated)
+      socket.on('ticket:resolved', handleSocketTicketUpdated)
+      socket.on('ticket:denied', handleSocketTicketUpdated)
+      socket.on('ticket:closed', handleSocketTicketUpdated)
+      socket.on('ticket:status-changed', handleSocketTicketUpdated)
+    }
+
+    return () => {
+      window.removeEventListener('ticket:created', handleTicketCreated)
+      window.removeEventListener('ticket:assigned', handleTicketAssigned)
+      window.removeEventListener('ticket:accepted', handleTicketUpdated)
+      window.removeEventListener('ticket:updated', handleTicketUpdated)
+      window.removeEventListener('ticket:resolved', handleTicketUpdated)
+      window.removeEventListener('ticket:denied', handleTicketUpdated)
+      window.removeEventListener('ticket:closed', handleTicketUpdated)
+      
+      if (socket) {
+        socket.off('ticket:created', handleSocketTicketCreated)
+        socket.off('ticket:assigned', handleSocketTicketAssigned)
+        socket.off('ticket:accepted', handleSocketTicketUpdated)
+        socket.off('ticket:updated', handleSocketTicketUpdated)
+        socket.off('ticket:resolved', handleSocketTicketUpdated)
+        socket.off('ticket:denied', handleSocketTicketUpdated)
+        socket.off('ticket:closed', handleSocketTicketUpdated)
+        socket.off('ticket:status-changed', handleSocketTicketUpdated)
+      }
+    }
+  }, [socket, loadDashboardData])
   
 
   if (loading) {

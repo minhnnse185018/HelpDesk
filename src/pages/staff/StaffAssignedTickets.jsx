@@ -188,21 +188,94 @@ function StaffAssignedTickets() {
       }
     }
 
+    // Generic handler for all ticket updates (accepted, resolved, denied, etc.)
+    const handleTicketUpdated = async (event) => {
+      const updatedTicket = event.detail
+      if (!updatedTicket?.id) return
+
+      try {
+        // Fetch full ticket details
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${updatedTicket.id}`)
+        const fullTicket = ticketRes?.data || ticketRes
+
+        // Check if ticket is assigned to current staff
+        const currentUserId = getCurrentUserId()
+        const isAssignedToMe = fullTicket.assignee?.id === currentUserId || 
+                              fullTicket.assigneeId === currentUserId ||
+                              fullTicket.assignee?.userId === currentUserId
+
+        if (isAssignedToMe) {
+          // Update ticket in list
+          setTickets((prevTickets) => {
+            return prevTickets.map(t => t.id === fullTicket.id ? fullTicket : t)
+          })
+        }
+      } catch (err) {
+        console.error('Failed to update ticket from event:', err)
+      }
+    }
+
+    // Generic handler for socket ticket updates
+    const handleSocketTicketUpdated = async (ticketData) => {
+      if (!ticketData?.id) return
+
+      try {
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`)
+        const fullTicket = ticketRes?.data || ticketRes
+
+        const currentUserId = getCurrentUserId()
+        const isAssignedToMe = fullTicket.assignee?.id === currentUserId || 
+                              fullTicket.assigneeId === currentUserId ||
+                              fullTicket.assignee?.userId === currentUserId
+
+        if (isAssignedToMe) {
+          setTickets((prevTickets) => {
+            return prevTickets.map(t => t.id === fullTicket.id ? fullTicket : t)
+          })
+        }
+      } catch (err) {
+        console.error('Failed to update ticket from socket:', err)
+      }
+    }
+
     // Register event listeners
     window.addEventListener('ticket:created', handleTicketCreated)
     window.addEventListener('ticket:assigned', handleTicketAssigned)
+    window.addEventListener('ticket:accepted', handleTicketUpdated)
+    window.addEventListener('ticket:updated', handleTicketUpdated)
+    window.addEventListener('ticket:resolved', handleTicketUpdated)
+    window.addEventListener('ticket:denied', handleTicketUpdated)
+    window.addEventListener('ticket:closed', handleTicketUpdated)
     
     if (socket) {
       socket.on('ticket:created', handleSocketTicketCreated)
       socket.on('ticket:assigned', handleTicketAssigned)
+      socket.on('ticket:accepted', handleSocketTicketUpdated)
+      socket.on('ticket:updated', handleSocketTicketUpdated)
+      socket.on('ticket:resolved', handleSocketTicketUpdated)
+      socket.on('ticket:denied', handleSocketTicketUpdated)
+      socket.on('ticket:closed', handleSocketTicketUpdated)
+      socket.on('ticket:status-changed', handleSocketTicketUpdated)
     }
 
     return () => {
       window.removeEventListener('ticket:created', handleTicketCreated)
       window.removeEventListener('ticket:assigned', handleTicketAssigned)
+      window.removeEventListener('ticket:accepted', handleTicketUpdated)
+      window.removeEventListener('ticket:updated', handleTicketUpdated)
+      window.removeEventListener('ticket:resolved', handleTicketUpdated)
+      window.removeEventListener('ticket:denied', handleTicketUpdated)
+      window.removeEventListener('ticket:closed', handleTicketUpdated)
+      
       if (socket) {
         socket.off('ticket:created', handleSocketTicketCreated)
         socket.off('ticket:assigned', handleTicketAssigned)
+        socket.off('ticket:accepted', handleSocketTicketUpdated)
+        socket.off('ticket:updated', handleSocketTicketUpdated)
+        socket.off('ticket:resolved', handleSocketTicketUpdated)
+        socket.off('ticket:denied', handleSocketTicketUpdated)
+        socket.off('ticket:closed', handleSocketTicketUpdated)
+        socket.off('ticket:status-changed', handleSocketTicketUpdated)
       }
     }
   }, [socket])

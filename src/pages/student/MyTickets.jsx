@@ -81,7 +81,43 @@ function MyTickets() {
     loadTickets()
   }, [loadTickets])
 
-  // Listen for new ticket created events (real-time update)
+  // Helper function to update ticket in list
+  const updateTicketInList = useCallback(async (ticketData, fetchFullDetails = true) => {
+    if (!ticketData || !ticketData.id) return
+
+    try {
+      let updatedTicket = ticketData
+      
+      if (fetchFullDetails) {
+        try {
+          const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`)
+          updatedTicket = ticketRes?.data || ticketRes
+        } catch (fetchErr) {
+          console.error('Failed to fetch ticket details:', fetchErr)
+          updatedTicket = ticketData
+        }
+      }
+
+      // Fetch room details if needed
+      if (updatedTicket.roomId && (!updatedTicket.room?.code || !updatedTicket.room?.floor)) {
+        try {
+          const roomRes = await apiClient.get(`/api/v1/rooms/${updatedTicket.roomId}`)
+          updatedTicket.room = roomRes.data || roomRes
+        } catch (err) {
+          console.error(`Failed to fetch room ${updatedTicket.roomId}:`, err)
+        }
+      }
+
+      // Update ticket in state
+      setTickets((prevTickets) => {
+        return prevTickets.map(t => t.id === updatedTicket.id ? updatedTicket : t)
+      })
+    } catch (err) {
+      console.error('Failed to update ticket in list:', err)
+    }
+  }, [])
+
+  // Listen for ticket events (real-time update)
   useEffect(() => {
     // Listen for custom window event (from CreateTicket)
     const handleTicketCreated = async (event) => {
@@ -122,6 +158,15 @@ function MyTickets() {
       }
     }
 
+    // Generic handler for all ticket updates (accepted, resolved, etc.)
+    const handleTicketUpdated = async (event) => {
+      const updatedTicket = event.detail
+      if (!updatedTicket?.id) return
+      
+      // Update ticket with latest data
+      await updateTicketInList(updatedTicket, true)
+    }
+
     // Listen for socket event from server (if server emits ticket:created)
     const handleSocketTicketCreated = async (ticketData) => {
       if (!ticketData || !ticketData.id) return
@@ -151,20 +196,53 @@ function MyTickets() {
       }
     }
 
-    // Register event listeners
+    // Generic handler for all socket ticket updates
+    const handleSocketTicketUpdated = async (ticketData) => {
+      if (!ticketData?.id) return
+      await updateTicketInList(ticketData, true)
+    }
+
+    // Register event listeners for all ticket update events
     window.addEventListener('ticket:created', handleTicketCreated)
+    window.addEventListener('ticket:accepted', handleTicketUpdated)
+    window.addEventListener('ticket:updated', handleTicketUpdated)
+    window.addEventListener('ticket:resolved', handleTicketUpdated)
+    window.addEventListener('ticket:denied', handleTicketUpdated)
+    window.addEventListener('ticket:closed', handleTicketUpdated)
+    window.addEventListener('ticket:assigned', handleTicketUpdated)
     
     if (socket) {
       socket.on('ticket:created', handleSocketTicketCreated)
+      socket.on('ticket:accepted', handleSocketTicketUpdated)
+      socket.on('ticket:updated', handleSocketTicketUpdated)
+      socket.on('ticket:resolved', handleSocketTicketUpdated)
+      socket.on('ticket:denied', handleSocketTicketUpdated)
+      socket.on('ticket:closed', handleSocketTicketUpdated)
+      socket.on('ticket:assigned', handleSocketTicketUpdated)
+      socket.on('ticket:status-changed', handleSocketTicketUpdated)
     }
 
     return () => {
       window.removeEventListener('ticket:created', handleTicketCreated)
+      window.removeEventListener('ticket:accepted', handleTicketUpdated)
+      window.removeEventListener('ticket:updated', handleTicketUpdated)
+      window.removeEventListener('ticket:resolved', handleTicketUpdated)
+      window.removeEventListener('ticket:denied', handleTicketUpdated)
+      window.removeEventListener('ticket:closed', handleTicketUpdated)
+      window.removeEventListener('ticket:assigned', handleTicketUpdated)
+      
       if (socket) {
         socket.off('ticket:created', handleSocketTicketCreated)
+        socket.off('ticket:accepted', handleSocketTicketUpdated)
+        socket.off('ticket:updated', handleSocketTicketUpdated)
+        socket.off('ticket:resolved', handleSocketTicketUpdated)
+        socket.off('ticket:denied', handleSocketTicketUpdated)
+        socket.off('ticket:closed', handleSocketTicketUpdated)
+        socket.off('ticket:assigned', handleSocketTicketUpdated)
+        socket.off('ticket:status-changed', handleSocketTicketUpdated)
       }
     }
-  }, [socket])
+  }, [socket, updateTicketInList])
 
 
   const formatRoom = (room) => {

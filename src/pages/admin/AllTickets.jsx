@@ -385,11 +385,19 @@ function AllTickets({ searchTerm = "" }) {
 
     try {
       await apiClient.delete(`/api/v1/tickets/${ticketId}`);
+      
+      // Remove ticket from state immediately for instant UI update
+      setTickets((prevTickets) => prevTickets.filter(t => t.id !== ticketId));
+      
       setNotification({ type: "success", message: "Ticket deleted successfully!" });
-      loadTickets();
+      
+      // Optionally reload to sync with server (but UI already updated)
+      // loadTickets();
     } catch (err) {
       console.error("Failed to delete:", err);
       setNotification({ type: "error", message: "Failed to delete ticket" });
+      // If delete failed, reload to get correct state
+      loadTickets();
     }
   }, [deleteConfirmModal, loadTickets]);
 

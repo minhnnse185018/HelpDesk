@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import StudentLayout from "./layouts/StudentLayout.jsx";
 import StaffLayout from "./layouts/StaffLayout.jsx";
 import AdminLayout from "./layouts/AdminLayout.jsx";
@@ -35,6 +36,7 @@ import "./App.css";
 
 function App() {
   return (
+    <>
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
@@ -103,7 +105,8 @@ function App() {
 
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
-
+      <SpeedInsights />
+    </>
   );
 }
 

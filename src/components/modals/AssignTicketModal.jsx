@@ -1,12 +1,34 @@
 import { useState, useEffect } from "react";
 import { apiClient } from "../../api/client";
-import { ActionButton } from "../templates";
+import { ActionButton, WarningMessage } from "../templates";
 
 function AssignTicketModal({ ticket, onClose, onSubmit }) {
   const [staffId, setStaffId] = useState("");
   const [priority, setPriority] = useState(ticket.priority || "medium");
   const [staffList, setStaffList] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedStaffWarning, setSelectedStaffWarning] = useState(null);
+  const [ticketDetails, setTicketDetails] = useState(null);
+
+  // Fetch ticket details to get assignedTo and deniedReason
+  useEffect(() => {
+    const fetchTicketDetails = async () => {
+      if (!ticket?.id) return;
+      
+      try {
+        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticket.id}`);
+        const ticketData = ticketRes?.data || ticketRes;
+        setTicketDetails(ticketData);
+        console.log("Ticket details:", ticketData);
+      } catch (err) {
+        console.error("Failed to fetch ticket details:", err);
+        // Fallback to use ticket prop if API fails
+        setTicketDetails(ticket);
+      }
+    };
+
+    fetchTicketDetails();
+  }, [ticket]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -36,31 +58,48 @@ function AssignTicketModal({ ticket, onClose, onSubmit }) {
 
         console.log("Ticket Department IDs:", Array.from(ticketDepartmentIds));
 
-        // Fetch all users and filter by department
-        const staffRes = await apiClient.get("/api/v1/users");
-        let staffData = staffRes?.data || staffRes;
-        
-        if (staffData && !Array.isArray(staffData)) {
-          staffData = Object.values(staffData).filter(Boolean);
-        }
-        
+        // Fetch staff by department using new API
         let allStaff = [];
         
         if (ticketDepartmentIds.size > 0) {
-          // Filter staff by department
-          allStaff = (Array.isArray(staffData) ? staffData : []).filter((user) => {
-            const isStaff = String(user.role || "").toLowerCase() === "staff";
-            const userDeptId = user.departmentId || user.department?.id;
-            
-            console.log(`User ${user.fullName || user.username} - Role: ${user.role}, DeptId: ${userDeptId}`);
-            
-            return isStaff && userDeptId && ticketDepartmentIds.has(userDeptId);
+          // Fetch staff for each department
+          const staffPromises = Array.from(ticketDepartmentIds).map(async (departmentId) => {
+            try {
+              const staffRes = await apiClient.post("/api/v1/users/staff/by-department", {
+                departmentId: departmentId
+              });
+              let staffData = staffRes?.data || staffRes;
+              
+              // Normalize response
+              if (staffData && !Array.isArray(staffData)) {
+                staffData = Object.values(staffData).filter(Boolean);
+              }
+              
+              return Array.isArray(staffData) ? staffData : [];
+            } catch (err) {
+              console.error(`Failed to fetch staff for department ${departmentId}:`, err);
+              return [];
+            }
           });
+          
+          const staffArrays = await Promise.all(staffPromises);
+          allStaff = staffArrays.flat();
         } else {
-          // No department found, show all staff
-          allStaff = (Array.isArray(staffData) ? staffData : []).filter(
-            (user) => String(user.role || "").toLowerCase() === "staff"
-          );
+          // No department found, fetch all staff
+          try {
+            const staffRes = await apiClient.get("/api/v1/users");
+            let staffData = staffRes?.data || staffRes;
+            
+            if (staffData && !Array.isArray(staffData)) {
+              staffData = Object.values(staffData).filter(Boolean);
+            }
+            
+            allStaff = (Array.isArray(staffData) ? staffData : []).filter(
+              (user) => String(user.role || "").toLowerCase() === "staff"
+            );
+          } catch (err) {
+            console.error("Failed to fetch all staff:", err);
+          }
         }
 
         // Remove duplicates
@@ -77,6 +116,32 @@ function AssignTicketModal({ ticket, onClose, onSubmit }) {
 
     loadData();
   }, [ticket]);
+
+  // Check if selected staff is the same as assignedTo in current ticket with deniedReason
+  useEffect(() => {
+    if (!staffId || !ticketDetails) {
+      setSelectedStaffWarning(null);
+      return;
+    }
+
+    // Check if the selected staff ID matches the assignedTo in the current ticket
+    const assignedTo = ticketDetails.assignedTo || 
+                      ticketDetails.assigneeId || 
+                      ticketDetails.assignee?.id || 
+                      ticketDetails.assignee?.userId;
+    
+    const deniedReason = ticketDetails.deniedReason;
+
+    // If selected staff matches assignedTo AND ticket has deniedReason, show warning
+    if (assignedTo && staffId === assignedTo && deniedReason) {
+      setSelectedStaffWarning({
+        message: `Warning: This staff member is already assigned to this ticket and it was denied. Deny reason: ${deniedReason}`,
+        deniedReason: deniedReason
+      });
+    } else {
+      setSelectedStaffWarning(null);
+    }
+  }, [staffId, ticketDetails]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -255,6 +320,13 @@ function AssignTicketModal({ ticket, onClose, onSubmit }) {
               </select>
             </div>
 
+            {selectedStaffWarning && (
+              <WarningMessage
+                message={selectedStaffWarning.message}
+                icon="⚠️"
+              />
+            )}
+
             <div>
               <label
                 htmlFor="priority"
@@ -310,7 +382,7 @@ function AssignTicketModal({ ticket, onClose, onSubmit }) {
             <ActionButton
               type="submit"
               variant="success"
-              disabled={submitting}
+              disabled={submitting || !!selectedStaffWarning}
             >
               {submitting ? "Assigning..." : "Assign Ticket"}
             </ActionButton>

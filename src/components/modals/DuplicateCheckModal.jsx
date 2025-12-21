@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { ActionButton } from "../templates";
 import { fontSize, fontWeight } from "../../utils/fontStyles";
+import { useNotificationSocket } from "../../context/NotificationSocketContext";
 
 function DuplicateCheckModal({ ticket, onClose, onMarkDuplicate }) {
   const navigate = useNavigate();
+  const { socket } = useNotificationSocket();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [duplicates, setDuplicates] = useState([]);
@@ -112,6 +114,33 @@ function DuplicateCheckModal({ ticket, onClose, onMarkDuplicate }) {
   const canMarkAsDuplicate = (ticketStatus) => {
     const restrictedStatuses = ["escalated", "closed", "resolved"];
     return !restrictedStatuses.includes(ticketStatus?.toLowerCase());
+  };
+
+  const handleDuplicateTicketClick = async (dupTicket) => {
+    try {
+      // Fetch full ticket details before navigating
+      const ticketRes = await apiClient.get(`/api/v1/tickets/${dupTicket.id}`);
+      const fullTicket = ticketRes?.data || ticketRes;
+
+      // Emit window event for real-time update
+      window.dispatchEvent(new CustomEvent('ticket:updated', {
+        detail: fullTicket
+      }));
+
+      // Emit socket event if socket is available
+      if (socket) {
+        socket.emit('ticket:viewed', { ticketId: fullTicket.id });
+      }
+
+      // Navigate to ticket detail page
+      navigate(`/admin/tickets/${dupTicket.id}`);
+      onClose(); // Close modal after navigation
+    } catch (err) {
+      console.error('Failed to fetch ticket details:', err);
+      // Navigate anyway even if fetch fails
+      navigate(`/admin/tickets/${dupTicket.id}`);
+      onClose();
+    }
   };
 
   const formatDate = (dateString) => {
@@ -311,13 +340,17 @@ function DuplicateCheckModal({ ticket, onClose, onMarkDuplicate }) {
                       padding: "1.25rem",
                       backgroundColor: "#ffffff",
                       transition: "all 0.2s",
+                      cursor: "pointer",
                     }}
+                    onClick={() => handleDuplicateTicketClick(dupTicket)}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.boxShadow =
                         "0 4px 12px rgba(0,0,0,0.1)";
+                      e.currentTarget.style.backgroundColor = "#f9fafb";
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.boxShadow = "none";
+                      e.currentTarget.style.backgroundColor = "#ffffff";
                     }}
                   >
                     {/* Similarity Badge */}
@@ -443,14 +476,8 @@ function DuplicateCheckModal({ ticket, onClose, onMarkDuplicate }) {
                         borderTop: "1px solid #e5e7eb",
                         alignItems: "center",
                       }}
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <ActionButton
-                        variant="secondary"
-                        onClick={() => navigate(`/admin/tickets/${dupTicket.id}`)}
-                        style={{ fontSize: fontSize.base }}
-                      >
-                        View Details
-                      </ActionButton>
                       {!canMarkAsDuplicate(dupTicket.status) ? (
                         <div
                           style={{
