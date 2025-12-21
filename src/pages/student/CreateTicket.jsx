@@ -136,10 +136,14 @@ function CreateTicket() {
       const response = await apiClient.post('/api/v1/tickets', fd)
       const newTicket = response?.data || response
 
+      console.log('🎫 CreateTicket: Ticket created successfully', newTicket?.id || newTicket)
+
       // Emit custom event để các component khác có thể listen
-      window.dispatchEvent(new CustomEvent('ticket:created', { 
+      const event = new CustomEvent('ticket:created', { 
         detail: newTicket 
-      }))
+      })
+      window.dispatchEvent(event)
+      console.log('📢 CreateTicket: Emitted ticket:created event', newTicket?.id || newTicket)
 
       setAlertModal({
         type: 'success',

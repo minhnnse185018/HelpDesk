@@ -334,40 +334,64 @@ function AllTickets({ searchTerm = "" }) {
 
   // Helper function to add ticket to list (avoid duplicates)
   const addTicketToList = useCallback(async (ticketData, fetchFullDetails = true) => {
-    if (!ticketData || !ticketData.id) return;
+    if (!ticketData || !ticketData.id) {
+      console.warn('⚠️ addTicketToList: Invalid ticket data', ticketData);
+      return;
+    }
+
+    console.log('➕ AllTickets: Adding ticket to list', ticketData.id, 'fetchFullDetails:', fetchFullDetails);
 
     try {
       let fullTicket = ticketData;
       
       if (fetchFullDetails) {
-        const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`);
-        fullTicket = ticketRes?.data || ticketRes;
+        try {
+          const ticketRes = await apiClient.get(`/api/v1/tickets/${ticketData.id}`);
+          fullTicket = ticketRes?.data || ticketRes;
+          console.log('✅ AllTickets: Fetched full ticket details', fullTicket.id);
+        } catch (fetchErr) {
+          console.error('❌ AllTickets: Failed to fetch ticket details:', fetchErr);
+          // Continue with ticketData as-is
+          fullTicket = ticketData;
+        }
       }
       
       // Enrich with room and category data (whether fetched or not)
-      await enrichTicket(fullTicket);
+      try {
+        await enrichTicket(fullTicket);
+        console.log('✅ AllTickets: Enriched ticket', fullTicket.id);
+      } catch (enrichErr) {
+        console.error('❌ AllTickets: Failed to enrich ticket:', enrichErr);
+        // Continue anyway
+      }
 
       setTickets((prevTickets) => {
         const exists = prevTickets.some(t => t.id === fullTicket.id);
-        if (exists) return prevTickets;
+        if (exists) {
+          console.log('ℹ️ AllTickets: Ticket already exists, skipping', fullTicket.id);
+          return prevTickets;
+        }
+        console.log('✅ AllTickets: Adding new ticket to list', fullTicket.id);
         return [fullTicket, ...prevTickets];
       });
     } catch (err) {
-      console.error('Failed to add ticket to list:', err);
+      console.error('❌ AllTickets: Failed to add ticket to list:', err);
       // Fallback: enrich and add ticket as-is if fetch failed
       try {
         await enrichTicket(ticketData);
         setTickets((prevTickets) => {
           const exists = prevTickets.some(t => t.id === ticketData.id);
           if (exists) return prevTickets;
+          console.log('✅ AllTickets: Added ticket (fallback)', ticketData.id);
           return [ticketData, ...prevTickets];
         });
       } catch (enrichErr) {
-        console.error('Failed to enrich ticket:', enrichErr);
+        console.error('❌ AllTickets: Failed to enrich ticket (fallback):', enrichErr);
         // Last resort: add ticket as-is
         setTickets((prevTickets) => {
           const exists = prevTickets.some(t => t.id === ticketData.id);
           if (exists) return prevTickets;
+          console.log('✅ AllTickets: Added ticket (last resort)', ticketData.id);
           return [ticketData, ...prevTickets];
         });
       }
@@ -427,8 +451,14 @@ function AllTickets({ searchTerm = "" }) {
   // Listen for ticket events (real-time update)
   useEffect(() => {
     // Listen for custom window event (from CreateTicket)
-    const handleTicketCreated = (event) => {
-      addTicketToList(event.detail, true);
+    const handleTicketCreated = async (event) => {
+      const newTicket = event.detail;
+      console.log('🎫 AllTickets: Received ticket:created event', newTicket);
+      if (!newTicket || !newTicket.id) {
+        console.warn('⚠️ AllTickets: Invalid ticket data in event', newTicket);
+        return;
+      }
+      await addTicketToList(newTicket, true);
     };
 
     // Generic handler for all ticket updates (assigned, accepted, in_progress, resolved, etc.)
@@ -441,8 +471,13 @@ function AllTickets({ searchTerm = "" }) {
     };
 
     // Listen for socket event from server
-    const handleSocketTicketCreated = (ticketData) => {
-      addTicketToList(ticketData, true);
+    const handleSocketTicketCreated = async (ticketData) => {
+      console.log('🎫 AllTickets: Received socket ticket:created event', ticketData);
+      if (!ticketData || !ticketData.id) {
+        console.warn('⚠️ AllTickets: Invalid ticket data in socket event', ticketData);
+        return;
+      }
+      await addTicketToList(ticketData, true);
     };
 
     // Generic handler for all socket ticket updates
@@ -1045,29 +1080,64 @@ function AllTickets({ searchTerm = "" }) {
                       {(() => {
                         // Get department from parent or sub-tickets
                         let department = ticket.department;
+                        let uniqueDepartments = [];
+                        
                         if (!department && ticket.subTickets && Array.isArray(ticket.subTickets) && ticket.subTickets.length > 0) {
-                          const firstSubTicket = ticket.subTickets.find(st => st.category?.department);
-                          if (firstSubTicket?.category?.department) {
-                            department = firstSubTicket.category.department;
+                          // Get all unique departments from sub-tickets
+                          const departmentMap = new Map();
+                          ticket.subTickets.forEach((st) => {
+                            if (st.category?.department) {
+                              const deptId = st.category.department.id || st.category.departmentId;
+                              if (deptId && !departmentMap.has(deptId)) {
+                                departmentMap.set(deptId, st.category.department);
+                              }
+                            }
+                          });
+                          uniqueDepartments = Array.from(departmentMap.values());
+                          
+                          if (uniqueDepartments.length > 0) {
+                            department = uniqueDepartments[0];
                           }
+                        } else if (department && ticket.subTickets && Array.isArray(ticket.subTickets) && ticket.subTickets.length > 0) {
+                          // If parent has department, still check for multiple departments from sub-tickets
+                          const departmentMap = new Map();
+                          if (department.id) {
+                            departmentMap.set(department.id, department);
+                          }
+                          ticket.subTickets.forEach((st) => {
+                            if (st.category?.department) {
+                              const deptId = st.category.department.id || st.category.departmentId;
+                              if (deptId && !departmentMap.has(deptId)) {
+                                departmentMap.set(deptId, st.category.department);
+                              }
+                            }
+                          });
+                          uniqueDepartments = Array.from(departmentMap.values());
                         }
                         
                         return department ? (
-                          <div>
-                            <div style={{ fontWeight: 500, color: "#6b7280" }}>
-                              {department.name || "N/A"}
+                          <>
+                            <div>
+                              <div style={{ fontWeight: 500, color: "#6b7280" }}>
+                                {department.name || "N/A"}
+                              </div>
+                              {department.code && (
+                                <div
+                                  style={{
+                                    fontSize: "0.75rem",
+                                    marginTop: "0.125rem",
+                                  }}
+                                >
+                                  ({department.code})
+                                </div>
+                              )}
                             </div>
-                            {department.code && (
-                              <div
-                                style={{
-                                  fontSize: "0.75rem",
-                                  marginTop: "0.125rem",
-                                }}
-                              >
-                                ({department.code})
+                            {uniqueDepartments.length > 1 && (
+                              <div style={{ fontSize: "0.7rem", marginTop: "0.125rem", color: "#9ca3af", fontStyle: "italic" }}>
+                                +{uniqueDepartments.length - 1} more
                               </div>
                             )}
-                          </div>
+                          </>
                         ) : (
                           "N/A"
                         );
