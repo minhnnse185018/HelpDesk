@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import StudentLayout from "./layouts/StudentLayout.jsx";
 import StaffLayout from "./layouts/StaffLayout.jsx";
 import AdminLayout from "./layouts/AdminLayout.jsx";
@@ -35,7 +36,9 @@ import "./App.css";
 
 function App() {
   return (
-      <Routes>
+      <>
+        <Analytics />
+        <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -103,6 +106,7 @@ function App() {
 
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+      </>
 
   );
 }
